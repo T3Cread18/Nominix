@@ -1,0 +1,16 @@
+# Django Core
+Django==5.0.0
+djangorestframework==3.14.0
+
+# Multi-tenancy
+django-tenants==3.6.1
+
+# Database
+psycopg2-binary
+
+# Environment Management
+python-decouple==3.8
+
+# Utilities
+pytz==2024.1
+requests>=2.31.0
