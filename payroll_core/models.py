@@ -7,14 +7,33 @@ Define los modelos core para el sistema de nómina venezolano:
 - Employee: Empleados con datos específicos de Venezuela
 - LaborContract: Contratos laborales
 """
-from django.db import models
+from django.db import models, connection
 from django.core.validators import RegexValidator, MinValueValidator
 from django.utils import timezone
 from decimal import Decimal
 from typing import Optional
 import datetime
+import os
 
-
+def tenant_upload_path(instance, filename):
+    # 1. Obtener el esquema actual (ej: 'farmacia_perez')
+    schema_name = connection.schema_name
+    
+    # 2. Obtener la extensión original ( .jpg, .png, etc. )
+    extension = os.path.splitext(filename)[1]
+    
+    # 3. Determinar el nombre y la carpeta
+    # Si es un Empleado, usamos su ID. Si es Empresa, le ponemos 'logo'
+    if instance.__class__.__name__ == "Employee":
+        folder = "employee_photos"
+        # Si el empleado es nuevo y no tiene ID aún, usamos 'temp' o su cédula
+        new_filename = f"{instance.national_id}{extension}"
+    else:
+        folder = "company_logos"
+        new_filename = f"logo{extension}"
+        
+    # Retorna: 'nombre_esquema/employee_photos/5.jpg'
+    return os.path.join(schema_name, folder, new_filename)
 class Currency(models.Model):
     """
     Modelo de Moneda.
@@ -84,7 +103,20 @@ class Currency(models.Model):
             # Desactivar otras monedas base
             Currency.objects.filter(is_base_currency=True).update(is_base_currency=False)
         super().save(*args, **kwargs)
-
+class Department(models.Model):
+    name = models.CharField(max_length=100)
+    description = models.TextField()
+    
+    supervisor = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True)
+    branch = models.ForeignKey('Branch', related_name='departments', on_delete=models.CASCADE, null=True, blank=True)
+    
+    class Meta:
+        verbose_name = 'Departamento'
+        verbose_name_plural = 'Departamentos'
+        ordering = ['name']
+    
+    def __str__(self) -> str:
+        return self.name
 
 class ExchangeRate(models.Model):
     """
@@ -208,6 +240,13 @@ class Branch(models.Model):
         auto_now_add=True,
         verbose_name='Fecha de Creación'
     )
+    rif: models.CharField = models.CharField(
+        max_length=20,
+        unique=True,
+        null=True,
+        verbose_name='RIF',
+        help_text='RIF de la sede'
+    )
     
     class Meta:
         verbose_name = 'Sede'
@@ -266,12 +305,15 @@ class Employee(models.Model):
     
     email: models.EmailField = models.EmailField(
         unique=True,
-        verbose_name='Correo Electrónico'
+        verbose_name='Correo Electrónico',
+        null=True,
+        blank=True,
     )
     
     phone: models.CharField = models.CharField(
         max_length=20,
         blank=True,
+        null=True,
         verbose_name='Teléfono'
     )
     
@@ -299,6 +341,11 @@ class Employee(models.Model):
         blank=True,
         verbose_name='Dirección'
     )
+    photo = models.ImageField(
+        upload_to=tenant_upload_path, 
+        null=True, 
+        blank=True
+    )
     
     # ==========================================================================
     # DOCUMENTOS VENEZUELA
@@ -314,7 +361,6 @@ class Employee(models.Model):
     
     rif: models.CharField = models.CharField(
         max_length=12,
-        unique=True,
         blank=True,
         null=True,
         validators=[rif_validator],
@@ -325,6 +371,7 @@ class Employee(models.Model):
     ivss_code: models.CharField = models.CharField(
         max_length=20,
         blank=True,
+        null=True,
         verbose_name='Código IVSS',
         help_text='Número de afiliación al Instituto Venezolano de los Seguros Sociales'
     )
@@ -332,6 +379,7 @@ class Employee(models.Model):
     faov_code: models.CharField = models.CharField(
         max_length=20,
         blank=True,
+        null=True,  
         verbose_name='Código FAOV/Banavih',
         help_text='Número de cuenta del Fondo de Ahorro Obligatorio para la Vivienda'
     )
@@ -377,10 +425,14 @@ class Employee(models.Model):
         help_text='Indica si el empleado está actualmente laborando'
     )
     
-    department: models.CharField = models.CharField(
-        max_length=100,
+    department = models.ForeignKey(
+        Department,
+        on_delete=models.PROTECT,
+        null=True,
         blank=True,
-        verbose_name='Departamento'
+        related_name='employees',
+        verbose_name='Departamento',
+        help_text='Departamento al que pertenece el empleado'
     )
     
     position: models.CharField = models.CharField(
@@ -429,6 +481,7 @@ class Employee(models.Model):
     
     notes: models.TextField = models.TextField(
         blank=True,
+        null=True,
         verbose_name='Observaciones'
     )
     
@@ -474,6 +527,8 @@ class Employee(models.Model):
         end_date = self.termination_date or timezone.now().date()
         delta = end_date - self.hire_date
         return delta.days
+ 
+
 
 
 class LaborContract(models.Model):
@@ -499,7 +554,7 @@ class LaborContract(models.Model):
         related_name='contracts',
         verbose_name='Empleado'
     )
-    
+    # 1. El acuerdo comercial (Lo que el empleado espera ganar en total) 
     branch: models.ForeignKey = models.ForeignKey(
         Branch,
         on_delete=models.PROTECT,
@@ -509,6 +564,12 @@ class LaborContract(models.Model):
         verbose_name='Sede',
         help_text='Sede donde se ejecuta el contrato'
     )
+    base_salary_bs = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        help_text="Sueldo Base en Bolívares (Fijo)")
+    includes_cestaticket = models.BooleanField(default=True)
     
     contract_type: models.CharField = models.CharField(
         max_length=20,
@@ -522,11 +583,11 @@ class LaborContract(models.Model):
     # ==========================================================================
     
     salary_amount: models.DecimalField = models.DecimalField(
-        max_digits=12,
+        max_digits=10,
         decimal_places=2,
-        validators=[MinValueValidator(Decimal('0.01'))],
+        default=0,
         verbose_name='Monto del Salario',
-        help_text='Monto del salario en la moneda especificada'
+        help_text="Total Paquete Mensual en USD"
     )
     
     salary_currency: models.ForeignKey = models.ForeignKey(
@@ -577,13 +638,18 @@ class LaborContract(models.Model):
     position: models.CharField = models.CharField(
         max_length=100,
         verbose_name='Cargo',
+        null=True,
+        blank=True,
         help_text='Cargo según el contrato'
     )
     
-    department: models.CharField = models.CharField(
-        max_length=100,
+    department = models.ForeignKey(
+        'Department',
+        on_delete=models.PROTECT,
+        null=True,
         blank=True,
-        verbose_name='Departamento'
+        verbose_name='Departamento',
+        help_text='Departamento según el contrato'
     )
     
     work_schedule: models.CharField = models.CharField(
@@ -642,13 +708,17 @@ class LaborContract(models.Model):
         """
         Al activar un contrato, desactiva los demás del mismo empleado.
         """
-        if self.is_active and self.employee_id:
-            # Desactivar otros contratos del mismo empleado
-            self.__class__.objects.filter(
-                employee_id=self.employee_id,
+        if self.is_active:
+            LaborContract.objects.filter(
+                employee=self.employee, 
                 is_active=True
             ).exclude(pk=self.pk).update(is_active=False)
-        
+            
+            # Sync Employee Department and Position
+            self.employee.position = self.position
+            self.employee.department = self.department
+            self.employee.save()
+            
         super().save(*args, **kwargs)
 
 class PayrollConcept(models.Model):
@@ -664,12 +734,11 @@ class PayrollConcept(models.Model):
         EARNING = 'EARNING', 'Asignación'
         DEDUCTION = 'DEDUCTION', 'Deducción'
     
+# 1. Modificar ComputationMethod
     class ComputationMethod(models.TextChoices):
-        """Método de cálculo del concepto."""
         FIXED_AMOUNT = 'FIXED_AMOUNT', 'Monto Fijo'
         PERCENTAGE_OF_BASIC = 'PERCENTAGE_OF_BASIC', 'Porcentaje del Salario Base'
-        FORMULA = 'FORMULA', 'Fórmula Compleja'
-    
+        DYNAMIC_FORMULA = 'DYNAMIC_FORMULA', 'Fórmula Dinámica (Usuario)' # <--- NUEVO
     code: models.CharField = models.CharField(
         max_length=20,
         unique=True,
@@ -724,6 +793,12 @@ class PayrollConcept(models.Model):
     created_at: models.DateTimeField = models.DateTimeField(
         auto_now_add=True,
         verbose_name='Fecha de Creación'
+    )
+    formula: models.TextField = models.TextField(
+        blank=True, 
+        null=True, 
+        verbose_name='Fórmula Python',
+        help_text='Variables disponibles: SALARIO, DIAS, LUNES, TASA, ANTIGUEDAD. Ej: (SALARIO / 30) * DIAS'
     )
     
     class Meta:
@@ -894,6 +969,15 @@ class Payslip(models.Model):
     
     created_at = models.DateTimeField(auto_now_add=True)
 
+    @property
+    def net_pay_usd_ref(self) -> Decimal:
+        """
+        Calcula el equivalente en USD basado en la tasa aplicada al momento del cierre.
+        """
+        if self.exchange_rate_applied > 0:
+            return (self.net_pay_ves / self.exchange_rate_applied).quantize(Decimal('0.01'))
+        return Decimal('0.00')
+
     class Meta:
         verbose_name = 'Recibo de Pago'
         verbose_name_plural = 'Recibos de Pago'
@@ -987,4 +1071,78 @@ class PayslipDetail(models.Model):
 
     def __str__(self):
         return f"{self.concept_code}: {self.amount}"
+
+class Company(models.Model):
+    """
+    Modelo Singleton para la configuración de la empresa/tenant.
+    """
+    name = models.CharField(max_length=200, verbose_name="Razón Social")
+    rif = models.CharField(max_length=20, verbose_name="RIF", help_text="J-12345678-9")
+    
+    # Contacto
+    email = models.EmailField(blank=True, null=True, verbose_name="Email Corporativo")
+    phone = models.CharField(max_length=50, blank=True, null=True, verbose_name="Teléfono")
+    website = models.URLField(blank=True, null=True, verbose_name="Sitio Web")
+    
+    # Ubicación
+    address = models.TextField(blank=True, null=True, verbose_name="Dirección Fiscal")
+    city = models.CharField(max_length=100, blank=True, null=True, verbose_name="Ciudad")
+    state = models.CharField(max_length=100, blank=True, null=True, verbose_name="Estado")
+    
+    # Configuración
+    logo = models.ImageField(upload_to='company_logos/', blank=True, null=True, verbose_name="Logo")
+    primary_color = models.CharField(max_length=7, default="#3b82f6", verbose_name="Color Primario") # Para reportes PDF
+    
+    # Nómina Parametrizada
+    national_minimum_salary = models.DecimalField(
+        max_digits=18, decimal_places=2, 
+        default=Decimal('130.00'),
+        verbose_name="Salario Mínimo Nacional",
+        help_text="Base para deducciones de ley (IVSS, RPE)"
+    )
+    
+    base_currency_symbol = models.CharField(max_length=5, default="Bs.", verbose_name="Símbolo Moneda Base")
+
+    # Configuración de Frecuencias y Pagos
+    PAYROLL_JOURNEY_CHOICES = [
+        ('WEEKLY', 'Semanal'),
+        ('BIWEEKLY', 'Quincenal'),
+        ('MONTHLY', 'Mensual'),
+    ]
+    payroll_journey = models.CharField(
+        max_length=10, 
+        choices=PAYROLL_JOURNEY_CHOICES, 
+        default='BIWEEKLY',
+        verbose_name="Frecuencia de Nómina Principal"
+    )
+    
+    CESTATICKET_JOURNEY_CHOICES = [
+        ('MONTHLY', 'Mensual (Única fecha)'),
+        ('PERIODIC', 'Proporcional en cada pago'),
+    ]
+    cestaticket_journey = models.CharField(
+        max_length=10, 
+        choices=CESTATICKET_JOURNEY_CHOICES, 
+        default='MONTHLY',
+        verbose_name="Frecuencia de Cestaticket"
+    )
+    
+    cestaticket_payment_day = models.PositiveSmallIntegerField(
+        default=30,
+        verbose_name="Día de Pago Cestaticket",
+        help_text="Si es mensual, día del mes en que se abona (ej: 30 para fin de mes)"
+    )
+
+    class Meta:
+        verbose_name = "Configuración de Empresa"
+        verbose_name_plural = "Configuración de Empresa"
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        # Garantizar que solo haya 1 registro (Singleton pattern simple)
+        if not self.pk and Company.objects.exists():
+            raise Exception("Solo puede haber una configuración de empresa.")
+        super().save(*args, **kwargs)
 

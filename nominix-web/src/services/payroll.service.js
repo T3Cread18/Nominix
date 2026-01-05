@@ -1,8 +1,20 @@
 import axiosClient from '../api/axiosClient';
 
 /**
- * payrollService - Servicio para la gestión de cierres y periodos de nómina.
+ * Función auxiliar para forzar la descarga en el navegador desde un Blob.
+ * Evita repetir código en cada método de descarga.
  */
+const triggerFileDownload = (data, filename) => {
+    const url = window.URL.createObjectURL(new Blob([data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url); // Buena práctica: liberar memoria
+};
+
 const payrollService = {
     /**
      * Obtiene la lista de todos los periodos registrados.
@@ -13,38 +25,83 @@ const payrollService = {
     },
 
     /**
+     * Crea un nuevo periodo de nómina.
+     */
+    createPeriod: async (data) => {
+        const response = await axiosClient.post('/payroll-periods/', data);
+        return response.data;
+    },
+
+    /**
+     * Descarga el PDF masivo de recibos.
+     */
+    /**
+     * Descarga el PDF masivo de recibos.
+     */
+    downloadPdf: async (periodId, periodName) => {
+        try {
+            const response = await axiosClient.get(`/payroll-periods/${periodId}/export-pdf/`, {
+                responseType: 'blob'
+            });
+            triggerFileDownload(response.data, `nomina_recibos_${periodName || periodId}.pdf`);
+        } catch (error) {
+            console.error("Error descargando PDF", error);
+            throw error;
+        }
+    },
+
+    /**
+     * Descarga el reporte financiero (CSV/Excel).
+     */
+    downloadFinanceReport: async (periodId, periodName) => {
+        try {
+            const response = await axiosClient.get(`/payroll-periods/${periodId}/export-finance/`, {
+                responseType: 'blob'
+            });
+            triggerFileDownload(response.data, `${Date.now()}_finanzas_nomina_${periodName || periodId}.csv`);
+        } catch (error) {
+            console.error("Error descargando Reporte Finanzas", error);
+            throw error;
+        }
+    },
+
+    /**
      * Ejecuta el proceso de cálculo masivo e inmutabilidad para un periodo.
      * @param {number|string} id ID del periodo a cerrar.
-     * @param {number|null} manual_rate Tasa de cambio manual (opcional).
+     * @param {number} manualRate (Opcional) Tasa manual si falla BCV.
      */
-    closePeriod: async (id, manual_rate = null) => {
-        const response = await axiosClient.post(`/payroll-periods/${id}/close-period/`, {
-            manual_rate
-        });
+    closePeriod: async (id, manualRate = null) => {
+        const payload = manualRate ? { manual_rate: manualRate } : {};
+        const response = await axiosClient.post(`/payroll-periods/${id}/close-period/`, payload);
         return response.data;
     },
 
     /**
-     * Descarga el archivo de transferencia bancaria (TXT/Excel).
-     * @param {number|string} id ID del periodo.
+     * Obtiene los recibos de pago de un periodo específico.
      */
-    getBankFile: async (id) => {
-        const response = await axiosClient.get(`/payroll-periods/${id}/export-bank/`, {
-            responseType: 'blob',
-        });
-        return response.data;
+    getPayslips: async (periodId) => {
+        const response = await axiosClient.get(`/payslips/?period=${periodId}`);
+        return response.data.results || response.data;
     },
 
     /**
-     * Descarga el reporte legal para el IVSS/TIUNA.
-     * @param {number|string} id ID del periodo.
+     * Descarga el PDF individual de un recibo.
      */
-    getLegalReport: async (id) => {
-        const response = await axiosClient.get(`/payroll-periods/${id}/export-ivss/`, {
-            responseType: 'blob',
-        });
-        return response.data;
-    }
+    downloadSinglePayslipPdf: async (payslipId, employeeName) => {
+        try {
+            const response = await axiosClient.get(`/payslips/${payslipId}/export-pdf/`, {
+                responseType: 'blob'
+            });
+            triggerFileDownload(response.data, `recibo_${employeeName || payslipId}.pdf`);
+        } catch (error) {
+            console.error("Error descargando recibo individual", error);
+            throw error;
+        }
+    },
+
+    // DEPRECATED: Se mantienen por compatibilidad si se requieren a futuro
+    getBankFile: async (id) => { throw new Error("Usar downloadFinanceReport"); },
+    getLegalReport: async (id) => { throw new Error("Usar downloadFinanceReport"); }
 };
 
 export default payrollService;

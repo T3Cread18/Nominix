@@ -12,10 +12,14 @@ import {
     X,
     TrendingUp,
     Users,
-    DollarSign
+    DollarSign,
+    PlusCircle,
+    Eye
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import CreatePeriodModal from './CreatePeriodModal';
+import PayslipsListModal from './PayslipsListModal'; // <--- NUEVO
 
 function cn(...inputs) {
     return twMerge(clsx(inputs));
@@ -29,6 +33,11 @@ const PayrollClosure = () => {
     const [loading, setLoading] = useState(true);
     const [processingId, setProcessingId] = useState(null);
     const [successData, setSuccessData] = useState(null);
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
+    // Estados para el Modal de Recibos
+    const [selectedPeriodForList, setSelectedPeriodForList] = useState(null);
+    const [isListModalOpen, setIsListModalOpen] = useState(false);
 
     useEffect(() => {
         loadPeriods();
@@ -101,21 +110,19 @@ const PayrollClosure = () => {
         link.parentNode.removeChild(link);
     };
 
-    const handleDownloadBank = async (id, name) => {
+    const handleDownloadPdf = async (id, name) => {
         try {
-            const blob = await payrollService.getBankFile(id);
-            downloadFile(blob, `Transferencias_${name.replace(/ /g, '_')}.txt`);
+            await payrollService.downloadPdf(id, name);
         } catch (error) {
-            alert("El archivo bancario no está disponible para este periodo.");
+            alert("No se pudieron descargar los recibos.");
         }
     };
 
-    const handleDownloadLegal = async (id, name) => {
+    const handleDownloadFinance = async (id, name) => {
         try {
-            const blob = await payrollService.getLegalReport(id);
-            downloadFile(blob, `Reporte_IVSS_${name.replace(/ /g, '_')}.xlsx`);
+            await payrollService.downloadFinanceReport(id, name);
         } catch (error) {
-            alert("El reporte legal no está disponible para este periodo.");
+            alert("No se pudo descargar el reporte financiero.");
         }
     };
 
@@ -130,6 +137,28 @@ const PayrollClosure = () => {
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
+            {/* Header Toolbar */}
+            <div className="flex justify-between items-center mb-6">
+                <div>
+                    <h3 className="text-xl font-black text-nominix-dark">Periodos de Nómina</h3>
+                    <p className="text-xs text-gray-400 font-medium">Gestione los cierres y reportes históricos</p>
+                </div>
+                <button
+                    onClick={() => setIsCreateModalOpen(true)}
+                    className="flex items-center gap-2 px-6 py-3 bg-white border border-gray-200 hover:border-nominix-electric text-gray-600 hover:text-nominix-electric rounded-2xl font-bold text-xs uppercase tracking-widest transition-all shadow-sm hover:shadow-md"
+                >
+                    <PlusCircle size={18} />
+                    Nuevo Periodo
+                </button>
+            </div>
+
+            {/* Modal de Lista de Recibos */}
+            <PayslipsListModal
+                isOpen={isListModalOpen}
+                onClose={() => setIsListModalOpen(false)}
+                period={selectedPeriodForList}
+            />
+
             {/* Grid de Periodos */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {periods.map((period) => (
@@ -181,18 +210,27 @@ const PayrollClosure = () => {
                         ) : (
                             <div className="grid grid-cols-2 gap-3">
                                 <button
-                                    onClick={() => handleDownloadBank(period.id, period.name)}
+                                    onClick={() => handleDownloadFinance(period.id, period.name)}
                                     className="flex flex-col items-center justify-center gap-2 py-4 bg-gray-50 hover:bg-nominix-electric hover:text-white rounded-2xl border border-gray-100 transition-all group"
                                 >
                                     <Download size={18} className="text-gray-400 group-hover:text-white" />
-                                    <span className="text-[8px] font-black uppercase tracking-widest text-center">TXT Banco</span>
+                                    <span className="text-[8px] font-black uppercase tracking-widest text-center">Reporte Finanzas</span>
                                 </button>
                                 <button
-                                    onClick={() => handleDownloadLegal(period.id, period.name)}
+                                    onClick={() => handleDownloadPdf(period.id, period.name)}
                                     className="flex flex-col items-center justify-center gap-2 py-4 bg-gray-50 hover:bg-nominix-electric hover:text-white rounded-2xl border border-gray-100 transition-all group"
                                 >
                                     <FileText size={18} className="text-gray-400 group-hover:text-white" />
-                                    <span className="text-[8px] font-black uppercase tracking-widest text-center">Rep. IVSS</span>
+                                    <span className="text-[8px] font-black uppercase tracking-widest text-center">Recibos PDF</span>
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setSelectedPeriodForList(period);
+                                        setIsListModalOpen(true);
+                                    }}
+                                    className="col-span-2 flex items-center justify-center gap-3 py-4 bg-nominix-electric/5 hover:bg-nominix-electric text-nominix-electric hover:text-white rounded-2xl border border-nominix-electric/10 transition-all font-black text-[10px] uppercase tracking-widest"
+                                >
+                                    <Eye size={16} /> Ver Recibos Individuales
                                 </button>
                             </div>
                         )}
@@ -264,6 +302,12 @@ const PayrollClosure = () => {
                     </div>
                 </div>
             )}
+            {/* Modal de Creación */}
+            <CreatePeriodModal
+                isOpen={isCreateModalOpen}
+                onClose={() => setIsCreateModalOpen(false)}
+                onSuccess={loadPeriods}
+            />
         </div>
     );
 };

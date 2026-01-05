@@ -3,11 +3,50 @@
 @tailwind utilities;
 
 :root {
-  background-color: #F8F9FA; /* nominix-smoke */
+  background-color: #F8F9FA;
+  /* nominix-smoke */
 }
 
 body {
   margin: 0;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* --- SCROLLBAR PERSONALIZADO --- */
+/* Ancho y color del track */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f9fafb;
+  /* gray-50 */
+  border-radius: 4px;
+}
+
+/* El "pulgar" que se mueve */
+::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  /* gray-300 */
+  border-radius: 4px;
+  border: 2px solid #f9fafb;
+  /* Borde para efecto flotante */
+}
+
+/* Hover del pulgar */
+::-webkit-scrollbar-thumb:hover {
+  background: #3b82f6;
+  /* nominix-electric (Ajusta este hex a tu color exacto) */
+}
+
+/* Inputs: Quitar el azul por defecto del navegador y usar el de la marca */
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: #3b82f6;
+  /* nominix-electric */
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
 }

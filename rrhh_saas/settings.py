@@ -28,7 +28,7 @@ CSRF_TRUSTED_ORIGINS: List[str] = [
     'http://localhost:8000',
     'http://*.localhost:8000',
 ]
-
+CORS_ALLOW_ALL_ORIGINS = True
 # =============================================================================
 # CONFIGURACIÓN DE DJANGO-TENANTS
 # =============================================================================
@@ -50,14 +50,18 @@ SHARED_APPS: List[str] = [
     # Apps de terceros
     'rest_framework',
 ]
-
+USE_X_FORWARDED_HOST = True
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+if DEBUG:
+    # Esto ayuda a que el servidor de media sepa que no está en el puerto 80
+    DEFAULT_HTTP_PROTOCOL = 'http'
 # Apps del inquilino: van en el esquema de cada tenant
 # Cada farmacia tendrá su propia copia de estas tablas
 TENANT_APPS: List[str] = [
     'django.contrib.contenttypes',
     'django.contrib.auth',
     'django.contrib.admin',
-    
+    'django_cleanup.apps.CleanupConfig',
     # Apps de nómina y RRHH
     'payroll_core',
 ]
@@ -179,10 +183,9 @@ STATICFILES_DIRS: List[Path] = [
 # =============================================================================
 # ARCHIVOS MEDIA
 # =============================================================================
-
-MEDIA_URL: str = 'media/'
-MEDIA_ROOT: Path = BASE_DIR / 'media'
-
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+MULTITENANT_RELATIVE_MEDIA_ROOT = ""
 # =============================================================================
 # CONFIGURACIÓN POR DEFECTO
 # =============================================================================

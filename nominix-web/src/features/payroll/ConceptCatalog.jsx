@@ -12,7 +12,8 @@ import {
     Loader2,
     Search,
     X,
-    Save
+    Save,
+    HelpCircle
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -29,12 +30,14 @@ const ConceptCatalog = () => {
     const [isAdding, setIsAdding] = useState(false);
     const [saving, setSaving] = useState(false);
 
+    // Estado inicial del formulario
     const [newConcept, setNewConcept] = useState({
         code: '',
         name: '',
         kind: 'EARNING',
         computation_method: 'FIXED_AMOUNT',
         value: '0.00',
+        formula: '', // Campo nuevo para la fórmula
         currency: 'USD',
         active: true,
         is_salary_incidence: true
@@ -64,7 +67,15 @@ const ConceptCatalog = () => {
         e.preventDefault();
         setSaving(true);
         try {
-            await axiosClient.post('/payroll-concepts/', newConcept);
+            // Limpiar datos según el método seleccionado
+            const payload = { ...newConcept };
+            if (payload.computation_method === 'DYNAMIC_FORMULA') {
+                payload.value = '0.00'; // Ignorar valor fijo
+            } else {
+                payload.formula = ''; // Ignorar fórmula
+            }
+
+            await axiosClient.post('/payroll-concepts/', payload);
             await fetchData();
             setIsAdding(false);
             setNewConcept({
@@ -73,6 +84,7 @@ const ConceptCatalog = () => {
                 kind: 'EARNING',
                 computation_method: 'FIXED_AMOUNT',
                 value: '0.00',
+                formula: '',
                 currency: 'USD',
                 active: true,
                 is_salary_incidence: true
@@ -105,7 +117,7 @@ const ConceptCatalog = () => {
             {/* Modal Crear Concepto */}
             {isAdding && (
                 <div className="absolute inset-0 z-50 bg-nominix-dark/95 backdrop-blur-md flex items-center justify-center p-8 animate-in fade-in duration-300">
-                    <div className="bg-white w-full max-w-xl rounded-[2.5rem] p-10 shadow-2xl animate-in zoom-in-95 duration-200 overflow-y-auto max-h-[90vh]">
+                    <div className="bg-white w-full max-w-2xl rounded-[2.5rem] p-10 shadow-2xl animate-in zoom-in-95 duration-200 overflow-y-auto max-h-[90vh]">
                         <div className="flex justify-between items-center mb-8">
                             <div>
                                 <h4 className="text-xl font-black text-nominix-dark uppercase tracking-widest">Nuevo Concepto Global</h4>
@@ -157,21 +169,51 @@ const ConceptCatalog = () => {
                                 >
                                     <option value="FIXED_AMOUNT">Monto Fijo</option>
                                     <option value="PERCENTAGE_OF_BASIC">Porcentaje del Sueldo</option>
-                                    <option value="FORMULA">Fórmula Legal (Backend)</option>
+                                    <option value="DYNAMIC_FORMULA">Fórmula Dinámica (Python Safe)</option>
                                 </select>
                             </div>
 
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-gray-400 uppercase">Valor Base</label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    required
-                                    className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold text-sm outline-none focus:border-nominix-electric"
-                                    value={newConcept.value}
-                                    onChange={e => setNewConcept({ ...newConcept, value: e.target.value })}
-                                />
-                            </div>
+                            {/* CONDICIONAL: Si es Fórmula Dinámica mostramos el editor, sino el input simple */}
+                            {newConcept.computation_method === 'DYNAMIC_FORMULA' ? (
+                                <div className="col-span-2 bg-gray-900 rounded-2xl p-6 border border-gray-800">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase flex items-center gap-2">
+                                            <Code2 size={14} className="text-nominix-electric" /> Editor de Fórmula
+                                        </label>
+                                        <div className="flex gap-2">
+                                            <span className="text-[9px] font-mono text-gray-500 bg-gray-800 px-2 py-1 rounded">SALARIO_MENSUAL</span>
+                                            <span className="text-[9px] font-mono text-gray-500 bg-gray-800 px-2 py-1 rounded">DIAS</span>
+                                            <span className="text-[9px] font-mono text-gray-500 bg-gray-800 px-2 py-1 rounded">LUNES</span>
+                                        </div>
+                                    </div>
+                                    <textarea
+                                        className="w-full bg-transparent text-green-400 font-mono text-sm outline-none min-h-[100px] resize-y placeholder-gray-700"
+                                        placeholder="(SALARIO_MENSUAL / 30) * DIAS"
+                                        value={newConcept.formula}
+                                        onChange={e => setNewConcept({ ...newConcept, formula: e.target.value })}
+                                    />
+                                    <p className="text-[10px] text-gray-500 mt-2 font-medium">
+                                        Use operaciones matemáticas estándar (+, -, *, /) y funciones como min(), max().
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase">Valor Base</label>
+                                    <div className="relative">
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            required
+                                            className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold text-sm outline-none focus:border-nominix-electric pl-10"
+                                            value={newConcept.value}
+                                            onChange={e => setNewConcept({ ...newConcept, value: e.target.value })}
+                                        />
+                                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                                            {newConcept.computation_method === 'PERCENTAGE_OF_BASIC' ? <Percent size={16} /> : <DollarSign size={16} />}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
 
                             {newConcept.computation_method === 'FIXED_AMOUNT' && (
                                 <div className="space-y-2">
@@ -245,9 +287,6 @@ const ConceptCatalog = () => {
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
                     <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-nominix-electric transition-colors" size={24} />
-                    <div className="absolute right-5 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                        <span className="text-[9px] font-black text-gray-300 uppercase bg-gray-50 px-2 py-1 rounded">ESC para limpiar</span>
-                    </div>
                 </div>
             </div>
 
@@ -282,8 +321,10 @@ const ConceptCatalog = () => {
 
                         <div className="flex flex-wrap items-center gap-3 mb-8">
                             <div className="bg-gray-50 p-2 px-3 rounded-xl flex items-center gap-2 border border-transparent group-hover:border-gray-100 transition-all">
-                                {concept.computation_method === 'FORMULA' ? <Code2 size={12} className="text-nominix-electric" /> : <Settings2 size={12} className="text-gray-400" />}
-                                <span className="text-[10px] font-black uppercase text-gray-500">{concept.computation_method.replace(/_/g, ' ')}</span>
+                                {concept.computation_method === 'DYNAMIC_FORMULA' ? <Code2 size={12} className="text-nominix-electric" /> : <Settings2 size={12} className="text-gray-400" />}
+                                <span className="text-[10px] font-black uppercase text-gray-500">
+                                    {concept.computation_method === 'DYNAMIC_FORMULA' ? 'Fórmula Dinámica' : concept.computation_method.replace(/_/g, ' ')}
+                                </span>
                             </div>
                             {concept.is_salary_incidence && (
                                 <div className="bg-blue-50/50 p-2 px-3 rounded-xl flex items-center gap-2 border border-blue-50">
@@ -295,12 +336,20 @@ const ConceptCatalog = () => {
 
                         <div className="flex items-center justify-between border-t border-dashed pt-6 border-gray-100 mt-auto">
                             <div>
-                                <p className="text-[9px] font-black text-gray-300 uppercase tracking-tighter mb-1">Valor Defecto</p>
-                                <p className="text-2xl font-black text-nominix-dark tracking-tighter">
-                                    {concept.value} <span className="text-sm text-gray-300 font-bold ml-1">
-                                        {concept.computation_method === 'PERCENTAGE_OF_BASIC' ? '%' : (concept.currency_data?.symbol || '$')}
-                                    </span>
+                                <p className="text-[9px] font-black text-gray-300 uppercase tracking-tighter mb-1">
+                                    {concept.computation_method === 'DYNAMIC_FORMULA' ? 'Fórmula Definida' : 'Valor Defecto'}
                                 </p>
+                                {concept.computation_method === 'DYNAMIC_FORMULA' ? (
+                                    <code className="text-[10px] bg-gray-900 text-green-400 p-2 rounded-lg block max-w-[180px] overflow-hidden text-ellipsis whitespace-nowrap">
+                                        {concept.formula}
+                                    </code>
+                                ) : (
+                                    <p className="text-2xl font-black text-nominix-dark tracking-tighter">
+                                        {concept.value} <span className="text-sm text-gray-300 font-bold ml-1">
+                                            {concept.computation_method === 'PERCENTAGE_OF_BASIC' ? '%' : (concept.currency_data?.symbol || '$')}
+                                        </span>
+                                    </p>
+                                )}
                             </div>
                             <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button

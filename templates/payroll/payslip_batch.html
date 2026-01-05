@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Recibos de Nómina</title>
+    <style>
+        @page {
+            size: letter;
+            margin: 1cm;
+        }
+
+        body {
+            font-family: 'Helvetica', sans-serif;
+            font-size: 11px;
+            color: #333;
+        }
+
+        .page-break {
+            page-break-after: always;
+            /* ¡CRÍTICO! Esto separa los empleados */
+        }
+
+        .header {
+            border-bottom: 2px solid #0052FF;
+            /* Azul Eléctrico Nóminix */
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+
+        .company-name {
+            font-size: 16px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .grid-info {
+            display: table;
+            width: 100%;
+            margin-bottom: 15px;
+        }
+
+        .row {
+            display: table-row;
+        }
+
+        .col {
+            display: table-cell;
+            padding: 2px;
+            width: 50%;
+        }
+
+        .label {
+            font-weight: bold;
+            color: #666;
+            width: 120px;
+            display: inline-block;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        th {
+            background-color: #F8F9FA;
+            border-bottom: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+            text-transform: uppercase;
+            font-size: 9px;
+        }
+
+        td {
+            padding: 8px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .amount {
+            text-align: right;
+            font-family: 'Courier New', monospace;
+        }
+
+        .totals {
+            margin-top: 20px;
+            background-color: #F0F4FF;
+            padding: 10px;
+            border-radius: 5px;
+        }
+
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            font-size: 12px;
+        }
+
+        .footer {
+            margin-top: 50px;
+            text-align: center;
+            font-size: 9px;
+            color: #999;
+            border-top: 1px solid #eee;
+            padding-top: 10px;
+        }
+
+        .firmas {
+            margin-top: 60px;
+            width: 100%;
+            height: 50px;
+        }
+
+        .linea-firma {
+            border-top: 1px solid #000;
+            width: 40%;
+            display: inline-block;
+            margin: 0 5%;
+            text-align: center;
+            padding-top: 5px;
+        }
+    </style>
+</head>
+
+<body>
+    {% for payslip in payslips %}
+    <div class="page-break">
+        <div class="header">
+            <div class="company-name">{{ payslip.employee.branch.name|default:tenant_name }}</div>
+            <div>RIF: {{ payslip.employee.branch.rif|default:tenant_rif }}</div>
+            <div>Dirección: {{ payslip.employee.branch.address|default:tenant_address }}</div>
+            <div style="text-align: right; font-size: 10px;">
+                RECIBO DE PAGO DE NÓMINA<br>
+                N° {{ payslip.employee.national_id }}-{{ payment_date|date:"Ymd" }}<br>
+                Periodo: {{ period_name }} ({{ start_date|date:"d/m/Y" }} al {{ end_date|date:"d/m/Y" }})
+            </div>
+        </div>
+
+        <div class="grid-info">
+            <div class="row">
+                <div class="col">
+                    <span class="label">Trabajador:</span> {{ payslip.employee.full_name }}
+                </div>
+                <div class="col">
+                    <span class="label">Cédula:</span> {{ payslip.employee.national_id }}
+                </div>
+            </div>
+            <div class="row">
+                <div class="col">
+                    <span class="label">Cargo:</span> {{ payslip.contract_snapshot.position }}
+                </div>
+                <div class="col">
+                    <span class="label">Departamento:</span> {{ payslip.employee.department.name|default:"N/D" }}
+                </div>
+            </div>
+            <div class="row">
+                <div class="col">
+                    <span class="label">Desde / Hasta:</span>
+                    {{ start_date|date:"d/m/Y" }} - {{ end_date|date:"d/m/Y" }}
+                </div>
+                <div class="col">
+                    <span class="label">Fecha Ingreso:</span>
+                    {{ payslip.employee.hire_date|default:payslip.contract_snapshot.hire_date|date:"d/m/Y" }}
+                </div>
+            </div>
+            <div class="row">
+                <div class="col">
+                    <span class="label">Fecha Pago:</span> {{ payment_date }}
+                </div>
+                <div class="col">
+                    <span class="label">Tasa Cambio:</span> Bs. {{ payslip.exchange_rate_applied }}
+                </div>
+            </div>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 50%">Concepto</th>
+                    <th style="width: 25%; text-align: right;">Asignaciones</th>
+                    <th style="width: 25%; text-align: right;">Deducciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for detail in payslip.details.all %}
+                <tr>
+                    <td>{{ detail.concept_name }}</td>
+                    <td class="amount">
+                        {% if detail.kind == 'EARNING' %}
+                        {{ detail.amount_ves }}
+                        {% endif %}
+                    </td>
+                    <td class="amount">
+                        {% if detail.kind == 'DEDUCTION' %}
+                        {{ detail.amount_ves }}
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="totals">
+            <table style="width: 100%; border: none;">
+                <tr>
+                    <td style="border: none;">Total Asignaciones:</td>
+                    <td class="amount" style="border: none;">{{ payslip.total_income_ves }}</td>
+                    <td style="border: none;">Total Deducciones:</td>
+                    <td class="amount" style="border: none;">{{ payslip.total_deductions_ves }}</td>
+                </tr>
+                <tr style="font-size: 14px; font-weight: bold; border-top: 1px solid #ccc;">
+                    <td colspan="2" style="border: none; padding-top: 10px;">NETO A PAGAR:</td>
+                    <td colspan="2" class="amount" style="border: none; padding-top: 10px; color: #0052FF;">
+                        Bs. {{ payslip.net_pay_ves }}
+                    </td>
+                </tr>
+            </table>
+            <div style="text-align: right; font-size: 9px; margin-top: 5px; color: #666;">
+                Ref USD: $ {{ payslip.net_pay_usd_ref }}
+            </div>
+        </div>
+
+        <div class="firmas">
+            <div class="linea-firma">
+                <br>Por la Empresa
+            </div>
+            <div class="linea-firma">
+                <br>Recibí Conforme<br>{{ payslip.employee.national_id }}
+            </div>
+        </div>
+
+        <div class="footer">
+            Generado por Nóminix SaaS - Fecha de Impresión: {% now "d/m/Y H:i" %}
+        </div>
+    </div>
+    {% endfor %}
+</body>
+
+</html>

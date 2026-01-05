@@ -1,18 +1,30 @@
 from django.db import transaction
-from rest_framework import viewsets, status
+from rest_framework import views, viewsets, response, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.utils import timezone
+import openpyxl
+from openpyxl.styles import Font, Alignment
+from openpyxl.utils import get_column_letter
 from decimal import Decimal
+from django_filters.rest_framework import DjangoFilterBackend
+from django.template.loader import render_to_string
+from django.http import HttpResponse
+from django.db.models import ProtectedError
+import weasyprint
+import csv
+from .services import BCVRateService
+from rest_framework.views import APIView
 from .models import (
     Employee, LaborContract, ExchangeRate, PayrollConcept, 
     EmployeeConcept, Branch, Currency, PayrollPeriod, Payslip,
-    PayrollNovelty
+    PayrollNovelty, Company, Department
 )
 from .serializers import (
     EmployeeSerializer, BranchSerializer, LaborContractSerializer,
     CurrencySerializer, PayrollConceptSerializer, EmployeeConceptSerializer,
-    PayrollPeriodSerializer, PayslipSerializer, PayrollNoveltySerializer
+    PayrollPeriodSerializer, PayslipSerializer, PayrollNoveltySerializer, CompanySerializer,
+    DepartmentSerializer
 )
 from .engine import PayrollEngine
 
@@ -33,33 +45,100 @@ class EmployeeConceptViewSet(viewsets.ModelViewSet):
 class BranchViewSet(viewsets.ModelViewSet):
     queryset = Branch.objects.all()
     serializer_class = BranchSerializer
+class LatestExchangeRateView(APIView):
+    """
+    Devuelve la tasa de cambio más reciente para una moneda dada.
+    Si no existe tasa para el día de hoy, intenta obtenerla del BCV.
+    """
+    def get(self, request):
+        currency_code = request.query_params.get('currency', 'USD')
+        today = timezone.now().date()
 
+        # 1. Intentar buscar en DB la tasa de HOY
+        rate_obj = ExchangeRate.objects.filter(
+            currency__code=currency_code,
+            date_valid__date=today
+        ).first()
+
+        # 2. Si no existe la de hoy, llamamos al Servicio BCV (Scraping)
+        if not rate_obj:
+            print(f"🔄 Tasa {currency_code} desactualizada. Consultando BCV...")
+            try:
+                # Tu servicio guarda en DB, así que solo lo ejecutamos
+                results = BCVRateService.fetch_and_update_rates()
+                
+                # Verificamos si la operación fue exitosa para la moneda solicitada
+                if results.get(currency_code, {}).get('status') == 'success':
+                    # Volvemos a consultar la DB recién actualizada
+                    rate_obj = ExchangeRate.objects.filter(
+                        currency__code=currency_code
+                    ).order_by('-date_valid').first()
+            except Exception as e:
+                print(f"Error consultando servicio BCV: {e}")
+
+        # 3. Si aún no hay tasa (ej. BCV caído y DB vacía), buscar la última histórica
+        if not rate_obj:
+             rate_obj = ExchangeRate.objects.filter(
+                currency__code=currency_code
+            ).order_by('-date_valid').first()
+
+        # 4. Respuesta final
+        if rate_obj:
+            return Response({
+                "currency": currency_code,
+                "rate": rate_obj.rate,
+                "date": rate_obj.date_valid,
+                "source": rate_obj.source
+            })
+        else:
+            # Fallback extremo si no hay nada en DB ni internet
+            return Response(
+                {"currency": currency_code, "rate": 60.00, "note": "Valor por defecto"}, 
+                status=status.HTTP_200_OK
+            )
 class LaborContractViewSet(viewsets.ModelViewSet):
     queryset = LaborContract.objects.all()
     serializer_class = LaborContractSerializer
+    filter_backends = [DjangoFilterBackend]
     filterset_fields = ['employee', 'is_active', 'branch']
+
+class DepartmentViewSet(viewsets.ModelViewSet):
+    queryset = Department.objects.all()
+    serializer_class = DepartmentSerializer
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    search_fields = ['name']
+    filterset_fields = ['branch']
 
 
 class EmployeeViewSet(viewsets.ModelViewSet):
     queryset = Employee.objects.all()
     serializer_class = EmployeeSerializer
-
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    search_fields = ['first_name', 'last_name', 'national_id']
+    filterset_fields = ['is_active', 'branch']
     @action(detail=True, methods=['get', 'post'], url_path='simulate-payslip')
     def simulate_payslip(self, request, pk=None):
         """
         GET/POST /api/employees/{id}/simulate-payslip/
-        Calcula la nómina proyectada para este empleado al día de hoy.
-        Soporta variables de entrada como {"overtime_hours": 5}.
+        Calcula la nómina proyectada usando el Engine Orquestador.
         """
         employee = self.get_object()
-        
         # 1. Obtener variables de entrada (POST json o GET params)
-        input_variables = {}
+        # 1. Obtener variables de entrada (POST json o GET params)
+        input_variables = None
+        period_id = None
+        
         if request.method == 'POST':
-            input_variables = request.data
+            data = request.data.copy()
+            period_id = data.pop('period_id', None)
+            if data:
+                input_variables = data
         else:
-            # Convertir query params a dict de floats (o strings para Decimal)
-            input_variables = {k: v for k, v in request.query_params.items()}
+            # Convertir query params a dict
+            data = {k: v for k, v in request.query_params.items()}
+            period_id = data.pop('period_id', None)
+            if data:
+                input_variables = data
 
         # 2. Buscar Contrato Activo
         contract = LaborContract.objects.filter(employee=employee, is_active=True).first()
@@ -68,79 +147,60 @@ class EmployeeViewSet(viewsets.ModelViewSet):
                 {"error": "El empleado no tiene contrato activo."}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
+            
+        # 2.1 Buscar Periodo (si se indica)
+        period = None
+        if period_id:
+            try:
+                period = PayrollPeriod.objects.get(pk=period_id)
+            except PayrollPeriod.DoesNotExist:
+                pass
 
-        # 3. Buscar Tasa de Cambio (BCV) del día
-        rate_obj = ExchangeRate.objects.filter(currency__code='USD').order_by('date_valid').last()
-        if not rate_obj:
+        try:
+            # 3. Inicializar Motor
+            # Si input_variables es None, el motor cargará las novedades de DB (si hay periodo)
+            payment_date = period.payment_date if period else timezone.now().date()
+            
+            engine = PayrollEngine(
+                contract=contract, 
+                period=period,
+                payment_date=payment_date, 
+                input_variables=input_variables
+            )
+
+            # 4. Delegar el cálculo al Engine (Orquestación)
+            # Esto automáticamente inyecta Sueldo Base, IVSS, FAOV y Novedades
+            result = engine.calculate_payroll()
+
+            # 5. Retornar el resultado directamente (Ya viene formateado en JSON)
+            return Response(result)
+
+        except Exception as e:
+            # Log de error para debug en consola
+            print(f"Error calculando simulación: {e}")
             return Response(
-                {"error": "No hay tasa de cambio registrada para USD en el sistema."}, 
+                {"error": f"Error interno de cálculo: {str(e)}"}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-            
-        rate_value = rate_obj.rate
 
-        # 4. Inicializar Motor con Variables
-        payment_date = timezone.now().date()
-        engine = PayrollEngine(
-            contract, 
-            payment_date, 
-            exchange_rate=rate_obj, 
-            input_variables=input_variables
-        )
-
-        # 5. Obtener conceptos aplicables (Activos)
-        concepts = PayrollConcept.objects.filter(active=True)
-        
-        lines = []
-        total_income = Decimal('0.00')
-        total_deductions = Decimal('0.00')
-
-        # 6. Iterar y Calcular
-        for concept in concepts:
-            # Verificar override
-            try:
-                override = EmployeeConcept.objects.filter(
-                    employee=employee, concept=concept, active=True
-                ).first()
-                override_val = override.override_value if override else None
-            except Exception:
-                 override_val = None
-
-            # ¡Cálculo con fórmulas legales!
-            amount_ves = engine.calculate_concept_amount(concept, override_value=override_val)
-            
-            if amount_ves > 0:
-                lines.append({
-                    "code": concept.code,
-                    "name": concept.name,
-                    "kind": concept.kind, 
-                    "amount_ves": amount_ves,
-                    "currency_origin": concept.currency.code,
-                    "formula": concept.computation_method
-                })
-
-                if concept.kind == 'EARNING':
-                    total_income += amount_ves
-                elif concept.kind == 'DEDUCTION':
-                    total_deductions += amount_ves
-
-        # 7. Respuesta JSON
-        return Response({
-            "employee": f"{employee.first_name} {employee.last_name}",
-            "position": contract.position,
-            "contract_currency": contract.salary_currency.code,
-            "exchange_rate_used": rate_value,
-            "payment_date": payment_date,
-            "input_variables": input_variables,
-            "lines": lines,
-            "totals": {
-                "income_ves": total_income,
-                "deductions_ves": total_deductions,
-                "net_pay_ves": total_income - total_deductions,
-                "net_pay_usd_ref": round((total_income - total_deductions) / rate_value, 2)
-            }
-        })
-
+    def update(self, request, *args, **kwargs):
+        partial = True # Forzamos parcial para que no borre datos no enviados
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response(serializer.data)
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        try:
+            self.perform_destroy(instance)
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except ProtectedError:
+            # Capturamos el error de integridad y devolvemos un mensaje amigable
+            return Response(
+                {"error": "No se puede eliminar este colaborador porque tiene histórico de nóminas o contratos. Proceda a desactivarlo (Dar de baja)."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
 class PayrollPeriodViewSet(viewsets.ModelViewSet):
     queryset = PayrollPeriod.objects.all()
@@ -161,7 +221,132 @@ class PayrollPeriodViewSet(viewsets.ModelViewSet):
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             return Response({"error": f"Falla inesperada en cierre: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    @action(detail=True, methods=['get'], url_path='export-pdf')
+    def export_payslips_pdf(self, request, pk=None):
+            """
+            Genera un PDF masivo con todos los recibos del periodo.
+            """
+            period = self.get_object()
+            
+            # Obtener recibos asociados a este periodo
+            # Usamos select_related para optimizar la consulta a DB y traer los detalles, empleados y sus departamentos
+            payslips = period.payslips.select_related('employee', 'employee__department').prefetch_related('details').all()
+            
+            if not payslips.exists():
+                return Response({"error": "No hay recibos generados para este periodo."}, status=404)
 
+            # Contexto para el Template HTML
+            context = {
+                'payslips': payslips,
+                'period_name': period.name,
+                'start_date': period.start_date,
+                'end_date': period.end_date,
+                'payment_date': period.payment_date,
+                'tenant_name': request.tenant.name,
+                'tenant_rif': request.tenant.rif,
+                'tenant_address': request.tenant.address,
+            }
+
+            # 1. Renderizar HTML string
+            html_string = render_to_string('payroll/payslip_batch.html', context)
+
+            # 2. Generar PDF con WeasyPrint
+            pdf_file = weasyprint.HTML(string=html_string).write_pdf()
+
+            # 3. Retornar respuesta HTTP con Content-Type correcto
+            response = HttpResponse(pdf_file, content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="nomina_{period.id}.pdf"'
+            return response
+
+    @action(detail=True, methods=['get'], url_path='export-finance')
+    def export_finance_report(self, request, pk=None):
+        """
+        Genera un reporte Excel (.xlsx) nativo para Finanzas.
+        Permite definir tipos de celda explícitos.
+        """
+        period = self.get_object()
+        # Usamos select_related para optimizar la DB
+        payslips = period.payslips.select_related('employee').all()
+
+        if not payslips.exists():
+            return Response({"error": "No hay recibos generados para este periodo."}, status=404)
+
+        # 1. Configuración del archivo Excel
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="finanzas_nomina_{period.id}.xlsx"'
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Reporte Finanzas"
+
+        # 2. Encabezados
+        headers = ['Cédula', 'Empleado', 'Sede', 'Banco', 'Tipo Cuenta', 'Número de Cuenta', 'Monto VES', 'Tasa BCV', 'Monto USD Ref']
+        ws.append(headers)
+
+        # Estilo para encabezados (Negrita)
+        for cell in ws[1]:
+            cell.font = Font(bold=True)
+
+        # 3. Iterar datos
+        for p in payslips:
+            emp = p.employee
+            
+            # Cálculos previos seguros
+            monto_ves = p.net_pay_ves or Decimal(0)
+            tasa = p.exchange_rate_applied or Decimal(0)
+            monto_usd = (monto_ves / tasa).quantize(Decimal('0.01')) if tasa > 0 else Decimal(0)
+
+            # Preparamos la fila
+            row = [
+                emp.national_id,
+                emp.full_name,
+                emp.branch.name if emp.branch else 'N/D',
+                emp.bank_name or 'N/D',
+                emp.bank_account_type or 'N/D',
+                emp.bank_account_number or 'N/D', # Se inserta como string inicialmente
+                monto_ves,
+                tasa,
+                monto_usd
+            ]
+            ws.append(row)
+            
+            # 4. DEFINICIÓN DE FORMATOS POR CELDA (La magia ocurre aquí)
+            current_row = ws.max_row
+            
+            # Columna E (Número de Cuenta): Forzar formato Texto para evitar notación científica
+            cell_acc = ws.cell(row=current_row, column=5)
+            cell_acc.number_format = '@'  # '@' significa Texto en Excel
+            
+            # Columna F (Monto VES): Formato numérico con separadores
+            cell_ves = ws.cell(row=current_row, column=6)
+            cell_ves.number_format = '#,##0.00' 
+
+            # Columna G (Tasa): Formato con más decimales si es necesario
+            cell_rate = ws.cell(row=current_row, column=7)
+            cell_rate.number_format = '#,##0.0000'
+
+            # Columna H (USD): Formato numérico
+            cell_usd = ws.cell(row=current_row, column=8)
+            cell_usd.number_format = '#,##0.00'
+
+        # 5. Ajustar ancho de columnas automáticamente (Opcional pero útil)
+        for col in ws.columns:
+            max_length = 0
+            column = col[0].column_letter # Get the column name
+            for cell in col:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = (max_length + 2)
+            ws.column_dimensions[column].width = adjusted_width
+
+        # 6. Guardar en la respuesta
+        wb.save(response)
+        return response
 
 class PayslipReadOnlyViewSet(viewsets.ReadOnlyModelViewSet):
     """
@@ -169,7 +354,39 @@ class PayslipReadOnlyViewSet(viewsets.ReadOnlyModelViewSet):
     """
     queryset = Payslip.objects.all()
     serializer_class = PayslipSerializer
+    filter_backends = [DjangoFilterBackend]
     filterset_fields = ['period', 'employee', 'currency_code']
+
+    @action(detail=True, methods=['get'], url_path='export-pdf')
+    def export_pdf(self, request, pk=None):
+        """
+        Genera el PDF individual para un recibo de pago.
+        Reuse the logic from Period export but for a single record.
+        """
+        import weasyprint
+        from django.template.loader import render_to_string
+        from django.http import HttpResponse
+
+        payslip = self.get_object()
+        
+        context = {
+            'payslips': [payslip], # El template espera una lista
+            'period_name': payslip.period.name,
+            'start_date': payslip.period.start_date,
+            'end_date': payslip.period.end_date,
+            'payment_date': payslip.period.payment_date,
+            'tenant_name': request.tenant.name if hasattr(request, 'tenant') else "Nóminix SaaS",
+            'tenant_rif': request.tenant.rif if hasattr(request, 'tenant') else "J-00000000-0",
+            'tenant_address': request.tenant.address if hasattr(request, 'tenant') else "",
+        }
+
+        html_string = render_to_string('payroll/payslip_batch.html', context)
+        pdf_file = weasyprint.HTML(string=html_string).write_pdf()
+
+        response = HttpResponse(pdf_file, content_type='application/pdf')
+        filename = f"recibo_{payslip.employee.national_id}_{payslip.period.id}.pdf"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
 
 
 class PayrollNoveltyViewSet(viewsets.ModelViewSet):
@@ -178,6 +395,7 @@ class PayrollNoveltyViewSet(viewsets.ModelViewSet):
     """
     queryset = PayrollNovelty.objects.all()
     serializer_class = PayrollNoveltySerializer
+    filter_backends = [DjangoFilterBackend]
     filterset_fields = ['employee', 'period', 'concept_code']
 
     @action(detail=False, methods=['post'], url_path='batch')
@@ -217,3 +435,23 @@ class PayrollNoveltyViewSet(viewsets.ModelViewSet):
                 {"error": f"Falla en procesamiento batch: {str(e)}"}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
+class CompanyConfigView(views.APIView):
+    """
+    Endpoint único para obtener/editar la configuración de la empresa.
+    Siempre devuelve el primer objeto encontrado o crea uno por defecto.
+    """
+    def get(self, request):
+        company = Company.objects.first()
+        if not company:
+            # Crear datos default si no existen
+            company = Company.objects.create(name="Mi Empresa C.A.", rif="J-00000000-0")
+        serializer = CompanySerializer(company)
+        return response.Response(serializer.data)
+
+    def put(self, request):
+        company = Company.objects.first()
+        serializer = CompanySerializer(company, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return response.Response(serializer.data)
+        return response.Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

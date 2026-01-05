@@ -415,44 +415,21 @@ class PayrollProcessor:
             # Obtener variables de entrada (novedades)
             input_vars = novelties_map.get(employee.id, {})
 
-            # Ejecutar Motor
+            # Ejecutar Motor (Lógica Centralizada LOTTT)
             engine = PayrollEngine(
                 contract=contract,
-                payment_date=period.payment_date,
+                period=period,
                 input_variables=input_vars
             )
             
-            # Recopilar conceptos aplicables
-            # (Nota: Aquí usamos la misma lógica que el motor, pero la persistimos)
-            # En una implementación real, el engine debería retornar los objetos Concepto calculados
-            # Para este MVP, calculamos asignaciones y deducciones
+            # Obtener resultados calculados por el motor
+            # Esto incluye: Conceptos de Contrato (Base, Cesta, Compl) + Deducciones Ley + Conceptos Dinámicos
+            calculation_result = engine.calculate_payroll()
             
-            results = []
-            e_total = Decimal('0.00')
-            d_total = Decimal('0.00')
-
-            # Obtener todos los conceptos para calcular (Asignados + Globales)
-            assigned_ids = employee.concepts.filter(active=True).values_list('concept_id', flat=True)
-            global_concepts = PayrollConcept.objects.filter(active=True).exclude(id__in=assigned_ids)
-            employee_assignments = employee.concepts.filter(active=True)
-
-            # --- Procesar Asignaciones Específicas ---
-            for sa in employee_assignments:
-                amt = engine.calculate_concept_amount(sa.concept, sa.override_value)
-                if amt > 0:
-                    results.append({'c': sa.concept, 'amt': amt})
-                    if sa.concept.kind == PayrollConcept.ConceptKind.EARNING: e_total += amt
-                    else: d_total += amt
-
-            # --- Procesar Globales ---
-            for gc in global_concepts:
-                amt = engine.calculate_concept_amount(gc)
-                if amt > 0:
-                    results.append({'c': gc, 'amt': amt})
-                    if gc.kind == PayrollConcept.ConceptKind.EARNING: e_total += amt
-                    else: d_total += amt
-
-            if not results:
+            result_lines = calculation_result.get('lines', [])
+            totals = calculation_result.get('totals', {})
+            
+            if not result_lines:
                 continue
 
             # 5. Guardar Snapshot e Inmutabilidad
@@ -461,37 +438,43 @@ class PayrollProcessor:
                 'salary_amount': str(contract.salary_amount),
                 'salary_currency': contract.salary_currency.code,
                 'payment_frequency': contract.payment_frequency,
-                'hire_date': str(employee.hire_date)
+                'hire_date': str(employee.hire_date),
+                'department': contract.department.name if contract.department else None,
+                'base_salary_bs': str(contract.base_salary_bs)
             }
 
             payslip = Payslip.objects.create(
                 period=period,
                 employee=employee,
                 contract_snapshot=snapshot,
-                total_income_ves=e_total,
-                total_deductions_ves=d_total,
-                net_pay_ves=e_total - d_total,
+                total_income_ves=totals.get('income_ves', 0),
+                total_deductions_ves=totals.get('deductions_ves', 0),
+                net_pay_ves=totals.get('net_pay_ves', 0),
                 exchange_rate_applied=bcv_rate,
                 currency_code='VES',
                 status=Payslip.PayslipStatus.DRAFT
             )
 
             # Bulk create de detalles
-            detail_objs = [
-                PayslipDetail(
-                    payslip=payslip,
-                    concept_code=r['c'].code,
-                    concept_name=r['c'].name,
-                    kind=r['c'].kind,
-                    amount_ves=r['amt'],
-                    # Guardamos el monto original si el contrato no es VES
-                    amount_src=(r['amt'] / bcv_rate).quantize(Decimal('0.01')) if contract.salary_currency.code != 'VES' else r['amt']
-                ) for r in results
-            ]
+            detail_objs = []
+            for line in result_lines:
+                # line = {'code', 'name', 'kind', 'amount_ves'}
+                detail_objs.append(
+                    PayslipDetail(
+                        payslip=payslip,
+                        concept_code=line['code'],
+                        concept_name=line['name'],
+                        kind=line['kind'],
+                        amount_ves=line['amount_ves'],
+                        # Referencial en moneda origen (si aplica)
+                        amount_src=(line['amount_ves'] / bcv_rate).quantize(Decimal('0.01')) if bcv_rate else 0
+                    )
+                )
+
             PayslipDetail.objects.bulk_create(detail_objs)
 
             processed_count += 1
-            total_income_ves += (e_total - d_total)
+            total_income_ves += totals.get('net_pay_ves', 0)
 
         # 6. Finalizar Periodo
         period.status = PayrollPeriod.Status.CLOSED
