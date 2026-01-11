@@ -16,21 +16,17 @@ import {
     PlusCircle,
     Eye
 } from 'lucide-react';
-import { clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { cn } from '../../utils/cn';
 import CreatePeriodModal from './CreatePeriodModal';
-import PayslipsListModal from './PayslipsListModal'; // <--- NUEVO
-
-function cn(...inputs) {
-    return twMerge(clsx(inputs));
-}
+import PayslipsListModal from './PayslipsListModal';
+import PayrollPreviewModal from './PayrollPreviewModal'; // <--- NUEVO
 
 /**
  * PayrollClosure - Módulo de Cierre Masivo y Reportes Históricos.
  */
-const PayrollClosure = () => {
-    const [periods, setPeriods] = useState([]);
-    const [loading, setLoading] = useState(true);
+const PayrollClosure = ({ initialPeriods, onRefresh }) => {
+    const [periods, setPeriods] = useState(initialPeriods || []);
+    const [loading, setLoading] = useState(!initialPeriods);
     const [processingId, setProcessingId] = useState(null);
     const [successData, setSuccessData] = useState(null);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -39,9 +35,33 @@ const PayrollClosure = () => {
     const [selectedPeriodForList, setSelectedPeriodForList] = useState(null);
     const [isListModalOpen, setIsListModalOpen] = useState(false);
 
+    // Estados para Previsualización
+    const [previewData, setPreviewData] = useState(null);
+    const [companyConfig, setCompanyConfig] = useState({}); // <--- Nuevo Estado
+    const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
+    const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+
+    // Estado para dropdown de tipo de recibo
+    const [pdfDropdownOpen, setPdfDropdownOpen] = useState(null);
+
     useEffect(() => {
-        loadPeriods();
-    }, []);
+        if (initialPeriods) {
+            setPeriods(initialPeriods);
+            setLoading(false);
+        } else {
+            loadPeriods();
+        }
+        loadCompanyConfig(); // <--- Cargar config al montar
+    }, [initialPeriods]);
+
+    const loadCompanyConfig = async () => {
+        try {
+            const config = await payrollService.getCompanyConfig();
+            setCompanyConfig(config);
+        } catch (error) {
+            console.error("Error cargando configuración de empresa:", error);
+        }
+    };
 
     const loadPeriods = async () => {
         setLoading(true);
@@ -100,6 +120,20 @@ const PayrollClosure = () => {
         }
     };
 
+    const handlePreview = async (period) => {
+        setIsPreviewLoading(true);
+        try {
+            const data = await payrollService.previewPayroll(period.id);
+            setPreviewData(data);
+            setIsPreviewModalOpen(true);
+        } catch (error) {
+            const errorMsg = error.response?.data?.error || "";
+            alert(`Error en previsualización: ${errorMsg || "No se pudo generar la vista previa."}`);
+        } finally {
+            setIsPreviewLoading(false);
+        }
+    };
+
     const downloadFile = (blob, filename) => {
         const url = window.URL.createObjectURL(new Blob([blob]));
         const link = document.createElement('a');
@@ -110,9 +144,9 @@ const PayrollClosure = () => {
         link.parentNode.removeChild(link);
     };
 
-    const handleDownloadPdf = async (id, name) => {
+    const handleDownloadPdf = async (id, name, receiptType = 'todos') => {
         try {
-            await payrollService.downloadPdf(id, name);
+            await payrollService.downloadPdf(id, name, receiptType);
         } catch (error) {
             alert("No se pudieron descargar los recibos.");
         }
@@ -159,6 +193,13 @@ const PayrollClosure = () => {
                 period={selectedPeriodForList}
             />
 
+            <PayrollPreviewModal
+                isOpen={isPreviewModalOpen}
+                onClose={() => setIsPreviewModalOpen(false)}
+                data={previewData}
+                companyConfig={companyConfig}
+            />
+
             {/* Grid de Periodos */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {periods.map((period) => (
@@ -166,7 +207,8 @@ const PayrollClosure = () => {
                         key={period.id}
                         className={cn(
                             "relative bg-white rounded-3xl p-6 shadow-sm border-l-8 transition-all hover:shadow-xl",
-                            period.status === 'OPEN' ? "border-nominix-electric" : "border-gray-200"
+                            period.status === 'OPEN' ? "border-nominix-electric" : "border-gray-200",
+                            pdfDropdownOpen == period.id ? "z-50" : "z-10"
                         )}
                     >
                         <div className="flex justify-between items-start mb-6">
@@ -200,6 +242,18 @@ const PayrollClosure = () => {
                                     )}
                                     {processingId === period.id ? 'Procesando...' : 'Ejecutar Cierre Masivo'}
                                 </button>
+                                <button
+                                    onClick={() => handlePreview(period)}
+                                    disabled={isPreviewLoading || processingId !== null}
+                                    className="w-full flex items-center justify-center gap-3 bg-white border border-gray-200 hover:border-nominix-electric text-gray-600 hover:text-nominix-electric py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-sm active:scale-95 disabled:opacity-50"
+                                >
+                                    {isPreviewLoading ? (
+                                        <Loader2 className="animate-spin" size={18} />
+                                    ) : (
+                                        <Eye size={18} />
+                                    )}
+                                    {isPreviewLoading ? 'Calculando...' : 'Previsualizar Nómina'}
+                                </button>
                                 <div className="flex items-start gap-2 text-amber-500 bg-amber-50 p-4 rounded-2xl">
                                     <AlertTriangle size={14} className="mt-0.5 shrink-0" />
                                     <p className="text-[9px] font-bold leading-relaxed uppercase tracking-wider">
@@ -216,13 +270,38 @@ const PayrollClosure = () => {
                                     <Download size={18} className="text-gray-400 group-hover:text-white" />
                                     <span className="text-[8px] font-black uppercase tracking-widest text-center">Reporte Finanzas</span>
                                 </button>
-                                <button
-                                    onClick={() => handleDownloadPdf(period.id, period.name)}
-                                    className="flex flex-col items-center justify-center gap-2 py-4 bg-gray-50 hover:bg-nominix-electric hover:text-white rounded-2xl border border-gray-100 transition-all group"
-                                >
-                                    <FileText size={18} className="text-gray-400 group-hover:text-white" />
-                                    <span className="text-[8px] font-black uppercase tracking-widest text-center">Recibos PDF</span>
-                                </button>
+                                <div className="relative">
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setPdfDropdownOpen(pdfDropdownOpen == period.id ? null : period.id);
+                                        }}
+                                        className="w-full flex flex-col items-center justify-center gap-2 py-4 bg-gray-50 hover:bg-nominix-electric hover:text-white rounded-2xl border border-gray-100 transition-all group"
+                                    >
+                                        <FileText size={18} className="text-gray-400 group-hover:text-white" />
+                                        <span className="text-[8px] font-black uppercase tracking-widest text-center">Recibos PDF ▼</span>
+                                    </button>
+                                    {pdfDropdownOpen == period.id && (
+                                        <div className="absolute z-[100] top-full right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden min-w-[200px] animate-in fade-in zoom-in-95 duration-200 origin-top-right">
+                                            <div className="p-2 border-b border-gray-50 bg-gray-50/50">
+                                                <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest px-2">Seleccione Tipo</p>
+                                            </div>
+                                            <button onClick={() => { handleDownloadPdf(period.id, period.name, 'todos'); setPdfDropdownOpen(null); }} className="w-full px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest hover:bg-nominix-electric hover:text-white transition-colors flex items-center gap-2">
+                                                <span className="text-lg">📄</span> Todos los Recibos
+                                            </button>
+                                            <button onClick={() => { handleDownloadPdf(period.id, period.name, 'salario'); setPdfDropdownOpen(null); }} className="w-full px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest hover:bg-nominix-electric hover:text-white transition-colors flex items-center gap-2 border-t border-gray-50">
+                                                <span className="text-lg">💵</span> Solo Salario Base
+                                            </button>
+                                            <button onClick={() => { handleDownloadPdf(period.id, period.name, 'complemento'); setPdfDropdownOpen(null); }} className="w-full px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest hover:bg-nominix-electric hover:text-white transition-colors flex items-center gap-2 border-t border-gray-50">
+                                                <span className="text-lg">🥗</span> Solo Complemento
+                                            </button>
+                                            <button onClick={() => { handleDownloadPdf(period.id, period.name, 'cestaticket'); setPdfDropdownOpen(null); }} className="w-full px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest hover:bg-nominix-electric hover:text-white transition-colors flex items-center gap-2 border-t border-gray-50">
+                                                <span className="text-lg">🍽️</span> Solo Cestaticket
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
                                 <button
                                     onClick={() => {
                                         setSelectedPeriodForList(period);
@@ -306,7 +385,7 @@ const PayrollClosure = () => {
             <CreatePeriodModal
                 isOpen={isCreateModalOpen}
                 onClose={() => setIsCreateModalOpen(false)}
-                onSuccess={loadPeriods}
+                onSuccess={onRefresh}
             />
         </div>
     );

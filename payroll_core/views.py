@@ -18,13 +18,13 @@ from rest_framework.views import APIView
 from .models import (
     Employee, LaborContract, ExchangeRate, PayrollConcept, 
     EmployeeConcept, Branch, Currency, PayrollPeriod, Payslip,
-    PayrollNovelty, Company, Department
+    PayrollNovelty, Company, Department, Loan, LoanPayment
 )
 from .serializers import (
     EmployeeSerializer, BranchSerializer, LaborContractSerializer,
     CurrencySerializer, PayrollConceptSerializer, EmployeeConceptSerializer,
     PayrollPeriodSerializer, PayslipSerializer, PayrollNoveltySerializer, CompanySerializer,
-    DepartmentSerializer
+    DepartmentSerializer, LoanSerializer, LoanPaymentSerializer
 )
 from .engine import PayrollEngine
 
@@ -206,6 +206,22 @@ class PayrollPeriodViewSet(viewsets.ModelViewSet):
     queryset = PayrollPeriod.objects.all()
     serializer_class = PayrollPeriodSerializer
 
+    @action(detail=True, methods=['get', 'post'], url_path='preview-payroll')
+    def preview_payroll(self, request, pk=None):
+        """
+        GET/POST /api/payroll-periods/{id}/preview-payroll/
+        Calcula la nómina proyectada para todos los empleados del periodo.
+        """
+        try:
+            from .services.payroll import PayrollProcessor
+            manual_rate = request.data.get('manual_rate') if request.method == 'POST' else request.query_params.get('manual_rate')
+            result = PayrollProcessor.preview_period(pk, manual_rate=manual_rate)
+            return Response(result, status=status.HTTP_200_OK)
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"error": f"Falla inesperada en previsualización: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
     @action(detail=True, methods=['post'], url_path='close-period')
     def close_period(self, request, pk=None):
         """
@@ -223,40 +239,54 @@ class PayrollPeriodViewSet(viewsets.ModelViewSet):
             return Response({"error": f"Falla inesperada en cierre: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     @action(detail=True, methods=['get'], url_path='export-pdf')
     def export_payslips_pdf(self, request, pk=None):
-            """
-            Genera un PDF masivo con todos los recibos del periodo.
-            """
-            period = self.get_object()
-            
-            # Obtener recibos asociados a este periodo
-            # Usamos select_related para optimizar la consulta a DB y traer los detalles, empleados y sus departamentos
-            payslips = period.payslips.select_related('employee', 'employee__department').prefetch_related('details').all()
-            
-            if not payslips.exists():
-                return Response({"error": "No hay recibos generados para este periodo."}, status=404)
+        """
+        Genera un PDF masivo con todos los recibos del periodo.
+        Params: ?tipo=todos|salario|complemento|cestaticket
+        """
+        period = self.get_object()
+        tipo_recibo = request.query_params.get('tipo', 'todos')
+        
+        # Obtener recibos asociados a este periodo
+        payslips = period.payslips.select_related('employee', 'employee__department').prefetch_related('details').all()
+        
+        if not payslips.exists():
+            return Response({"error": "No hay recibos generados para este periodo."}, status=404)
 
-            # Contexto para el Template HTML
-            context = {
-                'payslips': payslips,
-                'period_name': period.name,
-                'start_date': period.start_date,
-                'end_date': period.end_date,
-                'payment_date': period.payment_date,
-                'tenant_name': request.tenant.name,
-                'tenant_rif': request.tenant.rif,
-                'tenant_address': request.tenant.address,
-            }
+        # Contexto para el Template HTML
+        company_config = Company.objects.first()
+        context = {
+            'payslips': payslips,
+            'period_name': period.name,
+            'start_date': period.start_date,
+            'end_date': period.end_date,
+            'payment_date': period.payment_date,
+            'tenant_name': request.tenant.name,
+            'tenant_rif': request.tenant.rif,
+            'tenant_address': request.tenant.address,
+            'company_config': company_config,
+            'tipo_recibo': tipo_recibo,  # Pasamos el tipo al template
+        }
 
-            # 1. Renderizar HTML string
-            html_string = render_to_string('payroll/payslip_batch.html', context)
+        # Seleccionar template según tipo de recibo
+        template_map = {
+            'todos': 'payroll/payslip_batch.html',
+            'salario': 'payroll/recibo_salario.html',
+            'complemento': 'payroll/recibo_complemento.html',
+            'cestaticket': 'payroll/recibo_cestaticket.html',
+        }
+        template_name = template_map.get(tipo_recibo, 'payroll/payslip_batch.html')
 
-            # 2. Generar PDF con WeasyPrint
-            pdf_file = weasyprint.HTML(string=html_string).write_pdf()
+        # 1. Renderizar HTML string
+        html_string = render_to_string(template_name, context)
 
-            # 3. Retornar respuesta HTTP con Content-Type correcto
-            response = HttpResponse(pdf_file, content_type='application/pdf')
-            response['Content-Disposition'] = f'attachment; filename="nomina_{period.id}.pdf"'
-            return response
+        # 2. Generar PDF con WeasyPrint
+        pdf_file = weasyprint.HTML(string=html_string).write_pdf()
+
+        # 3. Retornar respuesta HTTP con Content-Type correcto
+        suffix = f'_{tipo_recibo}' if tipo_recibo != 'todos' else ''
+        response = HttpResponse(pdf_file, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="nomina{suffix}_{period.id}.pdf"'
+        return response
 
     @action(detail=True, methods=['get'], url_path='export-finance')
     def export_finance_report(self, request, pk=None):
@@ -368,6 +398,7 @@ class PayslipReadOnlyViewSet(viewsets.ReadOnlyModelViewSet):
         from django.http import HttpResponse
 
         payslip = self.get_object()
+        company_config = Company.objects.first()
         
         context = {
             'payslips': [payslip], # El template espera una lista
@@ -378,6 +409,7 @@ class PayslipReadOnlyViewSet(viewsets.ReadOnlyModelViewSet):
             'tenant_name': request.tenant.name if hasattr(request, 'tenant') else "Nóminix SaaS",
             'tenant_rif': request.tenant.rif if hasattr(request, 'tenant') else "J-00000000-0",
             'tenant_address': request.tenant.address if hasattr(request, 'tenant') else "",
+            'company_config': company_config,
         }
 
         html_string = render_to_string('payroll/payslip_batch.html', context)
@@ -455,3 +487,16 @@ class CompanyConfigView(views.APIView):
             serializer.save()
             return response.Response(serializer.data)
         return response.Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class LoanViewSet(viewsets.ModelViewSet):
+    queryset = Loan.objects.all()
+    serializer_class = LoanSerializer
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_fields = ['employee', 'status', 'currency', 'frequency']
+    search_fields = ['employee__first_name', 'employee__last_name', 'employee__national_id', 'description']
+
+class LoanPaymentViewSet(viewsets.ModelViewSet):
+    queryset = LoanPayment.objects.all()
+    serializer_class = LoanPaymentSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['loan', 'payslip']

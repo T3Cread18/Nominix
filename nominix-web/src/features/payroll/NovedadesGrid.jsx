@@ -16,25 +16,17 @@ import {
     Download,
     Upload
 } from 'lucide-react';
-import { clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
-
-/**
- * Utility to merge tailwind classes
- */
-function cn(...inputs) {
-    return twMerge(clsx(inputs));
-}
+import { cn } from '../../utils/cn';
 
 /**
  * NovedadesGrid - Componente de edición masiva de incidencias.
  * Proporciona una interfaz tipo Excel para cargar variables de nómina.
  */
-const NovedadesGrid = () => {
-    const [periods, setPeriods] = useState([]);
+const NovedadesGrid = ({ initialPeriods, initialEmployees }) => {
+    const [periods, setPeriods] = useState(initialPeriods || []);
     const [selectedPeriodId, setSelectedPeriodId] = useState('');
-    const [employees, setEmployees] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [employees, setEmployees] = useState(initialEmployees || []);
+    const [loading, setLoading] = useState(!initialPeriods || !initialEmployees);
     const [saving, setSaving] = useState(false);
     const [isDirty, setIsDirty] = useState(false);
 
@@ -42,50 +34,48 @@ const NovedadesGrid = () => {
     const [data, setData] = useState([]);
 
     useEffect(() => {
-        fetchInitialData();
-    }, []);
+        if (initialEmployees && initialPeriods) {
+            setupGrid();
+        } else {
+            loadInitialData();
+        }
+    }, [initialEmployees, initialPeriods]);
 
-    /**
-     * Carga los datos maestros necesarios para la cuadrícula.
-     */
-    const fetchInitialData = async () => {
+    const loadInitialData = async () => {
+        setLoading(true);
         try {
-            const [pRes, eRes] = await Promise.all([
+            const [periodsRes, employeesRes] = await Promise.all([
                 axiosClient.get('/payroll-periods/'),
-                axiosClient.get('/employees/?page_size=1000') // Solicitar lote grande para el grid técnico
+                axiosClient.get('/employees/?is_active=true&page_size=1000')
             ]);
+            const periodsList = periodsRes.data.results || periodsRes.data;
+            const employeesList = employeesRes.data.results || employeesRes.data;
 
-            const periodsList = pRes.data.results || pRes.data;
             const openPeriods = periodsList.filter(p => p.status === 'OPEN');
             setPeriods(openPeriods);
-
+            setEmployees(employeesList);
             if (openPeriods.length > 0) {
                 setSelectedPeriodId(openPeriods[0].id);
-            } else {
-                setLoading(false); // Detener loading si no hay periodos para procesar
-            }
-
-            const employeesList = eRes.data.results || eRes.data;
-            setEmployees(employeesList);
-
-            // Si no hay periodos, inicializar data solo con empleados para que el grid no esté vacío
-            if (openPeriods.length === 0) {
-                const initialTableData = employeesList.map(emp => ({
-                    id: emp.id,
-                    name: emp.full_name,
-                    national_id: emp.national_id,
-                    position: emp.position,
-                    H_EXTRA: 0,
-                    B_NOCTURNO: 0,
-                    FALTAS: 0,
-                }));
-                setData(initialTableData);
             }
         } catch (error) {
-            console.error("Error al cargar datos iniciales:", error);
+            console.error("Error loading data:", error);
         } finally {
             setLoading(false);
         }
+    };
+
+    /**
+     * Inicializa el estado local basándose en las props.
+     */
+    const setupGrid = () => {
+        const openPeriods = initialPeriods.filter(p => p.status === 'OPEN');
+        setPeriods(openPeriods);
+        setEmployees(initialEmployees);
+
+        if (openPeriods.length > 0) {
+            setSelectedPeriodId(openPeriods[0].id);
+        }
+        setLoading(false);
     };
 
     /**

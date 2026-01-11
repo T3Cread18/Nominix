@@ -7,7 +7,9 @@ from rest_framework import serializers
 from django.db import connection
 from .models import Client, Domain
 from typing import Dict, Any
+import logging
 
+logger = logging.getLogger(__name__)
 
 class DomainSerializer(serializers.ModelSerializer):
     """Serializer para el modelo Domain."""
@@ -47,6 +49,7 @@ class ClientSerializer(serializers.ModelSerializer):
             'created_on',
             'domains',
             'primary_domain',
+            'price_per_employee',
         ]
         read_only_fields = ['id', 'created_on', 'domains']
         extra_kwargs = {
@@ -55,6 +58,10 @@ class ClientSerializer(serializers.ModelSerializer):
                 'help_text': 'Nombre del esquema en PostgreSQL (sin espacios, minúsculas)'
             },
         }
+
+    def validate(self, attrs):
+        logger.info(f"Validating Tenant Data: {attrs}")
+        return super().validate(attrs)
     
     def validate_schema_name(self, value: str) -> str:
         """Valida que el schema_name sea válido para PostgreSQL."""
@@ -87,8 +94,12 @@ class ClientSerializer(serializers.ModelSerializer):
         """Valida y normaliza el RIF."""
         value = value.upper().strip()
         
-        # Verificar que no exista
-        if Client.objects.filter(rif=value).exists():
+        # Verificar que no exista, excluyendo la instancia actual
+        qs = Client.objects.filter(rif=value)
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+            
+        if qs.exists():
             raise serializers.ValidationError(
                 f"Ya existe un tenant con el RIF '{value}'"
             )

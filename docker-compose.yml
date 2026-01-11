@@ -1,0 +1,40 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: nominix_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=nominix_db
+      - POSTGRES_USER=nominix_user
+      - POSTGRES_PASSWORD=nominix_password
+    restart: always
+    ports:
+      - "5423:5432"
+
+  backend:
+    build: .
+    container_name: nominix_backend
+    volumes:
+      - .:/app
+    environment:
+      - DEBUG=True
+      - SECRET_KEY=django-insecure-docker-dev-key
+      - DATABASE_URL=postgres://nominix_user:nominix_password@db:5432/nominix_db
+    depends_on:
+      - db
+    expose:
+      - "8000"
+    restart: always
+
+  frontend:
+    build: ./nominix-web
+    container_name: nominix_frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: always
+
+volumes:
+  postgres_data:

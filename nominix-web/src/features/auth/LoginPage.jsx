@@ -1,28 +1,30 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useNavigate } from 'react-router-dom'; // <--- 1. IMPORTAR ESTO
 import {
-    Lock,
-    User,
-    ChevronRight,
-    Loader2,
-    ShieldCheck,
-    AlertCircle
+    Lock, User, ChevronRight, Loader2,
+    ShieldCheck, AlertCircle
 } from 'lucide-react';
-import { clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
-
-function cn(...inputs) {
-    return twMerge(clsx(inputs));
-}
+import { cn } from '../../utils/cn';
 
 const LoginPage = () => {
-    const { login, tenant } = useAuth();
+    const { login, tenant, user } = useAuth(); // Traemos 'user' para verificar si ya entró
+    const navigate = useNavigate(); // <--- 2. INICIALIZAR HOOK
+
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [formData, setFormData] = useState({
         username: '',
         password: ''
     });
+
+    // 3. EFECTO DE SEGURIDAD:
+    // Si el usuario ya está logueado (ej: recargó la página), sácalo del login y mándalo al home
+    useEffect(() => {
+        if (user) {
+            navigate('/');
+        }
+    }, [user, navigate]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -31,8 +33,17 @@ const LoginPage = () => {
 
         try {
             await login(formData.username, formData.password);
+            // 4. REDIRECCIÓN EXITOSA
+            // Aquí es donde ocurre la magia después de que el backend responde 200 OK
+            navigate('/');
         } catch (err) {
-            setError(err.response?.data?.error || 'Error al iniciar sesión. Revisa tus credenciales.');
+            console.error(err);
+            // Manejo robusto de errores del backend
+            setError(
+                err.response?.data?.error ||
+                err.response?.data?.detail ||
+                'Credenciales inválidas o error de conexión.'
+            );
         } finally {
             setLoading(false);
         }
@@ -47,9 +58,14 @@ const LoginPage = () => {
                         <ShieldCheck size={40} className="text-white" />
                     </div>
                     <h1 className="text-4xl font-black italic tracking-tighter text-nominix-dark">NÓMINIX</h1>
+
+                    {/* INDICADOR DE TENANT (Muy importante en SaaS) */}
                     {tenant ? (
-                        <div className="mt-2 inline-block px-3 py-1 bg-nominix-dark text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-full">
-                            {tenant.name}
+                        <div className="mt-2 inline-flex flex-col items-center">
+                            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">Empresa</span>
+                            <div className="px-4 py-1 bg-white border border-gray-200 text-nominix-dark text-xs font-black uppercase tracking-widest rounded-full shadow-sm">
+                                {tenant.name}
+                            </div>
                         </div>
                     ) : (
                         <p className="text-gray-400 font-bold text-xs uppercase tracking-widest mt-2">Acceso Colaboradores</p>
@@ -57,16 +73,16 @@ const LoginPage = () => {
                 </div>
 
                 {/* Formulario */}
-                <div className="bg-nominix-surface p-10 rounded-[2.5rem] shadow-sm border border-gray-100 relative overflow-hidden">
+                <div className="bg-white p-10 rounded-[2.5rem] shadow-xl shadow-gray-200/50 border border-gray-100 relative overflow-hidden">
                     {/* Decoración sutil */}
                     <div className="absolute top-0 right-0 w-32 h-32 bg-nominix-electric/5 rounded-full -mr-16 -mt-16 blur-2xl"></div>
 
-                    <h2 className="text-xl font-bold mb-8 text-center">¡Bienvenido de nuevo!</h2>
+                    <h2 className="text-xl font-bold mb-8 text-center text-slate-800">¡Bienvenido de nuevo!</h2>
 
                     {error && (
                         <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 rounded-r-xl flex items-center gap-3 animate-shake">
                             <AlertCircle className="text-red-500 shrink-0" size={20} />
-                            <p className="text-xs text-red-700 font-bold uppercase tracking-tight">{error}</p>
+                            <p className="text-xs text-red-700 font-bold uppercase tracking-tight leading-tight">{error}</p>
                         </div>
                     )}
 
@@ -75,16 +91,17 @@ const LoginPage = () => {
                             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
                                 <User size={12} /> Usuario o Cédula
                             </label>
-                            <div className="relative">
+                            <div className="relative group">
                                 <input
                                     type="text"
                                     required
-                                    className="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-nominix-electric focus:ring-0 focus:outline-none font-bold transition-all pr-12"
+                                    autoFocus // <--- Pequeña mejora de UX
+                                    className="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:bg-white focus:border-nominix-electric focus:ring-0 focus:outline-none font-bold text-slate-700 transition-all pr-12 placeholder:text-gray-300"
                                     placeholder="Ej: admin"
                                     value={formData.username}
                                     onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                                 />
-                                <User className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300" size={20} />
+                                <User className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-nominix-electric transition-colors" size={20} />
                             </div>
                         </div>
 
@@ -92,16 +109,16 @@ const LoginPage = () => {
                             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
                                 <Lock size={12} /> Contraseña
                             </label>
-                            <div className="relative">
+                            <div className="relative group">
                                 <input
                                     type="password"
                                     required
-                                    className="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-nominix-electric focus:ring-0 focus:outline-none font-bold transition-all pr-12"
+                                    className="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:bg-white focus:border-nominix-electric focus:ring-0 focus:outline-none font-bold text-slate-700 transition-all pr-12 placeholder:text-gray-300"
                                     placeholder="••••••••"
                                     value={formData.password}
                                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                                 />
-                                <Lock className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300" size={20} />
+                                <Lock className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-nominix-electric transition-colors" size={20} />
                             </div>
                         </div>
 
@@ -110,13 +127,13 @@ const LoginPage = () => {
                             disabled={loading}
                             className={cn(
                                 "w-full bg-nominix-electric text-white py-5 rounded-2xl font-bold text-lg shadow-xl shadow-nominix-electric/20",
-                                "hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50",
+                                "hover:bg-nominix-dark active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed",
                                 "flex items-center justify-center gap-2 uppercase tracking-widest overflow-hidden group"
                             )}
                         >
                             {loading ? <Loader2 className="animate-spin" /> : (
                                 <>
-                                    Ingresar al Sistema
+                                    Ingresar
                                     <ChevronRight size={20} className="group-hover:translate-x-1 transition-transform" />
                                 </>
                             )}
@@ -131,7 +148,7 @@ const LoginPage = () => {
                 </div>
 
                 {/* Footer */}
-                <div className="mt-8 text-center text-gray-400 text-[10px] font-black uppercase tracking-[0.3em]">
+                <div className="mt-8 text-center text-gray-400 text-[10px] font-black uppercase tracking-[0.3em] opacity-50">
                     &copy; 2025 NÓMINIX VZLA - SAAS EDITION
                 </div>
             </div>

@@ -2,10 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axiosClient from '../api/axiosClient';
 import { Plus, Check, ChevronDown, Loader2, X, Layers } from 'lucide-react';
 import { toast } from 'sonner';
-import { clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
-
-function cn(...inputs) { return twMerge(clsx(inputs)); }
+import { cn } from '../utils/cn';
 
 export default function DepartmentSelector({ value, onChange, error, branchId }) {
     const [departments, setDepartments] = useState([]);

@@ -2,7 +2,7 @@ from rest_framework import serializers
 from .models import (
     Employee, LaborContract, Branch, PayrollConcept, 
     EmployeeConcept, Currency, PayrollPeriod, Payslip, PayslipDetail,
-    PayrollNovelty, Company, Department
+    PayrollNovelty, Company, Department, Loan, LoanPayment
 )
 
 class PayrollNoveltySerializer(serializers.ModelSerializer):
@@ -24,10 +24,7 @@ class PayrollConceptSerializer(serializers.ModelSerializer):
     currency_data = CurrencySerializer(source='currency', read_only=True)
     class Meta:
         model = PayrollConcept
-        fields = [
-            'id', 'code', 'name', 'kind', 'computation_method', 
-            'value', 'currency', 'currency_data', 'is_salary_incidence', 'active'
-        ]
+        fields = ['id', 'code', 'name', 'kind', 'computation_method', 'value', 'currency', 'currency_data', 'is_salary_incidence', 'active', 'formula', 'show_on_payslip']
 
 class EmployeeConceptSerializer(serializers.ModelSerializer):
     concept_data = PayrollConceptSerializer(source='concept', read_only=True)
@@ -128,3 +125,23 @@ class CompanySerializer(serializers.ModelSerializer):
     class Meta:
         model = Company
         fields = '__all__'
+
+class LoanPaymentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LoanPayment
+        fields = '__all__'
+
+class LoanSerializer(serializers.ModelSerializer):
+    payments = LoanPaymentSerializer(many=True, read_only=True)
+    employee_data = EmployeeSerializer(source='employee', read_only=True)
+    currency_data = CurrencySerializer(source='currency', read_only=True)
+    
+    class Meta:
+        model = Loan
+        fields = [
+            'id', 'employee', 'employee_data', 'description', 
+            'amount', 'interest_rate', 'balance', 'currency', 'currency_data',
+            'num_installments', 'installment_amount', 'frequency', 
+            'status', 'start_date', 'payments', 'created_at'
+        ]
+        read_only_fields = ['balance', 'created_at', 'updated_at']

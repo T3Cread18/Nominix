@@ -12,10 +12,7 @@ import {
     User, Camera, Loader2, Building2, ChevronLeft,
     UserX, UserCheck, Trash2 // <--- 2. NUEVOS ICONOS
 } from 'lucide-react';
-import { clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
-
-function cn(...inputs) { return twMerge(clsx(inputs)); }
+import { cn } from '../../utils/cn';
 
 const EmployeeFormPage = () => {
     const { id } = useParams();
@@ -51,22 +48,56 @@ const EmployeeFormPage = () => {
 
     // Catálogos
     const [branches, setBranches] = useState([]);
+
+    // Sub-entidades (Para evitar re-fetch en pestañas)
+    const [contracts, setContracts] = useState([]);
+    const [assignedConcepts, setAssignedConcepts] = useState([]);
+    const [exchangeRate, setExchangeRate] = useState(60.00);
+    const [loadingSubs, setLoadingSubs] = useState(false);
+
     const fileInputRef = useRef(null);
+    const hasLoaded = useRef(false);
 
     // --- CARGA INICIAL ---
     useEffect(() => {
-        const loadCatalogs = async () => {
-            try {
-                const res = await axiosClient.get('/branches/');
-                setBranches(res.data.results || res.data);
-            } catch (error) { toast.error("Error cargando sedes"); }
-        };
-        loadCatalogs();
+        if (!hasLoaded.current) {
+            const loadCatalogs = async () => {
+                try {
+                    const res = await axiosClient.get('/branches/');
+                    setBranches(res.data.results || res.data);
+                } catch (error) { toast.error("Error cargando sedes"); }
+            };
+            loadCatalogs();
 
-        if (isEditing) {
-            fetchEmployee();
+            if (isEditing) {
+                fetchEmployee();
+                fetchSubEntities();
+            }
+            hasLoaded.current = true;
         }
-    }, [id]);
+    }, [id, isEditing]);
+
+    const fetchSubEntities = async () => {
+        if (!id) return;
+        setLoadingSubs(true);
+        try {
+            const [contractsRes, conceptsRes, rateRes] = await Promise.all([
+                axiosClient.get(`/contracts/?employee=${id}`),
+                axiosClient.get(`/employee-concepts/?employee=${id}`),
+                axiosClient.get('/exchange-rates/latest/?currency=USD')
+            ]);
+
+            setContracts(contractsRes.data.results || contractsRes.data);
+            setAssignedConcepts(conceptsRes.data.results || conceptsRes.data);
+
+            const rate = rateRes.data.rate || rateRes.data.value || 60.00;
+            setExchangeRate(parseFloat(rate));
+        } catch (error) {
+            console.error("Error loading sub-entities:", error);
+        } finally {
+            setLoadingSubs(false);
+        }
+    };
 
     const fetchEmployee = async () => {
         setLoading(true);
@@ -380,8 +411,8 @@ const EmployeeFormPage = () => {
                     )}
                 </div>
 
-                {/* CONTENIDO DEL FORMULARIO */}
-                {activeTab === 'profile' && (
+                {/* CONTENIDO DEL FORMULARIO CON CSS HIDDEN PARA PRESERVAR ESTADO */}
+                <div className={cn(activeTab !== 'profile' && "hidden")}>
                     <form id="employee-form" onSubmit={handleSave} className="space-y-8 animate-in fade-in">
                         <Section title="Información Básica">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -431,17 +462,31 @@ const EmployeeFormPage = () => {
                             </div>
                         </Section>
                     </form>
-                )}
+                </div>
 
-                {isEditing && activeTab === 'contract' && (
-                    <div className="bg-white p-8 rounded-[2rem] border border-gray-100">
-                        <LaborContractsManager employeeId={id} employeeData={employee} />
-                    </div>
-                )}
-                {isEditing && activeTab === 'payroll' && (
-                    <div className="bg-white p-8 rounded-[2rem] border border-gray-100">
-                        <EmployeeConcepts employeeId={id} employeeData={employee} />
-                    </div>
+                {isEditing && (
+                    <>
+                        <div className={cn(activeTab !== 'contract' && "hidden", "bg-white p-8 rounded-[2rem] border border-gray-100")}>
+                            <LaborContractsManager
+                                employeeId={id}
+                                employeeData={employee}
+                                initialContracts={contracts}
+                                onRefresh={fetchSubEntities}
+                                loading={loadingSubs}
+                            />
+                        </div>
+                        <div className={cn(activeTab !== 'payroll' && "hidden", "bg-white p-8 rounded-[2rem] border border-gray-100")}>
+                            <EmployeeConcepts
+                                employeeId={id}
+                                employeeData={employee}
+                                initialAssignedConcepts={assignedConcepts}
+                                initialActiveContract={contracts.find(c => c.is_active)}
+                                initialExchangeRate={exchangeRate}
+                                onRefresh={fetchSubEntities}
+                                isLoading={loadingSubs}
+                            />
+                        </div>
+                    </>
                 )}
             </div>
         </div>

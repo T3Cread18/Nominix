@@ -8,7 +8,7 @@ from .views import (
     EmployeeViewSet, BranchViewSet, LaborContractViewSet,
     CurrencyViewSet, PayrollConceptViewSet, EmployeeConceptViewSet,
     PayrollPeriodViewSet, PayslipReadOnlyViewSet, PayrollNoveltyViewSet,
-    CompanyConfigView, DepartmentViewSet
+    CompanyConfigView, DepartmentViewSet, LoanViewSet, LoanPaymentViewSet
 )
 
 app_name = 'payroll_core'
@@ -24,6 +24,9 @@ router.register(r'payroll-periods', PayrollPeriodViewSet, basename='payroll-peri
 router.register(r'payslips', PayslipReadOnlyViewSet, basename='payslip')
 router.register(r'payroll-novelties', PayrollNoveltyViewSet, basename='payroll-novelty')
 router.register(r'departments', DepartmentViewSet, basename='department')
+# Loan Routes
+router.register(r'loans', LoanViewSet, basename='loan')
+router.register(r'loan-payments', LoanPaymentViewSet, basename='loan-payment')
 
 urlpatterns = [
     path('', include(router.urls)),

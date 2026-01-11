@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Recibo de Complemento</title>
+    <style>
+        @page {
+            size: letter;
+            margin: 1.5cm;
+        }
+
+        body {
+            font-family: 'Helvetica', sans-serif;
+            font-size: 11px;
+            color: #333;
+        }
+
+        .page-break {
+            page-break-after: always;
+        }
+
+        .header {
+            border-bottom: 2px solid #28A745;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+
+        .company-name {
+            font-size: 14px;
+            font-weight: bold;
+            text-transform: uppercase;
+            color: #28A745;
+        }
+
+        .receipt-title {
+            font-size: 13px;
+            font-weight: bold;
+            text-align: center;
+            margin: 20px 0;
+            padding: 10px;
+            background-color: #E8F5E9;
+            border-radius: 5px;
+            color: #1B5E20;
+        }
+
+        .legal-ref {
+            text-align: center;
+            font-size: 10px;
+            color: #666;
+            margin-bottom: 20px;
+            font-style: italic;
+        }
+
+        .worker-info {
+            display: table;
+            width: 100%;
+            margin-bottom: 20px;
+            font-size: 10px;
+        }
+
+        .row {
+            display: table-row;
+        }
+
+        .col {
+            display: table-cell;
+            padding: 3px 0;
+            width: 50%;
+        }
+
+        .label {
+            font-weight: bold;
+            color: #666;
+            width: 110px;
+            display: inline-block;
+        }
+
+        .amount-box {
+            text-align: center;
+            padding: 20px;
+            background-color: #F0FFF0;
+            border: 2px solid #28A745;
+            border-radius: 10px;
+            margin: 20px auto;
+            max-width: 300px;
+        }
+
+        .amount-label {
+            font-size: 11px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .amount-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #28A745;
+            font-family: 'Courier New', monospace;
+        }
+
+        .note {
+            text-align: center;
+            font-size: 9px;
+            color: #999;
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #FFF9E6;
+            border-radius: 5px;
+        }
+
+        .firmas {
+            margin-top: 60px;
+            width: 100%;
+        }
+
+        .linea-firma {
+            border-top: 1px solid #000;
+            width: 40%;
+            display: inline-block;
+            margin: 0 5%;
+            text-align: center;
+            padding-top: 5px;
+            font-size: 9px;
+        }
+
+        .footer {
+            margin-top: 40px;
+            text-align: center;
+            font-size: 8px;
+            color: #999;
+            border-top: 1px solid #eee;
+            padding-top: 5px;
+        }
+    </style>
+</head>
+
+<body>
+    {% for payslip in payslips %}
+    {% if payslip.complemento_amount > 0 %}
+    <div class="page-break">
+        <!-- ENCABEZADO -->
+        <div class="header">
+            <div class="company-name">{{ payslip.employee.branch.name|default:tenant_name }}</div>
+            <div>RIF: {{ payslip.employee.branch.rif|default:tenant_rif }}</div>
+            <div>{{ payslip.employee.branch.address|default:tenant_address }}</div>
+            <div style="text-align: right; font-size: 10px;">
+                N° {{ payslip.employee.national_id }}-{{ payment_date|date:"Ymd" }}-COMP
+            </div>
+        </div>
+
+        <!-- TÍTULO Y REFERENCIA LEGAL -->
+        <div class="receipt-title">
+            Complemento de Beneficio de Alimentación<br>
+            en Carácter No Remunerativo
+        </div>
+        <div class="legal-ref">
+            Conforme al Artículo 105 de la Ley Orgánica del Trabajo, los Trabajadores y las Trabajadoras (LOTTT)<br>
+            y Artículo 50 del Reglamento de la Ley Orgánica del Trabajo (RLOT)
+        </div>
+
+        <!-- DATOS DEL TRABAJADOR -->
+        <div class="worker-info">
+            <div class="row">
+                <div class="col">
+                    <span class="label">Trabajador:</span> {{ payslip.employee.full_name }}
+                </div>
+                <div class="col">
+                    <span class="label">Cédula:</span> {{ payslip.employee.national_id }}
+                </div>
+            </div>
+            <div class="row">
+                <div class="col">
+                    <span class="label">Cargo:</span> {{ payslip.contract_snapshot.position }}
+                </div>
+                <div class="col">
+                    <span class="label">Departamento:</span> {{ payslip.employee.department.name|default:"N/D" }}
+                </div>
+            </div>
+            <div class="row">
+                <div class="col">
+                    <span class="label">Período:</span> {{ start_date|date:"d/m/Y" }} al {{ end_date|date:"d/m/Y" }}
+                </div>
+                {% if company_config.show_seniority %}
+                <div class="col">
+                    <span class="label">Antigüedad:</span> {{ payslip.employee.seniority_years }} años,
+                    {{ payslip.employee.seniority_months }} meses
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- MONTO -->
+        <div class="amount-box">
+            <div class="amount-label">Monto del Complemento</div>
+            <div class="amount-value">Bs. {{ payslip.complemento_amount|floatformat:2 }}</div>
+        </div>
+
+        <!-- NOTA -->
+        <div class="note">
+            Este beneficio no forma parte del salario y no genera incidencia en las prestaciones sociales,<br>
+            según lo establecido en el marco legal vigente.
+        </div>
+
+        <!-- FIRMAS -->
+        <div class="firmas">
+            <div class="linea-firma">
+                <br>Por la Empresa
+            </div>
+            <div class="linea-firma">
+                <br>Recibí Conforme<br>C.I. {{ payslip.employee.national_id }}
+            </div>
+        </div>
+
+        <div class="footer">
+            Generado por Nóminix SaaS - {% now "d/m/Y H:i" %}
+        </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+</body>
+
+</html>

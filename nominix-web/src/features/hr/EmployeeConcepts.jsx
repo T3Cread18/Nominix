@@ -8,15 +8,23 @@ import {
 /**
  * EmployeeConcepts - Muestra conceptos fijos del contrato Y permite asignar conceptos extra.
  */
-const EmployeeConcepts = ({ employeeId, employeeData }) => {
-    const [loading, setLoading] = useState(true);
-    const [activeContract, setActiveContract] = useState(null);
-    const [tasaCambio, setTasaCambio] = useState(0);
-    const [loadingTasa, setLoadingTasa] = useState(true);
+const EmployeeConcepts = ({
+    employeeId,
+    employeeData,
+    initialAssignedConcepts,
+    initialActiveContract = null,
+    initialExchangeRate = 60.00,
+    onRefresh,
+    isLoading: parentLoading
+}) => {
+    const [loading, setLoading] = useState(parentLoading);
+    const [activeContract, setActiveContract] = useState(initialActiveContract);
+    const [tasaCambio, setTasaCambio] = useState(initialExchangeRate);
+    const [loadingTasa, setLoadingTasa] = useState(parentLoading);
 
     // Estados para Conceptos Asignados (Extra)
-    const [assignedConcepts, setAssignedConcepts] = useState([]);
-    const [loadingAssigned, setLoadingAssigned] = useState(false);
+    const [assignedConcepts, setAssignedConcepts] = useState(initialAssignedConcepts || []);
+    const [loadingAssigned, setLoadingAssigned] = useState(parentLoading);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [availableConcepts, setAvailableConcepts] = useState([]);
     const [newConceptData, setNewConceptData] = useState({ concept: '', override_value: '' });
@@ -24,48 +32,15 @@ const EmployeeConcepts = ({ employeeId, employeeData }) => {
     // Constante fija para el Cestaticket (Valor de Ley)
     const MONTO_CESTATICKET_USD = 40.00;
 
-    // Cargar Datos Iniciales
+    // Sync with props
     useEffect(() => {
-        loadContractAndRate();
-        loadAssignedConcepts();
-    }, [employeeId]);
-
-    const loadContractAndRate = async () => {
-        setLoading(true);
-        if (!employeeId) return;
-
-        try {
-            // Contrato
-            const resContract = await axiosClient.get(`/contracts/?employee=${employeeId}&is_active=true`);
-            const contracts = resContract.data.results || resContract.data;
-            if (contracts.length > 0) setActiveContract(contracts[0]);
-
-            // Tasa
-            setLoadingTasa(true);
-            const resRate = await axiosClient.get('/exchange-rates/latest/?currency=USD');
-            const rate = resRate.data.rate || resRate.data.value || 60.00;
-            setTasaCambio(parseFloat(rate));
-
-        } catch (error) {
-            console.error("Error cargando datos base:", error);
-            setTasaCambio(60.00); // Fallback
-        } finally {
-            setLoading(false);
-            setLoadingTasa(false);
-        }
-    };
-
-    const loadAssignedConcepts = async () => {
-        setLoadingAssigned(true);
-        try {
-            const res = await axiosClient.get(`/employee-concepts/?employee=${employeeId}`);
-            setAssignedConcepts(res.data.results || res.data);
-        } catch (error) {
-            console.error("Error cargando conceptos asignados:", error);
-        } finally {
-            setLoadingAssigned(false);
-        }
-    };
+        setAssignedConcepts(initialAssignedConcepts);
+        setActiveContract(initialActiveContract);
+        setTasaCambio(initialExchangeRate);
+        setLoading(parentLoading);
+        setLoadingAssigned(parentLoading);
+        setLoadingTasa(parentLoading);
+    }, [initialAssignedConcepts, initialActiveContract, initialExchangeRate, parentLoading]);
 
     const loadAvailableConcepts = async () => {
         try {
@@ -87,7 +62,7 @@ const EmployeeConcepts = ({ employeeId, employeeData }) => {
             });
             setIsAddModalOpen(false);
             setNewConceptData({ concept: '', override_value: '' });
-            loadAssignedConcepts();
+            onRefresh();
         } catch (error) {
             alert("Error asignando concepto. Verifique que no esté ya asignado.");
         }
@@ -97,7 +72,7 @@ const EmployeeConcepts = ({ employeeId, employeeData }) => {
         if (!window.confirm("¿Eliminar esta asignación?")) return;
         try {
             await axiosClient.delete(`/employee-concepts/${id}/`);
-            loadAssignedConcepts();
+            onRefresh();
         } catch (error) {
             alert("Error eliminando concepto.");
         }

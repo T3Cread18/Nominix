@@ -16,7 +16,9 @@ from .models import (
     ExchangeRate, 
     PayrollPeriod, 
     PayrollNovelty,
-    Company
+    PayrollNovelty,
+    Company,
+    Loan
 )
 
 # Constantes de Configuración
@@ -239,21 +241,37 @@ class PayrollEngine:
         
         sueldo_base_ves = base_salary_bs
         
-        # 2. Cestaticket (Lógica especial)
+        # 2. Cestaticket (Lógica especial - Híbrida)
         cestaticket_ves = Decimal('0.00')
+        
+        # Intentar obtener configuración de DB para el monto
+        ct_concept = PayrollConcept.objects.filter(code='CESTATICKET').first()
+        ct_base_amount = MONTO_CESTATICKET_USD
+        ct_currency = self.contract.salary_currency # Default USD (asumido por MONTO_CESTATICKET_USD)
+        
+        if ct_concept and ct_concept.value > 0:
+            ct_base_amount = ct_concept.value
+            if ct_concept.currency:
+                ct_currency = ct_concept.currency
+            elif ct_concept.currency_code: # Fallback
+                ct_currency = Currency.objects.filter(code=ct_concept.currency_code).first() or ct_currency
+
         if self.contract.includes_cestaticket and company:
+            # Calcular la tasa para la moneda del concepto (puede ser diferente a la del contrato)
+            ct_rate = self._get_exchange_rate_value(ct_currency)
+            
             if company.cestaticket_journey == 'PERIODIC':
                 # Se paga proporcional según la frecuencia de la nómina
-                cestaticket_ves = MONTO_CESTATICKET_USD * rate * salary_factor
+                cestaticket_ves = ct_base_amount * ct_rate * salary_factor
             else:
                 # Se paga en una fecha específica (MENSUAL)
                 # Solo se incluye si el periodo actual contiene el día de pago configurado
                 payment_day = company.cestaticket_payment_day
                 if self.period and self.period.start_date.day <= payment_day <= self.period.end_date.day:
-                    cestaticket_ves = MONTO_CESTATICKET_USD * rate
+                    cestaticket_ves = ct_base_amount * ct_rate
                 elif not self.period:
                     # Si es simulación sin periodo, asumimos el pago completo para que el usuario lo vea
-                    cestaticket_ves = MONTO_CESTATICKET_USD * rate
+                    cestaticket_ves = ct_base_amount * ct_rate
         
         # Complemento = (Total USD * Tasa) - Sueldo Base - Cestaticket
         total_package_ves = total_package_usd * rate
@@ -266,26 +284,36 @@ class PayrollEngine:
         cestaticket_ves = cestaticket_ves.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
         complemento_ves = complemento_ves.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
         
-        return [
-            {
+        concepts = []
+
+        # 1. SUELDO BASE
+        if not company or company.show_base_salary:
+            concepts.append({
                 'code': 'SUELDO_BASE',
                 'name': 'Sueldo Base',
                 'kind': 'EARNING',
                 'amount_ves': sueldo_base_ves,
-            },
-            {
+            })
+
+        # 2. CESTATICKET
+        if not company or company.show_tickets:
+             concepts.append({
                 'code': 'CESTATICKET',
                 'name': 'Cestaticket',
                 'kind': 'EARNING',
                 'amount_ves': cestaticket_ves,
-            },
-            {
+            })
+
+        # 3. COMPLEMENTO
+        if not company or company.show_supplement:
+            concepts.append({
                 'code': 'COMPLEMENTO',
                 'name': 'Complemento Salarial',
                 'kind': 'EARNING',
                 'amount_ves': complemento_ves,
-            }
-        ]
+            })
+        
+        return concepts
 
     def _get_law_deductions(self, total_income_ves: Decimal) -> list:
         """
@@ -317,6 +345,7 @@ class PayrollEngine:
         base_ivss = min(sueldo_base_mensual, tope_ivss)
         semanal_ivss = (base_ivss * 12) / 52
         ivss_ves = (semanal_ivss * num_lunes * Decimal('0.04')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        ivss_ves = (semanal_ivss * num_lunes * Decimal('0.04')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
         # 3. RPE / Paro Forzoso (Tope 10 SM)
         tope_rpe = 10 * sm
@@ -343,13 +372,43 @@ class PayrollEngine:
         contract_concepts = self._get_contract_concepts()
         eval_context = self._build_eval_context()
         
+        # Cargar configuración de Conceptos de Sistema (Sueldo, Cestaticket, Complemento)
+        system_codes = ['SUELDO_BASE', 'CESTATICKET', 'COMPLEMENTO']
+        system_concepts_map = {c.code: c for c in PayrollConcept.objects.filter(code__in=system_codes)}
+
         for cc in contract_concepts:
+            # Verificar configuración en DB
+            db_concept = system_concepts_map.get(cc['code'])
+            
+            # 1. Chequeo de visibilidad
+            if db_concept and not db_concept.show_on_payslip:
+                continue
+                
+            # 2. Override de Nombre (Personalización)
+            if db_concept:
+                cc['name'] = db_concept.name
+
             if cc['kind'] == 'EARNING' and cc['amount_ves'] > 0:
+                # Determinamos tipo de recibo
+                tipo = 'salario'
+                if cc['code'] == 'CESTATICKET':
+                    tipo = 'cestaticket'
+                elif cc['code'] == 'COMPLEMENTO':
+                    tipo = 'complemento'
+
+                line = {
+                    'code': cc['code'],
+                    'name': cc['name'],
+                    'kind': cc['kind'],
+                    'amount_ves': cc['amount_ves'],
+                    'tipo_recibo': tipo  # <--- NUEVO
+                }
+                
                 # Agregar metadata de cantidad para el sueldo base
                 if cc['code'] == 'SUELDO_BASE':
-                    cc['quantity'] = eval_context.get('DIAS', 0)
-                    cc['unit'] = 'días'
-                results_lines.append(cc)
+                    line['quantity'] = eval_context.get('DIAS', 0)
+                    line['unit'] = 'días'
+                results_lines.append(line)
                 total_income += cc['amount_ves']
 
         # 2. Procesar conceptos dinámicos de ASIGNACIÓN primero
@@ -368,6 +427,10 @@ class PayrollEngine:
         for concept in all_concepts.filter(kind='EARNING'):
             if concept.code in contract_codes:
                 continue
+
+            # Chequeo de visibilidad
+            if not concept.show_on_payslip:
+                continue
                 
             override_val = overrides.get(concept.code)
             amount = self.calculate_concept(concept, override_value=override_val, context=eval_context)
@@ -377,7 +440,8 @@ class PayrollEngine:
                     'code': concept.code,
                     'name': concept.name,
                     'kind': concept.kind,
-                    'amount_ves': amount
+                    'amount_ves': amount,
+                    'tipo_recibo': 'salario' # <--- NUEVO
                 }
                 
                 # Inyectar cantidad si el concepto mapea a una novedad
@@ -390,11 +454,56 @@ class PayrollEngine:
                 total_income += amount
 
         # 3. Inyectar deducciones de ley (Ahora con total_income para FAOV)
+        # Búsqueda de configuración de visibilidad para conceptos de ley
+        law_concepts_config = {
+            c.code: c.show_on_payslip 
+            for c in PayrollConcept.objects.filter(code__in=['IVSS', 'PIE', 'FAOV', 'RPE'])
+        }
+
         law_deductions = self._get_law_deductions(total_income)
         for ld in law_deductions:
-            if ld['amount_ves'] > 0:
+            # Chequear configuración de visibilidad (Default: True si no existe el concepto en DB)
+            is_visible = law_concepts_config.get(ld['code'], True)
+            
+            if ld['amount_ves'] > 0 and is_visible:
+                ld['tipo_recibo'] = 'salario' # <--- NUEVO
                 results_lines.append(ld)
                 total_deductions += ld['amount_ves']
+
+        # 3.1 Procesar Préstamos y Anticipos (Cuentas por Cobrar)
+        # Buscamos préstamos activos para este empleado
+        from .models.loans import Loan
+        active_loans = Loan.objects.filter(employee=self.contract.employee, status=Loan.LoanStatus.Active)
+        
+        for loan in active_loans:
+            if loan.balance <= 0 or not loan.installment_amount:
+                continue
+                
+            # Verificar frecuencia
+            # Si es 2ND_Q, solo cobramos si es la 2da quincena (día > 15) o fin de mes
+            if loan.frequency == Loan.Frequency.SECOND_FORTNIGHT:
+                if self.payment_date.day <= 15:
+                    continue
+
+            # Determinar monto a descontar: Min(Cuota, Saldo Restante)
+            deduction_amount = min(loan.installment_amount, loan.balance)
+            
+            # Conversión de Moneda si el préstamo es en USD
+            amount_ves = deduction_amount
+            if loan.currency.code != 'VES':
+                 rate = self._get_exchange_rate_value(loan.currency)
+                 amount_ves = (deduction_amount * rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+            if amount_ves > 0:
+                results_lines.append({
+                    'code': 'LOAN',
+                    'name': f"Préstamo: {loan.description}",
+                    'kind': 'DEDUCTION',
+                    'amount_ves': amount_ves,
+                    'loan_id': loan.id,
+                    'tipo_recibo': 'salario'
+                })
+                total_deductions += amount_ves
 
         # 4. Procesar conceptos dinámicos de DEDUCCIÓN
         # Evitar duplicados con las deducciones de ley ya calculadas
@@ -403,6 +512,10 @@ class PayrollEngine:
         
         for concept in all_concepts.filter(kind='DEDUCTION'):
             if concept.code in contract_codes or concept.code in law_codes:
+                continue
+            
+            # Chequeo de visibilidad
+            if not concept.show_on_payslip:
                 continue
                 
             override_val = overrides.get(concept.code)
@@ -413,7 +526,8 @@ class PayrollEngine:
                     'code': concept.code,
                     'name': concept.name,
                     'kind': concept.kind,
-                    'amount_ves': amount
+                    'amount_ves': amount,
+                    'tipo_recibo': 'salario'
                 })
                 total_deductions += amount
 

@@ -5,6 +5,7 @@ Sistema de Recursos Humanos adaptado a la legislación venezolana.
 Utiliza django-tenants para manejo de multi-inquilinos mediante esquemas PostgreSQL.
 """
 import os
+import dj_database_url
 from pathlib import Path
 from typing import List, Dict, Any
 
@@ -84,6 +85,7 @@ TENANT_DOMAIN_MODEL: str = 'customers.Domain'
 MIDDLEWARE: List[str] = [
     'django_tenants.middleware.main.TenantMainMiddleware',  # Debe estar primero
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -120,19 +122,14 @@ WSGI_APPLICATION: str = 'rrhh_saas.wsgi.application'
 # BASE DE DATOS - PostgreSQL con django-tenants
 # =============================================================================
 
-DATABASES: Dict[str, Dict[str, Any]] = {
-    'default': {
-        'ENGINE': 'django_tenants.postgresql_backend',
-        'NAME': 'rrhh_saas',
-        'USER': 'postgres',
-        'PASSWORD': 'T3Cread18',
-        'HOST': 'localhost',
-        'PORT': '5432',
-        'OPTIONS': {
-            'client_encoding': 'UTF8',
-        },
-    }
+# Configuración de Base de Datos dinámica para Docker/Producción
+DATABASES = {
+    'default': dj_database_url.config(
+        default='postgres://postgres:T3Cread18@localhost:5432/rrhh_saas',
+        conn_max_age=600
+    )
 }
+DATABASES['default']['ENGINE'] = 'django_tenants.postgresql_backend'
 
 # Router de base de datos para django-tenants
 DATABASE_ROUTERS: List[str] = [

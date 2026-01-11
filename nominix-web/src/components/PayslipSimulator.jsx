@@ -17,10 +17,10 @@ const PayslipSimulator = ({ employeeId }) => {
   const [payslip, setPayslip] = useState(null);
 
   // Formateadores de moneda
-  const formatVES = (val) => 
+  const formatVES = (val) =>
     new Intl.NumberFormat('es-VE', { style: 'currency', currency: 'VES' }).format(val);
-  
-  const formatUSD = (val) => 
+
+  const formatUSD = (val) =>
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val);
 
   const fetchData = async () => {
@@ -29,6 +29,7 @@ const PayslipSimulator = ({ employeeId }) => {
     try {
       // Nota: En producción, usar una instancia de axios configurada con el baseURL del tenant
       const response = await axios.post(`/api/employees/${employeeId}/simulate-payslip/`, formData);
+      console.log('PAYSLIP RESPONSE:', response.data);
       setPayslip(response.data);
     } catch (err) {
       setError('Error al conectar con el motor de nómina. Verifica el contrato del empleado.');
@@ -51,16 +52,16 @@ const PayslipSimulator = ({ employeeId }) => {
   return (
     <div className="min-h-screen bg-nominix-bg p-8 font-sans text-nominix-dark">
       <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
-        
+
         {/* PANEL DE CONTROL (Izquierda) */}
         <div className="lg:col-span-4 space-y-6">
           <div className="bg-white p-8 rounded-xl shadow-lg border border-gray-100">
             <h2 className="text-2xl font-bold mb-6 text-nominix-dark">Variables del Periodo</h2>
-            
+
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-500 mb-2">Horas Extra Diurnas (50%)</label>
-                <input 
+                <input
                   type="number"
                   name="overtime_hours"
                   value={formData.overtime_hours}
@@ -72,7 +73,7 @@ const PayslipSimulator = ({ employeeId }) => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-500 mb-2">Bono Nocturno (30%)</label>
-                <input 
+                <input
                   type="number"
                   name="night_hours"
                   value={formData.night_hours}
@@ -82,7 +83,7 @@ const PayslipSimulator = ({ employeeId }) => {
                 />
               </div>
 
-              <button 
+              <button
                 onClick={fetchData}
                 disabled={loading}
                 className="w-full py-4 bg-nominix-primary text-white rounded-lg font-bold text-lg shadow-blue-500/30 shadow-lg hover:brightness-110 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-wider"
@@ -103,7 +104,7 @@ const PayslipSimulator = ({ employeeId }) => {
         <div className="lg:col-span-8">
           {payslip ? (
             <div className="bg-white rounded-xl shadow-2xl overflow-hidden relative border border-gray-100 transform rotate-1 transition-transform hover:rotate-0 duration-500">
-              
+
               {/* Marca de Agua / Decoración */}
               <div className="absolute top-0 right-0 p-8 opacity-5">
                 <span className="text-8xl font-black">NÓMINIX</span>
@@ -151,9 +152,8 @@ const PayslipSimulator = ({ employeeId }) => {
                       <tr key={idx} className="hover:bg-gray-50 transition-colors">
                         <td className="px-10 py-5 text-sm font-medium">{line.name}</td>
                         <td className="px-10 py-5 text-center">
-                          <span className={`text-[10px] px-2 py-1 rounded-full font-bold uppercase ${
-                            line.kind === 'EARNING' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                          }`}>
+                          <span className={`text-[10px] px-2 py-1 rounded-full font-bold uppercase ${line.kind === 'EARNING' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                            }`}>
                             {line.kind === 'EARNING' ? 'Asignación' : 'Deducción'}
                           </span>
                         </td>

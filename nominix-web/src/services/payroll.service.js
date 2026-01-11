@@ -34,16 +34,16 @@ const payrollService = {
 
     /**
      * Descarga el PDF masivo de recibos.
+     * @param {string} receiptType - 'todos' | 'salario' | 'complemento' | 'cestaticket'
      */
-    /**
-     * Descarga el PDF masivo de recibos.
-     */
-    downloadPdf: async (periodId, periodName) => {
+    downloadPdf: async (periodId, periodName, receiptType = 'todos') => {
         try {
-            const response = await axiosClient.get(`/payroll-periods/${periodId}/export-pdf/`, {
+            const params = receiptType !== 'todos' ? `?tipo=${receiptType}` : '';
+            const response = await axiosClient.get(`/payroll-periods/${periodId}/export-pdf/${params}`, {
                 responseType: 'blob'
             });
-            triggerFileDownload(response.data, `nomina_recibos_${periodName || periodId}.pdf`);
+            const suffix = receiptType !== 'todos' ? `_${receiptType}` : '';
+            triggerFileDownload(response.data, `nomina_recibos${suffix}_${periodName || periodId}.pdf`);
         } catch (error) {
             console.error("Error descargando PDF", error);
             throw error;
@@ -85,6 +85,17 @@ const payrollService = {
     },
 
     /**
+     * Previsualiza los resultados de la nómina para un periodo.
+     * @param {number|string} id ID del periodo.
+     * @param {number} manualRate (Opcional) Tasa manual.
+     */
+    previewPayroll: async (id, manualRate = null) => {
+        const payload = manualRate ? { manual_rate: manualRate } : {};
+        const response = await axiosClient.post(`/payroll-periods/${id}/preview-payroll/`, payload);
+        return response.data;
+    },
+
+    /**
      * Descarga el PDF individual de un recibo.
      */
     downloadSinglePayslipPdf: async (payslipId, employeeName) => {
@@ -101,7 +112,15 @@ const payrollService = {
 
     // DEPRECATED: Se mantienen por compatibilidad si se requieren a futuro
     getBankFile: async (id) => { throw new Error("Usar downloadFinanceReport"); },
-    getLegalReport: async (id) => { throw new Error("Usar downloadFinanceReport"); }
+    getLegalReport: async (id) => { throw new Error("Usar downloadFinanceReport"); },
+
+    /**
+     * Obtiene la configuración de la empresa (para visibilidad en recibos).
+     */
+    getCompanyConfig: async () => {
+        const response = await axiosClient.get('/company/config/');
+        return response.data;
+    }
 };
 
 export default payrollService;

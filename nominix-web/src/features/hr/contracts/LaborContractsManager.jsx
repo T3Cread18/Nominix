@@ -4,27 +4,16 @@ import axiosClient from '../../../api/axiosClient';
 import ContractCard from './ContractCard';
 import UpsertContractModal from './UpsertContractModal';
 
-const LaborContractsManager = ({ employeeId, employeeData }) => {
-    const [contracts, setContracts] = useState([]);
-    const [loading, setLoading] = useState(true);
+const LaborContractsManager = ({ employeeId, employeeData, initialContracts, onRefresh, loading: parentLoading }) => {
+    const [contracts, setContracts] = useState(initialContracts || []);
+    const [loading, setLoading] = useState(parentLoading);
     const [modalOpen, setModalOpen] = useState(false);
     const [editingContract, setEditingContract] = useState(null);
 
-    const fetchContracts = async () => {
-        setLoading(true);
-        try {
-            const res = await axiosClient.get(`/contracts/?employee=${employeeId}`);
-            setContracts(res.data.results || res.data);
-        } catch (error) {
-            console.error("Error fetching contracts:", error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
     useEffect(() => {
-        if (employeeId) fetchContracts();
-    }, [employeeId]);
+        setContracts(initialContracts);
+        setLoading(parentLoading);
+    }, [initialContracts, parentLoading]);
 
     const handleCreate = () => {
         setEditingContract(null);
@@ -100,7 +89,7 @@ const LaborContractsManager = ({ employeeId, employeeData }) => {
             <UpsertContractModal
                 isOpen={modalOpen}
                 onClose={() => setModalOpen(false)}
-                onSuccess={fetchContracts}
+                onSuccess={onRefresh}
                 employeeId={employeeId}
                 employeeData={employeeData}
                 contractToEdit={editingContract}

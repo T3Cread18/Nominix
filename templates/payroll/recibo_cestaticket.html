@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Recibo de Cestaticket</title>
+    <style>
+        @page {
+            size: letter;
+            margin: 1.5cm;
+        }
+
+        body {
+            font-family: 'Helvetica', sans-serif;
+            font-size: 11px;
+            color: #333;
+        }
+
+        .page-break {
+            page-break-after: always;
+        }
+
+        .header {
+            border-bottom: 2px solid #FF6B00;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+
+        .company-name {
+            font-size: 14px;
+            font-weight: bold;
+            text-transform: uppercase;
+            color: #FF6B00;
+        }
+
+        .receipt-title {
+            font-size: 16px;
+            font-weight: bold;
+            text-align: center;
+            margin: 25px 0;
+            padding: 15px;
+            background: linear-gradient(135deg, #FF6B00 0%, #FF8C00 100%);
+            border-radius: 8px;
+            color: white;
+        }
+
+        .worker-info {
+            display: table;
+            width: 100%;
+            margin-bottom: 20px;
+            font-size: 10px;
+        }
+
+        .row {
+            display: table-row;
+        }
+
+        .col {
+            display: table-cell;
+            padding: 3px 0;
+            width: 50%;
+        }
+
+        .label {
+            font-weight: bold;
+            color: #666;
+            width: 110px;
+            display: inline-block;
+        }
+
+        .amount-box {
+            text-align: center;
+            padding: 25px;
+            background-color: #FFF5EB;
+            border: 3px solid #FF6B00;
+            border-radius: 12px;
+            margin: 25px auto;
+            max-width: 350px;
+        }
+
+        .amount-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 8px;
+        }
+
+        .amount-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #FF6B00;
+            font-family: 'Courier New', monospace;
+        }
+
+        .payment-info {
+            text-align: center;
+            margin: 20px 0;
+            padding: 10px;
+            background-color: #E3F2FD;
+            border-radius: 5px;
+            font-size: 10px;
+        }
+
+        .payment-info strong {
+            color: #1565C0;
+        }
+
+        .legal-note {
+            text-align: center;
+            font-size: 9px;
+            color: #666;
+            margin-top: 15px;
+            font-style: italic;
+        }
+
+        .firmas {
+            margin-top: 50px;
+            width: 100%;
+        }
+
+        .linea-firma {
+            border-top: 1px solid #000;
+            width: 40%;
+            display: inline-block;
+            margin: 0 5%;
+            text-align: center;
+            padding-top: 5px;
+            font-size: 9px;
+        }
+
+        .footer {
+            margin-top: 30px;
+            text-align: center;
+            font-size: 8px;
+            color: #999;
+            border-top: 1px solid #eee;
+            padding-top: 5px;
+        }
+    </style>
+</head>
+
+<body>
+    {% for payslip in payslips %}
+    {% if payslip.cestaticket_amount > 0 %}
+    <div class="page-break">
+        <!-- ENCABEZADO -->
+        <div class="header">
+            <div class="company-name">{{ payslip.employee.branch.name|default:tenant_name }}</div>
+            <div>RIF: {{ payslip.employee.branch.rif|default:tenant_rif }}</div>
+            <div>{{ payslip.employee.branch.address|default:tenant_address }}</div>
+            <div style="text-align: right; font-size: 10px;">
+                N° {{ payslip.employee.national_id }}-{{ payment_date|date:"Ymd" }}-CT
+            </div>
+        </div>
+
+        <!-- TÍTULO -->
+        <div class="receipt-title">
+            🍽️ Cestaticket Socialista
+        </div>
+
+        <!-- DATOS DEL TRABAJADOR -->
+        <div class="worker-info">
+            <div class="row">
+                <div class="col">
+                    <span class="label">Trabajador:</span> {{ payslip.employee.full_name }}
+                </div>
+                <div class="col">
+                    <span class="label">Cédula:</span> {{ payslip.employee.national_id }}
+                </div>
+            </div>
+            <div class="row">
+                <div class="col">
+                    <span class="label">Cargo:</span> {{ payslip.contract_snapshot.position }}
+                </div>
+                {% if company_config.show_seniority %}
+                <div class="col">
+                    <span class="label">Antigüedad:</span> {{ payslip.employee.seniority_years }} años,
+                    {{ payslip.employee.seniority_months }} meses
+                </div>
+                {% endif %}
+            </div>
+            <div class="row">
+                <div class="col">
+                    <span class="label">Fecha Ingreso:</span>
+                    {{ payslip.employee.hire_date|default:payslip.contract_snapshot.hire_date|date:"d/m/Y" }}
+                </div>
+                <div class="col"></div>
+            </div>
+        </div>
+
+        <!-- INFORMACIÓN DE PAGO -->
+        <div class="payment-info">
+            <strong>Período correspondiente:</strong> {{ start_date|date:"m/Y" }} <br>
+            <strong>Fecha de pago:</strong> {{ payment_date|date:"m/Y" }}
+        </div>
+
+        <!-- MONTO -->
+        <div class="amount-box">
+            <div class="amount-label">Monto del Cestaticket</div>
+            <div class="amount-value">Bs. {{ payslip.cestaticket_amount|floatformat:2 }}</div>
+        </div>
+
+        <!-- NOTA LEGAL -->
+        <div class="legal-note">
+            Beneficio de alimentación conforme a la Ley de Alimentación para<br>
+            los Trabajadores y Trabajadoras (Decreto Nº 4.019).
+        </div>
+
+        <!-- FIRMAS -->
+        <div class="firmas">
+            <div class="linea-firma">
+                <br>Recibí Conforme<br>C.I. {{ payslip.employee.national_id }}
+            </div>
+        </div>
+
+        <div class="footer">
+            Generado por Nóminix SaaS - {% now "d/m/Y H:i" %}
+        </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+</body>
+
+</html>

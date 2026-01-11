@@ -13,16 +13,31 @@ export const AuthProvider = ({ children }) => {
 
     // Verificar sesión al cargar
     useEffect(() => {
-        checkAuth();
-        fetchTenantInfo();
+        initAuth();
     }, []);
 
-    const fetchTenantInfo = async () => {
+    const initAuth = async () => {
+        if (!loading) setLoading(true);
         try {
-            const response = await axiosClient.get('/tenant-info/');
-            setTenant(response.data.tenant);
+            // Obtener info del usuario y del tenant en paralelo para velocidad
+            const [userRes, tenantRes] = await Promise.allSettled([
+                axiosClient.get('/auth/me/'),
+                axiosClient.get('/tenant-info/')
+            ]);
+
+            if (userRes.status === 'fulfilled') {
+                setUser(userRes.value.data);
+            } else {
+                setUser(null);
+            }
+
+            if (tenantRes.status === 'fulfilled') {
+                setTenant(tenantRes.value.data.tenant);
+            }
         } catch (error) {
-            console.error("No se pudo obtener info del tenant");
+            console.error("Error crítico en inicialización de AuthContext", error);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -32,20 +47,21 @@ export const AuthProvider = ({ children }) => {
             setUser(response.data);
         } catch (error) {
             setUser(null);
-        } finally {
-            setLoading(false);
         }
     };
 
     const login = async (username, password) => {
         const response = await axiosClient.post('/auth/login/', { username, password });
         setUser(response.data);
+        // Al loguear, refrescamos info del tenant por si acaso
+        await initAuth();
         return response.data;
     };
 
     const logout = async () => {
         await axiosClient.post('/auth/logout/');
         setUser(null);
+        setTenant(null);
     };
 
     return (

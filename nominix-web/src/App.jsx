@@ -1,9 +1,9 @@
 import React from 'react';
 import { useAuth } from './context/AuthContext';
 import LoginPage from './features/auth/LoginPage';
-import { LogOut, Loader2, Calculator, Users, ClipboardList, Settings, ShieldCheck, FileSpreadsheet, PieChart } from 'lucide-react';
-import { clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+// Lucide Icons
+import { LogOut, Loader2, Calculator, Users, ClipboardList, Settings, ShieldCheck, FileSpreadsheet, PieChart, Banknote } from 'lucide-react';
+import { cn } from './utils/cn';
 import { Toaster } from 'sonner';
 import { useNavigate, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 
@@ -16,14 +16,15 @@ import PayrollClosure from './features/payroll/PayrollClosure';
 import NovedadesGrid from './features/payroll/NovedadesGrid';
 import PayrollDashboard from './features/payroll/PayrollDashboard';
 import CompanySettings from './features/settings/CompanySettings';
+import LoanManager from './features/loans/LoanManager';
+import TenantsLogin from './features/tenants/TenantsLogin';
+import TenantsAdmin from './features/tenants/TenantsAdmin';
 
-function cn(...inputs) {
-    return twMerge(clsx(inputs));
-}
 
 function App() {
-    const { user, logout, loading } = useAuth();
+    const { user, loading, tenant, logout } = useAuth();
     const location = useLocation();
+    const isTenantAdminPath = location.pathname.startsWith('/tenants');
 
     if (loading) {
         return (
@@ -33,11 +34,34 @@ function App() {
         );
     }
 
+    // Ruta especial de login para administración de tenants
+    if (location.pathname === '/tenants') {
+        return <TenantsLogin />;
+    }
+
     if (!user) {
         return <LoginPage />;
     }
 
+    // Proteger contra acceso a apps de inquilino desde el dominio público
+    const isPublicSchema = tenant?.schema_name === 'public';
+    if (isPublicSchema && !isTenantAdminPath) {
+        return <Navigate to="/tenants" replace />;
+    }
+
     const isActive = (path) => location.pathname.startsWith(path);
+
+    if (isTenantAdminPath) {
+        return (
+            <div className="min-h-screen bg-[#0a0a0b]">
+                <Routes>
+                    <Route path="/tenants" element={<TenantsLogin />} />
+                    <Route path="/tenants/admin" element={<TenantsAdmin />} />
+                </Routes>
+                <Toaster position="top-center" richColors theme="dark" />
+            </div>
+        );
+    }
 
     return (
         <div className="App min-h-screen bg-nominix-smoke/30">
@@ -73,6 +97,9 @@ function App() {
 
                 <div className="flex items-center gap-6">
                     <div className="hidden lg:flex gap-6 text-[10px] font-black uppercase tracking-[0.2em] opacity-50">
+                        <Link to="/loans" className={cn("flex items-center gap-3 cursor-pointer transition-colors", isActive('/loans') ? "text-nominix-electric" : "hover:text-white")}>
+                            <Banknote size={12} /> Préstamos
+                        </Link>
                         <span className="flex items-center gap-3 cursor-pointer hover:text-white transition-colors"><PieChart size={12} /> Reportes</span>
                     </div>
                     <div className="w-px h-6 bg-white/10 hidden lg:block"></div>
@@ -96,10 +123,11 @@ function App() {
                     <Routes>
 
 
-                        <Route path="/" element={<><p className="text-sm font-semibold text-gray-500 mb-1 uppercase tracking-[0.3em]">Gestión de RRHH</p><h2 className="text-4xl font-black text-nominix-dark flex items-center gap-4">Administración de Personal</h2></>} />
+
                         <Route path="/payroll" element={<><p className="text-sm font-semibold text-gray-500 mb-1 uppercase tracking-[0.3em]">Procesamiento</p><h2 className="text-4xl font-black text-nominix-dark flex items-center gap-4">Dashboard de Nómina</h2></>} />
 
                         {/* PERSONAL: Lista Principal */}
+                        <Route path="/" element={<><p className="text-sm font-semibold text-gray-500 mb-1 uppercase tracking-[0.3em]">Gestión de RRHH</p><h2 className="text-4xl font-black text-nominix-dark flex items-center gap-4">Administración de Personal</h2></>} />
                         <Route path="/personnel" element={<><p className="text-sm font-semibold text-gray-500 mb-1 uppercase tracking-[0.3em]">Gestión de RRHH</p><h2 className="text-4xl font-black text-nominix-dark flex items-center gap-4">Administración de Personal</h2></>} />
 
 
@@ -109,6 +137,7 @@ function App() {
 
                         <Route path="/catalog" element={<><p className="text-sm font-semibold text-gray-500 mb-1 uppercase tracking-[0.3em]">Maestros Especiales</p><h2 className="text-4xl font-black text-nominix-dark flex items-center gap-4">Catálogo de Conceptos</h2></>} />
                         <Route path="/novelties" element={<><p className="text-sm font-semibold text-gray-500 mb-1 uppercase tracking-[0.3em]">Incidencias Laborales</p><h2 className="text-4xl font-black text-nominix-dark flex items-center gap-4">Carga Masiva de Novedades</h2></>} />
+                        <Route path="/loans" element={<><p className="text-sm font-semibold text-gray-500 mb-1 uppercase tracking-[0.3em]">Cuentas por Cobrar</p><h2 className="text-4xl font-black text-nominix-dark flex items-center gap-4">Gestión de Préstamos</h2></>} />
                         <Route path="/closures" element={<><p className="text-sm font-semibold text-gray-500 mb-1 uppercase tracking-[0.3em]">Auditoría Legal</p><h2 className="text-4xl font-black text-nominix-dark flex items-center gap-4">Cierre de Periodos</h2></>} />
                         <Route path="/config" element={<><p className="text-sm font-semibold text-gray-500 mb-1 uppercase tracking-[0.3em]">Configuración</p><h2 className="text-4xl font-black text-nominix-dark flex items-center gap-4">Datos de la Empresa</h2></>} />
                     </Routes>
@@ -127,7 +156,13 @@ function App() {
                     <Route path="/catalog" element={<ConceptCatalog />} />
                     <Route path="/novelties" element={<NovedadesGrid />} />
                     <Route path="/closures" element={<PayrollClosure />} />
+                    <Route path="/loans" element={<LoanManager />} />
                     <Route path="/config" element={<CompanySettings />} />
+
+                    {/* RUTAS MAESTRAS (Tenants) */}
+                    <Route path="/tenants" element={<TenantsLogin />} />
+                    <Route path="/tenants/admin" element={<TenantsAdmin />} />
+
                     <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
             </main>

@@ -13,14 +13,10 @@ import {
     Search,
     X,
     Save,
-    HelpCircle
+    HelpCircle,
+    Edit2
 } from 'lucide-react';
-import { clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
-
-function cn(...inputs) {
-    return twMerge(clsx(inputs));
-}
+import { cn } from '../../utils/cn';
 
 const ConceptCatalog = () => {
     const [concepts, setConcepts] = useState([]);
@@ -28,6 +24,8 @@ const ConceptCatalog = () => {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [isAdding, setIsAdding] = useState(false);
+    const [isEditing, setIsEditing] = useState(false);
+    const [editingId, setEditingId] = useState(null);
     const [saving, setSaving] = useState(false);
 
     // Estado inicial del formulario
@@ -40,7 +38,8 @@ const ConceptCatalog = () => {
         formula: '', // Campo nuevo para la fórmula
         currency: 'USD',
         active: true,
-        is_salary_incidence: true
+        is_salary_incidence: true,
+        show_on_payslip: true
     });
 
     const fetchData = async () => {
@@ -63,34 +62,69 @@ const ConceptCatalog = () => {
         fetchData();
     }, []);
 
-    const handleCreateConcept = async (e) => {
+    const resetForm = () => {
+        setNewConcept({
+            code: '',
+            name: '',
+            kind: 'EARNING',
+            computation_method: 'FIXED_AMOUNT',
+            value: '0.00',
+            formula: '',
+            currency: 'USD',
+            active: true,
+            is_salary_incidence: true,
+            show_on_payslip: true
+        });
+        setIsAdding(false);
+        setIsEditing(false);
+        setEditingId(null);
+    };
+
+    const handleOpenCreate = () => {
+        resetForm();
+        setIsAdding(true);
+    };
+
+    const handleOpenEdit = (concept) => {
+        setNewConcept({
+            code: concept.code,
+            name: concept.name,
+            kind: concept.kind,
+            computation_method: concept.computation_method,
+            value: concept.value,
+            formula: concept.formula || '',
+            currency: concept.currency_code || 'USD',
+            active: concept.active,
+            is_salary_incidence: concept.is_salary_incidence,
+            show_on_payslip: concept.show_on_payslip ?? true
+        });
+        setEditingId(concept.id);
+        setIsEditing(true);
+        setIsAdding(true); // Reusamos el modal
+    };
+
+    const handleSubmit = async (e) => {
         e.preventDefault();
         setSaving(true);
         try {
             // Limpiar datos según el método seleccionado
             const payload = { ...newConcept };
             if (payload.computation_method === 'DYNAMIC_FORMULA') {
-                payload.value = '0.00'; // Ignorar valor fijo
+                payload.value = '0.00';
             } else {
-                payload.formula = ''; // Ignorar fórmula
+                payload.formula = '';
             }
 
-            await axiosClient.post('/payroll-concepts/', payload);
+            if (isEditing) {
+                await axiosClient.put(`/payroll-concepts/${editingId}/`, payload);
+            } else {
+                await axiosClient.post('/payroll-concepts/', payload);
+            }
+
             await fetchData();
-            setIsAdding(false);
-            setNewConcept({
-                code: '',
-                name: '',
-                kind: 'EARNING',
-                computation_method: 'FIXED_AMOUNT',
-                value: '0.00',
-                formula: '',
-                currency: 'USD',
-                active: true,
-                is_salary_incidence: true
-            });
+            resetForm();
         } catch (error) {
-            alert(error.response?.data?.error || "Error al crear concepto. Verifique que el código sea único.");
+            alert(error.response?.data?.error || "Error al guardar concepto. Verifique que el código sea único.");
         } finally {
             setSaving(false);
         }
@@ -120,15 +154,17 @@ const ConceptCatalog = () => {
                     <div className="bg-white w-full max-w-2xl rounded-[2.5rem] p-10 shadow-2xl animate-in zoom-in-95 duration-200 overflow-y-auto max-h-[90vh]">
                         <div className="flex justify-between items-center mb-8">
                             <div>
-                                <h4 className="text-xl font-black text-nominix-dark uppercase tracking-widest">Nuevo Concepto Global</h4>
+                                <h4 className="text-xl font-black text-nominix-dark uppercase tracking-widest">
+                                    {isEditing ? 'Editar Concepto' : 'Nuevo Concepto Global'}
+                                </h4>
                                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-tighter mt-1">Definición de Regla Salarial</p>
                             </div>
-                            <button onClick={() => setIsAdding(false)} className="p-2 hover:bg-gray-100 rounded-xl transition-colors text-gray-300 hover:text-nominix-dark">
+                            <button onClick={resetForm} className="p-2 hover:bg-gray-100 rounded-xl transition-colors text-gray-300 hover:text-nominix-dark">
                                 <X size={24} />
                             </button>
                         </div>
 
-                        <form onSubmit={handleCreateConcept} className="grid grid-cols-2 gap-6">
+                        <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-6">
                             <div className="space-y-2">
                                 <label className="text-[10px] font-black text-gray-400 uppercase">Código (Sugerido: BONO_X)</label>
                                 <input
@@ -244,6 +280,15 @@ const ConceptCatalog = () => {
                                     <input
                                         type="checkbox"
                                         className="w-5 h-5 rounded-lg border-gray-300 text-nominix-electric focus:ring-nominix-electric"
+                                        checked={newConcept.show_on_payslip}
+                                        onChange={e => setNewConcept({ ...newConcept, show_on_payslip: e.target.checked })}
+                                    />
+                                    <span className="text-[10px] font-black text-gray-500 uppercase">Mostrar en Recibo</span>
+                                </label>
+                                <label className="flex items-center gap-3 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        className="w-5 h-5 rounded-lg border-gray-300 text-nominix-electric focus:ring-nominix-electric"
                                         checked={newConcept.active}
                                         onChange={e => setNewConcept({ ...newConcept, active: e.target.checked })}
                                     />
@@ -271,7 +316,7 @@ const ConceptCatalog = () => {
                         <p className="text-[11px] text-gray-400 font-black uppercase tracking-[0.3em] mt-2">DICCIONARIO MAESTRO DE REGLAS SALARIALES</p>
                     </div>
                     <button
-                        onClick={() => setIsAdding(true)}
+                        onClick={handleOpenCreate}
                         className="flex items-center gap-3 px-8 py-4 bg-nominix-dark text-white rounded-[1.2rem] text-[11px] font-black uppercase tracking-widest hover:bg-black transition-all shadow-2xl shadow-nominix-dark/10 active:scale-95"
                     >
                         <Plus size={20} /> Crear Nuevo Concepto
@@ -332,6 +377,24 @@ const ConceptCatalog = () => {
                                     <span className="text-[10px] font-black uppercase text-blue-500">Salario Integral</span>
                                 </div>
                             )}
+                            <div className={cn(
+                                "p-2 px-3 rounded-xl flex items-center gap-2 border",
+                                concept.show_on_payslip
+                                    ? "bg-purple-50/50 border-purple-50"
+                                    : "bg-gray-100 border-gray-200"
+                            )}>
+                                {concept.show_on_payslip ? (
+                                    <>
+                                        <CheckCircle2 size={12} className="text-purple-500" />
+                                        <span className="text-[10px] font-black uppercase text-purple-500">Visible en Recibo</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <XCircle size={12} className="text-gray-400" />
+                                        <span className="text-[10px] font-black uppercase text-gray-400">Oculto</span>
+                                    </>
+                                )}
+                            </div>
                         </div>
 
                         <div className="flex items-center justify-between border-t border-dashed pt-6 border-gray-100 mt-auto">
@@ -352,6 +415,12 @@ const ConceptCatalog = () => {
                                 )}
                             </div>
                             <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                    onClick={() => handleOpenEdit(concept)}
+                                    className="p-3 bg-blue-50 text-blue-400 rounded-2xl hover:bg-blue-500 hover:text-white transition-all scale-90 hover:scale-100 shadow-lg shadow-blue-500/10"
+                                >
+                                    <Edit2 size={20} />
+                                </button>
                                 <button
                                     onClick={() => handleDeleteConcept(concept.id)}
                                     className="p-3 bg-red-50 text-red-400 rounded-2xl hover:bg-red-500 hover:text-white transition-all scale-90 hover:scale-100 shadow-lg shadow-red-500/10"

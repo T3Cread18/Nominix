@@ -20,6 +20,9 @@ from .serializers import (
     TenantStatsSerializer
 )
 from .auth_serializers import LoginSerializer, UserSerializer
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class IsPublicSchemaPermission(permissions.BasePermission):
@@ -38,17 +41,16 @@ class IsPublicSchemaPermission(permissions.BasePermission):
 class ClientViewSet(viewsets.ModelViewSet):
     """
     ViewSet para gestión de Clientes/Tenants.
-    
-    Endpoints:
-    - GET /api/tenants/ - Listar todos los tenants
-    - POST /api/tenants/ - Crear nuevo tenant
-    - GET /api/tenants/{id}/ - Obtener detalle de un tenant
-    - PUT /api/tenants/{id}/ - Actualizar tenant
-    - DELETE /api/tenants/{id}/ - Eliminar tenant
-    - GET /api/tenants/stats/ - Estadísticas del sistema
-    - POST /api/tenants/{id}/add_domain/ - Agregar dominio
-    - DELETE /api/tenants/{id}/remove_domain/ - Eliminar dominio
     """
+    def update(self, request, *args, **kwargs):
+        logger.info(f"Update Tenant Request Data: {request.data}")
+        try:
+            return super().update(request, *args, **kwargs)
+        except Exception as e:
+            logger.error(f"Error updating tenant: {e}")
+            raise e
+    
+
     
     queryset = Client.objects.all()
     serializer_class = ClientSerializer
@@ -103,7 +105,8 @@ class ClientViewSet(viewsets.ModelViewSet):
         """
         Eliminar un tenant y su esquema de PostgreSQL.
         
-        ⚠️ ADVERTENCIA: Esta acción es irreversible.
+        
+        ADVERTENCIA: Esta acción es irreversible.
         """
         instance = self.get_object()
         schema_name = instance.schema_name
@@ -242,6 +245,67 @@ class ClientViewSet(viewsets.ModelViewSet):
             {'message': f"Dominio '{domain_name}' eliminado"},
             status=status.HTTP_200_OK
         )
+
+
+    @action(detail=True, methods=['get'])
+    def deep_stats(self, request, pk=None):
+        """
+        Obtener estadísticas profundas de un tenant específico.
+        Requiere cambiar al esquema del tenant para consultar sus tablas.
+        
+        GET /api/tenants/{id}/deep_stats/
+        """
+        client = self.get_object()
+        schema = client.schema_name
+        
+        from django_tenants.utils import schema_context
+        from payroll_core.models import Employee
+        
+        try:
+            with schema_context(schema):
+                active_employees = Employee.objects.filter(is_active=True).count()
+                total_employees = Employee.objects.count()
+                
+                deep_data = {
+                    'active_employees': active_employees,
+                    'total_employees': total_employees,
+                }
+                
+            return Response(deep_data)
+        except Exception as e:
+            return Response(
+                {'error': f'Error accediendo al esquema {schema}: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=True, methods=['post'])
+    def renew_subscription(self, request, pk=None):
+        """
+        Renovar suscripción del tenant.
+        
+        POST /api/tenants/{id}/renew/
+        Body: {"months": 1} (default 1)
+        """
+        client = self.get_object()
+        months = int(request.data.get('months', 1))
+        
+        from datetime import date
+        from dateutil.relativedelta import relativedelta
+        
+        current_date = client.paid_until or date.today()
+        if current_date < date.today():
+            current_date = date.today()
+            
+        new_date = current_date + relativedelta(months=months)
+        client.paid_until = new_date
+        client.on_trial = False
+        client.save()
+        
+        serializer = self.get_serializer(client)
+        return Response({
+            'message': f'Suscripción renovada hasta {new_date}',
+            'tenant': serializer.data
+        })
 
 
 class TenantInfoView(APIView):

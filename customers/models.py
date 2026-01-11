@@ -66,6 +66,14 @@ class Client(TenantMixin):
         default=True,
         verbose_name='En Período de Prueba'
     )
+
+    price_per_employee: models.DecimalField = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0.00,
+        verbose_name='Precio por Empleado ($)',
+        help_text='Costo mensual por empleado activo'
+    )
     
     # Información de contacto
     email: models.EmailField = models.EmailField(

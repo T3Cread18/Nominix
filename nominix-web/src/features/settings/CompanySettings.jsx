@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axiosClient from '../../api/axiosClient';
 import { toast } from 'sonner';
 import {
@@ -7,13 +7,37 @@ import {
     Plus, Edit3, Trash2, X, CheckCircle2, XCircle,
     DollarSign, Clock
 } from 'lucide-react';
-import { clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
-
-function cn(...inputs) { return twMerge(clsx(inputs)); }
+import { cn } from '../../utils/cn';
 
 const CompanySettings = () => {
-    const [activeTab, setActiveTab] = useState('company'); // 'company' | 'branches'
+    const [activeTab, setActiveTab] = useState('company');
+    const [company, setCompany] = useState(null);
+    const [branches, setBranches] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const hasLoaded = useRef(false);
+
+    useEffect(() => {
+        if (!hasLoaded.current) {
+            loadData();
+            hasLoaded.current = true;
+        }
+    }, []);
+
+    const loadData = async () => {
+        setLoading(true);
+        try {
+            const [companyRes, branchesRes] = await Promise.all([
+                axiosClient.get('/company/config/'),
+                axiosClient.get('/branches/')
+            ]);
+            setCompany(companyRes.data);
+            setBranches(branchesRes.data.results || branchesRes.data);
+        } catch (error) {
+            toast.error("Error cargando configuración");
+        } finally {
+            setLoading(false);
+        }
+    };
 
     return (
         <div className="max-w-6xl mx-auto pb-10">
@@ -48,37 +72,36 @@ const CompanySettings = () => {
             </div>
 
             {/* Content Switcher */}
-            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                {activeTab === 'company' ? <CompanyForm /> : <BranchManager />}
-            </div>
+            {loading ? (
+                <div className="py-20 text-center"><Loader2 className="animate-spin mx-auto text-gray-400" /></div>
+            ) : (
+                <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    <div className={cn(activeTab !== 'company' && "hidden")}>
+                        <CompanyForm
+                            initialData={company}
+                            onRefresh={loadData}
+                        />
+                    </div>
+                    <div className={cn(activeTab !== 'branches' && "hidden")}>
+                        <BranchManager
+                            initialBranches={branches}
+                            onRefresh={loadData}
+                        />
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
 
-// --- SUB-COMPONENTE 1: FORMULARIO DE EMPRESA (El que ya teníamos) ---
-const CompanyForm = () => {
-    const [loading, setLoading] = useState(true);
+// --- SUB-COMPONENTE 1: FORMULARIO DE EMPRESA ---
+const CompanyForm = ({ initialData, onRefresh }) => {
     const [saving, setSaving] = useState(false);
-    const [company, setCompany] = useState({
-        name: '', rif: '', email: '', phone: '',
-        website: '', address: '', city: '', state: '',
-        base_currency_symbol: 'Bs.',
-        national_minimum_salary: 130.00,
-        payroll_journey: 'BIWEEKLY',
-        cestaticket_journey: 'MONTHLY',
-        cestaticket_payment_day: 30
-    });
+    const [company, setCompany] = useState(initialData);
 
     useEffect(() => {
-        const loadData = async () => {
-            try {
-                const res = await axiosClient.get('/company/config/');
-                setCompany(res.data);
-            } catch (error) { toast.error("Error cargando datos"); }
-            finally { setLoading(false); }
-        };
-        loadData();
-    }, []);
+        setCompany(initialData);
+    }, [initialData]);
 
     const handleChange = (e) => setCompany({ ...company, [e.target.name]: e.target.value });
 
@@ -96,7 +119,7 @@ const CompanyForm = () => {
         }
     };
 
-    if (loading) return <div className="py-20 text-center"><Loader2 className="animate-spin mx-auto text-gray-400" /></div>;
+
 
     return (
         <form onSubmit={handleSave} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -131,6 +154,31 @@ const CompanyForm = () => {
                             <p className="text-[9px] text-amber-600 font-bold uppercase tracking-wider mt-2 px-3">
                                 <DollarSign size={10} className="inline mr-1" /> Base para topes de IVSS y RPE
                             </p>
+                        </div>
+                    </div>
+
+                    {/* Nueva Sección: Visibilidad en Recibos */}
+                    <div className="mt-8 pt-8 border-t border-gray-50">
+                        <h4 className="text-[10px] font-black uppercase text-gray-400 mb-4">Visibilidad en Recibos PDF</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <ToggleField
+                                label="Mostrar Sueldo Base"
+                                name="show_base_salary"
+                                checked={company.show_base_salary}
+                                onChange={handleChange}
+                            />
+                            <ToggleField
+                                label="Mostrar Complemento"
+                                name="show_supplement"
+                                checked={company.show_supplement}
+                                onChange={handleChange}
+                            />
+                            <ToggleField
+                                label="Mostrar Cestaticket"
+                                name="show_tickets"
+                                checked={company.show_tickets}
+                                onChange={handleChange}
+                            />
                         </div>
                     </div>
                 </div>
@@ -200,29 +248,26 @@ const CompanyForm = () => {
     );
 };
 
-// --- SUB-COMPONENTE 2: GESTOR DE SEDES (Nuevo) ---
-const BranchManager = () => {
-    const [branches, setBranches] = useState([]);
-    const [loading, setLoading] = useState(true);
+// --- SUB-COMPONENTE 2: GESTOR DE SEDES ---
+const BranchManager = ({ initialBranches, onRefresh }) => {
+    const [branches, setBranches] = useState(initialBranches);
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [editingBranch, setEditingBranch] = useState(null); // null = creando, obj = editando
+    const [editingBranch, setEditingBranch] = useState(null);
 
-    useEffect(() => { fetchBranches(); }, []);
+    useEffect(() => {
+        setBranches(initialBranches);
+    }, [initialBranches]);
 
-    const fetchBranches = async () => {
-        try {
-            const res = await axiosClient.get('/branches/');
-            setBranches(res.data.results || res.data);
-        } catch (error) { toast.error("Error cargando sedes"); }
-        finally { setLoading(false); }
+    const handleModalSuccess = () => {
+        setIsModalOpen(false);
+        onRefresh();
     };
-
     const handleDelete = async (id) => {
         if (!confirm("¿Eliminar sede? Si tiene empleados asociados no se podrá eliminar.")) return;
         try {
             await axiosClient.delete(`/branches/${id}/`);
             toast.success("Sede eliminada");
-            fetchBranches();
+            onRefresh();
         } catch (error) { toast.error("No se pudo eliminar (Posiblemente tiene empleados activos)"); }
     };
 
@@ -235,13 +280,6 @@ const BranchManager = () => {
         setEditingBranch(null);
         setIsModalOpen(true);
     };
-
-    const handleModalSuccess = () => {
-        setIsModalOpen(false);
-        fetchBranches();
-    };
-
-    if (loading) return <div className="py-20 text-center"><Loader2 className="animate-spin mx-auto text-gray-400" /></div>;
 
     return (
         <div className="space-y-6">
@@ -394,6 +432,28 @@ const InputField = ({ label, name, value, onChange, required, placeholder, type 
             type={type}
             step={step}
         />
+    </div>
+);
+
+const ToggleField = ({ label, name, checked, onChange }) => (
+    <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100">
+        <div className="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+            <input
+                type="checkbox"
+                name={name}
+                id={name}
+                checked={checked || false}
+                onChange={(e) => onChange({ target: { name, value: e.target.checked } })}
+                className="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer peer checked:right-0 right-5"
+            />
+            <label
+                htmlFor={name}
+                className={`toggle-label block overflow-hidden h-5 rounded-full cursor-pointer ${checked ? 'bg-nominix-electric' : 'bg-gray-300'}`}
+            ></label>
+        </div>
+        <label htmlFor={name} className="text-[10px] font-bold uppercase text-gray-500 cursor-pointer select-none">
+            {label}
+        </label>
     </div>
 );
 

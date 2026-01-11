@@ -1,12 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Search, User, DollarSign, Calculator, Download, Loader2, Eye } from 'lucide-react';
 import payrollService from '../../services/payroll.service';
-import { clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
-
-function cn(...inputs) {
-    return twMerge(clsx(inputs));
-}
+import { cn } from '../../utils/cn';
 
 /**
  * PayslipsListModal - Muestra la lista de recibos generados para un periodo.

@@ -6,17 +6,12 @@ import {
     Search, ChevronDown, Check
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { cn } from '../../utils/cn';
 
-function cn(...inputs) {
-    return twMerge(clsx(inputs));
-}
-
-const PayrollDetail = ({ period }) => {
+const PayrollDetail = ({ period, allEmployees, initialConcepts }) => {
     const [loading, setLoading] = useState(false);
-    const [fetchingEmployees, setFetchingEmployees] = useState(true);
-    const [employees, setEmployees] = useState([]);
+    const [fetchingEmployees, setFetchingEmployees] = useState(false);
+    const [employees, setEmployees] = useState(allEmployees);
     const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
 
     // --- NUEVO: ESTADOS PARA EL BUSCADOR ---
@@ -28,31 +23,26 @@ const PayrollDetail = ({ period }) => {
     // Data State
     const [payslipData, setPayslipData] = useState(null);
     const [novelties, setNovelties] = useState([]);
-    const [availableConcepts, setAvailableConcepts] = useState([]);
+    const [availableConcepts, setAvailableConcepts] = useState(initialConcepts || []);
 
     // Modal State
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [newNovelty, setNewNovelty] = useState({ concept: '', amount: '' });
     const [errorMsg, setErrorMsg] = useState(null);
 
-    // Load Employees
     useEffect(() => {
-        const fetchEmployees = async () => {
-            try {
-                const response = await axiosClient.get('/employees/?is_active=true');
-                const list = response.data.results || response.data;
-                setEmployees(Array.isArray(list) ? list : []);
-                setFilteredEmployees(Array.isArray(list) ? list : []); // Inicializar filtrados
+        if (allEmployees) {
+            setEmployees(allEmployees);
+            setFilteredEmployees(allEmployees);
+        } else {
+            fetchEmployees();
+        }
 
-                // Seleccionar el primero por defecto y llenar el buscador
-            } catch (error) {
-                console.error("Error loading employees:", error);
-            } finally {
-                setFetchingEmployees(false);
-            }
-        };
-        fetchEmployees();
-        loadConcepts();
+        if (initialConcepts) {
+            setAvailableConcepts(initialConcepts);
+        } else {
+            loadConcepts();
+        }
 
         // Click outside para cerrar el buscador
         const handleClickOutside = (event) => {
@@ -62,9 +52,22 @@ const PayrollDetail = ({ period }) => {
         };
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, []);
+    }, [allEmployees, initialConcepts]);
 
-    // Load Concepts for dropdown
+    const fetchEmployees = async () => {
+        setFetchingEmployees(true);
+        try {
+            const res = await axiosClient.get('/employees/?is_active=true\u0026page_size=1000');
+            const list = res.data.results || res.data;
+            setEmployees(list);
+            setFilteredEmployees(list);
+        } catch (error) {
+            console.error("Error fetching employees:", error);
+        } finally {
+            setFetchingEmployees(false);
+        }
+    };
+
     const loadConcepts = async () => {
         try {
             const res = await axiosClient.get('/payroll-concepts/?active=true');
@@ -73,6 +76,7 @@ const PayrollDetail = ({ period }) => {
             console.error("Error loading concepts:", error);
         }
     };
+
 
     // --- NUEVO: EFECTO DE FILTRADO ---
     useEffect(() => {

@@ -6,7 +6,7 @@ monedas, tasas de cambio, empleados y contratos laborales.
 """
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import Currency, ExchangeRate, Employee, LaborContract, Branch, PayrollConcept, EmployeeConcept
+from .models import Currency, ExchangeRate, Employee, LaborContract, Branch, PayrollConcept, EmployeeConcept, Loan, LoanPayment
 from typing import Tuple, List, Optional
 
 

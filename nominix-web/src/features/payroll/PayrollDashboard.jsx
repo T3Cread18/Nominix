@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axiosClient from '../../api/axiosClient';
 import NovedadesGrid from './NovedadesGrid';
 import PayrollClosure from './PayrollClosure';
@@ -15,12 +15,7 @@ import {
     ChevronRight,
     RefreshCw
 } from 'lucide-react';
-import { clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
-
-function cn(...inputs) {
-    return twMerge(clsx(inputs));
-}
+import { cn } from '../../utils/cn';
 
 /**
  * PayrollDashboard - Dashboard unificado de gestión de nómina
@@ -29,26 +24,37 @@ function cn(...inputs) {
 const PayrollDashboard = () => {
     const [activeTab, setActiveTab] = useState('novelties');
     const [periods, setPeriods] = useState([]);
+    const [employees, setEmployees] = useState([]); // <--- Lista completa compartida
     const [selectedPeriod, setSelectedPeriod] = useState(null);
     const [stats, setStats] = useState({ employees: 0, openPeriods: 0, lastRate: 0 });
     const [loading, setLoading] = useState(true);
     const [loadingRate, setLoadingRate] = useState(true);
+    const [concepts, setConcepts] = useState([]);
+    const hasLoaded = useRef(false);
 
     useEffect(() => {
-        loadInitialData();
+        if (!hasLoaded.current) {
+            loadInitialData();
+            hasLoaded.current = true;
+        }
     }, []);
 
     const loadInitialData = async () => {
         setLoading(true);
         try {
-            const [periodsRes, employeesRes] = await Promise.all([
+            const [periodsRes, employeesRes, conceptsRes] = await Promise.all([
                 axiosClient.get('/payroll-periods/'),
-                axiosClient.get('/employees/?is_active=true&page_size=1')
+                axiosClient.get('/employees/?is_active=true&page_size=1000'),
+                axiosClient.get('/payroll-concepts/?active=true')
             ]);
 
             const periodsList = periodsRes.data.results || periodsRes.data;
+            const employeesList = employeesRes.data.results || employeesRes.data; // <--- Guardar lista
+
             const openPeriods = periodsList.filter(p => p.status === 'OPEN');
             setPeriods(periodsList);
+            setEmployees(employeesList);
+            setConcepts(conceptsRes.data.results || conceptsRes.data);
 
             if (openPeriods.length > 0) {
                 setSelectedPeriod(openPeriods[0]);
@@ -198,9 +204,25 @@ const PayrollDashboard = () => {
 
             {/* === CONTENT === */}
             <div className="max-w-7xl mx-auto px-6 lg:px-10 py-6">
-                {activeTab === 'novelties' && <NovedadesGrid />}
-                {activeTab === 'detail' && <PayrollDetail period={selectedPeriod} />}
-                {activeTab === 'closure' && <PayrollClosure />}
+                {activeTab === 'novelties' && (
+                    <NovedadesGrid
+                        initialPeriods={periods}
+                        initialEmployees={employees}
+                    />
+                )}
+                {activeTab === 'detail' && (
+                    <PayrollDetail
+                        period={selectedPeriod}
+                        allEmployees={employees}
+                        initialConcepts={concepts}
+                    />
+                )}
+                {activeTab === 'closure' && (
+                    <PayrollClosure
+                        initialPeriods={periods}
+                        onRefresh={loadInitialData}
+                    />
+                )}
             </div>
         </div>
     );

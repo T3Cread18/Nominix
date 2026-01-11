@@ -1,0 +1,57 @@
+﻿python : Traceback 
+(most recent call 
+last):
+En línea: 1 Carácter: 1
++ python manage.py 
+shell -c "import 
+payroll_core.urls; 
+print('Import OK ...
++ ~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
+~~
+    + CategoryInfo     
+         : NotSpecifi  
+  ed: (Traceback (mo   
+ st recent call las    
+t)::String) [], Re    
+moteException
+    + FullyQualifiedEr 
+   rorId : NativeComm  
+  andError
+ 
+  File "C:\Desarrollo\R
+RHH\manage.py", line 
+15, in main
+    from 
+django.core.management 
+import execute_from_com
+mand_line
+ModuleNotFoundError: 
+No module named 
+'django'
+
+The above exception 
+was the direct cause 
+of the following 
+exception:
+
+Traceback (most recent 
+call last):
+  File "C:\Desarrollo\R
+RHH\manage.py", line 
+26, in <module>
+    main()
+  File "C:\Desarrollo\R
+RHH\manage.py", line 
+17, in main
+    raise ImportError(
+ImportError: No se 
+pudo importar Django. 
+┐Estß seguro de que 
+estß instalado y 
+disponible en su 
+variable de entorno 
+PYTHONPATH? ┐Olvid¾ 
+activar un entorno 
+virtual?
