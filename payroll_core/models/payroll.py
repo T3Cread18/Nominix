@@ -233,6 +233,17 @@ class PayslipDetail(models.Model):
         verbose_name='Monto Original'
     )
     
+    quantity = models.DecimalField(
+        max_digits=12, decimal_places=2,
+        default=Decimal('0.00'),
+        verbose_name='Cantidad/Valor Auxiliar'
+    )
+    unit = models.CharField(
+        max_length=20,
+        default='días',
+        verbose_name='Unidad'
+    )
+    calculation_trace = models.TextField(blank=True, null=True, verbose_name='Traza de Cálculo')
     notes = models.TextField(blank=True, verbose_name='Notas')
 
     class Meta:

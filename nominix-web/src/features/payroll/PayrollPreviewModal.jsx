@@ -142,14 +142,21 @@ const PayrollPreviewModal = ({ isOpen, onClose, data, companyConfig }) => {
                                                                     <div key={idx} className="flex justify-between items-center py-2 group/line">
                                                                         <div>
                                                                             <p className="text-[11px] font-bold text-nominix-dark uppercase tracking-wider">{line.name}</p>
-                                                                            {line.quantity > 0 && (
-                                                                                <p className="text-[9px] text-gray-400 font-medium">{line.quantity} {line.unit}</p>
-                                                                            )}
+                                                                            <div className="flex items-center gap-2">
+                                                                                {line.quantity > 0 && (
+                                                                                    <p className="text-[9px] text-gray-400 font-medium">{line.quantity} {line.unit}</p>
+                                                                                )}
+                                                                                {line.trace && (
+                                                                                    <p className="text-[9px] text-amber-500 font-black tracking-tight bg-amber-50 px-1.5 rounded">
+                                                                                        {line.trace}
+                                                                                    </p>
+                                                                                )}
+                                                                            </div>
                                                                         </div>
                                                                         <div className="flex items-center gap-10">
                                                                             <span className={`text-xs font-black ${line.kind === 'EARNING' ? 'text-green-600' : 'text-red-500'}`}>
                                                                                 {line.kind === 'DEDUCTION' ? '-' : ''}
-                                                                                {line.amount_ves.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                                                                                {Number(line.amount_ves || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
                                                                             </span>
                                                                         </div>
                                                                     </div>

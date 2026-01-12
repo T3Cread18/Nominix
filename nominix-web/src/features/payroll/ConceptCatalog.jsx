@@ -14,7 +14,11 @@ import {
     X,
     Save,
     HelpCircle,
-    Edit2
+    Edit2,
+    Play,
+    AlertCircle,
+    ChevronRight,
+    BookOpen
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 
@@ -27,6 +31,9 @@ const ConceptCatalog = () => {
     const [isEditing, setIsEditing] = useState(false);
     const [editingId, setEditingId] = useState(null);
     const [saving, setSaving] = useState(false);
+    const [variables, setVariables] = useState({});
+    const [validationResult, setValidationResult] = useState(null);
+    const [isValidating, setIsValidating] = useState(false);
 
     // Estado inicial del formulario
     const [newConcept, setNewConcept] = useState({
@@ -45,14 +52,16 @@ const ConceptCatalog = () => {
     const fetchData = async () => {
         setLoading(true);
         try {
-            const [concRes, currRes] = await Promise.all([
+            const [concRes, currRes, varsRes] = await Promise.all([
                 axiosClient.get('/payroll-concepts/'),
-                axiosClient.get('/currencies/')
+                axiosClient.get('/currencies/'),
+                axiosClient.get('/payroll/variables/')
             ]);
             setConcepts(concRes.data.results || concRes.data);
             setCurrencies(currRes.data.results || currRes.data);
+            setVariables(varsRes.data);
         } catch (error) {
-            console.error("Error cargando catálogo de conceptos");
+            console.error("Error cargando catálogo de conceptos o variables");
         } finally {
             setLoading(false);
         }
@@ -78,6 +87,7 @@ const ConceptCatalog = () => {
         setIsAdding(false);
         setIsEditing(false);
         setEditingId(null);
+        setValidationResult(null);
     };
 
     const handleOpenCreate = () => {
@@ -101,6 +111,22 @@ const ConceptCatalog = () => {
         setEditingId(concept.id);
         setIsEditing(true);
         setIsAdding(true); // Reusamos el modal
+        setValidationResult(null);
+    };
+
+    const handleTestFormula = async () => {
+        if (!newConcept.formula) return;
+        setIsValidating(true);
+        try {
+            const res = await axiosClient.post('/payroll/validate-formula/', {
+                formula: newConcept.formula
+            });
+            setValidationResult(res.data);
+        } catch (error) {
+            setValidationResult({ success: false, error: "Error de red o servidor" });
+        } finally {
+            setIsValidating(false);
+        }
     };
 
     const handleSubmit = async (e) => {
@@ -209,28 +235,112 @@ const ConceptCatalog = () => {
                                 </select>
                             </div>
 
-                            {/* CONDICIONAL: Si es Fórmula Dinámica mostramos el editor, sino el input simple */}
+                            {/* CONDICIONAL: Si es Fórmula Dinámica mostramos el editor avanzado */}
                             {newConcept.computation_method === 'DYNAMIC_FORMULA' ? (
-                                <div className="col-span-2 bg-gray-900 rounded-2xl p-6 border border-gray-800">
-                                    <div className="flex justify-between items-center mb-4">
-                                        <label className="text-[10px] font-black text-gray-400 uppercase flex items-center gap-2">
-                                            <Code2 size={14} className="text-nominix-electric" /> Editor de Fórmula
-                                        </label>
-                                        <div className="flex gap-2">
-                                            <span className="text-[9px] font-mono text-gray-500 bg-gray-800 px-2 py-1 rounded">SALARIO_MENSUAL</span>
-                                            <span className="text-[9px] font-mono text-gray-500 bg-gray-800 px-2 py-1 rounded">DIAS</span>
-                                            <span className="text-[9px] font-mono text-gray-500 bg-gray-800 px-2 py-1 rounded">LUNES</span>
+                                <div className="col-span-2 space-y-4">
+                                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                        {/* Editor Area */}
+                                        <div className="lg:col-span-2 bg-gray-900 rounded-[2rem] p-8 border border-gray-800 shadow-2xl relative overflow-hidden">
+                                            <div className="absolute top-0 right-0 p-4 opacity-10">
+                                                <Code2 size={120} className="text-nominix-electric" />
+                                            </div>
+
+                                            <div className="flex justify-between items-center mb-4 relative z-10">
+                                                <label className="text-[10px] font-black text-gray-400 uppercase flex items-center gap-2">
+                                                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                                                    Editor de Lógica Salarial
+                                                </label>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleTestFormula}
+                                                    disabled={isValidating || !newConcept.formula}
+                                                    className="px-4 py-2 bg-nominix-electric/10 text-nominix-electric rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-nominix-electric hover:text-white transition-all flex items-center gap-2 border border-nominix-electric/20"
+                                                >
+                                                    {isValidating ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
+                                                    Probar Fórmula
+                                                </button>
+                                            </div>
+
+                                            <textarea
+                                                className="w-full bg-transparent text-green-400 font-mono text-base outline-none min-h-[140px] resize-y placeholder-gray-800 relative z-10 custom-scrollbar"
+                                                placeholder="(SALARIO_MENSUAL / 30) * DIAS"
+                                                value={newConcept.formula}
+                                                onChange={e => setNewConcept({ ...newConcept, formula: e.target.value })}
+                                            />
+
+                                            {/* Validation results inside editor */}
+                                            {validationResult && (
+                                                <div className={cn(
+                                                    "mt-4 p-4 rounded-2xl border animate-in fade-in slide-in-from-top-2 duration-300 relative z-10",
+                                                    validationResult.success ? "bg-green-500/5 border-green-500/20" : "bg-red-500/5 border-red-500/20"
+                                                )}>
+                                                    <div className="flex items-start gap-3">
+                                                        {validationResult.success ? (
+                                                            <CheckCircle2 size={16} className="text-green-500 shrink-0 mt-0.5" />
+                                                        ) : (
+                                                            <AlertCircle size={16} className="text-red-500 shrink-0 mt-0.5" />
+                                                        )}
+                                                        <div className="space-y-1">
+                                                            <p className={cn(
+                                                                "text-[10px] font-black uppercase tracking-widest",
+                                                                validationResult.success ? "text-green-400" : "text-red-400"
+                                                            )}>
+                                                                {validationResult.success ? 'Validación Exitosa' : 'Error de Sintaxis'}
+                                                            </p>
+                                                            {validationResult.success ? (
+                                                                <>
+                                                                    <p className="text-lg font-black text-white tracking-tighter">
+                                                                        Resultado: {validationResult.result.toLocaleString()}
+                                                                    </p>
+                                                                    <div className="bg-black/20 p-2 rounded-lg mt-2">
+                                                                        <p className="text-[9px] text-gray-500 font-bold uppercase mb-1">Traza de Ejecución:</p>
+                                                                        <code className="text-[10px] text-gray-400 block break-all font-mono italic">
+                                                                            {validationResult.trace}
+                                                                        </code>
+                                                                    </div>
+                                                                </>
+                                                            ) : (
+                                                                <p className="text-xs font-medium text-red-300 italic">{validationResult.error}</p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Documentation Sidebar */}
+                                        <div className="bg-gray-50 rounded-[2rem] p-6 border border-gray-100 flex flex-col max-h-[400px]">
+                                            <div className="flex items-center gap-2 mb-4">
+                                                <BookOpen size={16} className="text-nominix-dark" />
+                                                <h5 className="text-[10px] font-black uppercase text-nominix-dark tracking-widest">Diccionario de Variables</h5>
+                                            </div>
+                                            <div className="overflow-y-auto flex-1 pr-2 custom-scrollbar space-y-3">
+                                                {Object.keys(variables).length === 0 ? (
+                                                    <div className="text-center py-8 text-gray-400">
+                                                        <Loader2 size={24} className="animate-spin mx-auto mb-2" />
+                                                        <p className="text-[10px] font-bold uppercase">Cargando variables...</p>
+                                                    </div>
+                                                ) : Object.entries(variables).map(([name, meta]) => (
+                                                    <button
+                                                        key={name}
+                                                        type="button"
+                                                        onClick={() => setNewConcept(prev => ({ ...prev, formula: prev.formula + name }))}
+                                                        className="w-full text-left p-3 bg-white rounded-xl border border-gray-100 hover:border-nominix-electric hover:shadow-md transition-all group"
+                                                    >
+                                                        <div className="flex justify-between items-center mb-1">
+                                                            <span className="text-[10px] font-mono text-nominix-electric font-black">{name}</span>
+                                                            <ChevronRight size={10} className="text-gray-300 group-hover:translate-x-1 transition-transform" />
+                                                        </div>
+                                                        <p className="text-[9px] text-gray-400 font-bold leading-tight">{meta.description}</p>
+                                                        <div className="mt-2 flex items-center justify-between">
+                                                            <span className="text-[8px] bg-gray-50 text-gray-400 px-1.5 py-0.5 rounded uppercase font-black">{meta.category}</span>
+                                                            <span className="text-[8px] text-gray-300 font-mono italic">Ej: {meta.example}</span>
+                                                        </div>
+                                                    </button>
+                                                ))}
+                                            </div>
                                         </div>
                                     </div>
-                                    <textarea
-                                        className="w-full bg-transparent text-green-400 font-mono text-sm outline-none min-h-[100px] resize-y placeholder-gray-700"
-                                        placeholder="(SALARIO_MENSUAL / 30) * DIAS"
-                                        value={newConcept.formula}
-                                        onChange={e => setNewConcept({ ...newConcept, formula: e.target.value })}
-                                    />
-                                    <p className="text-[10px] text-gray-500 mt-2 font-medium">
-                                        Use operaciones matemáticas estándar (+, -, *, /) y funciones como min(), max().
-                                    </p>
                                 </div>
                             ) : (
                                 <div className="space-y-2">

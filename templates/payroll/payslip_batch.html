@@ -73,28 +73,38 @@
             display: inline-block;
         }
 
-        table {
+        .receipt-table {
             width: 100%;
             border-collapse: collapse;
             margin-top: 10px;
+            border: 1px solid #dee2e6;
         }
 
-        th {
-            padding: 6px 8px;
-            text-align: left;
-            text-transform: uppercase;
-            font-size: 9px;
-        }
-
-        td {
-            padding: 5px 8px;
-            border-bottom: 1px solid #eee;
+        .receipt-table th {
+            background-color: #0052FF;
+            color: white;
+            padding: 8px;
             font-size: 10px;
+            text-transform: uppercase;
+            border: 1px solid #0041cc;
+        }
+
+        .receipt-table td {
+            padding: 6px 8px;
+            border-bottom: 1px solid #eee;
+            border-left: 1px solid #eee;
+            border-right: 1px solid #eee;
+            font-size: 10px;
+        }
+
+        .receipt-table tr:nth-child(even) {
+            background-color: #f9f9f9;
         }
 
         .amount {
             text-align: right;
             font-family: 'Courier New', monospace;
+            font-weight: bold;
         }
 
         .firmas {
@@ -304,48 +314,39 @@
             </div>
         </div>
 
-        <table>
+        <table class="receipt-table">
             <thead>
                 <tr>
-                    <th style="width: 45%; background-color: #0052FF; color: white;">Concepto</th>
-                    <th style="width: 15%; text-align: center; background-color: #0052FF; color: white;">Cantidad</th>
-                    <th style="width: 20%; text-align: right; background-color: #0052FF; color: white;">Asignaciones
-                    </th>
-                    <th style="width: 20%; text-align: right; background-color: #0052FF; color: white;">Deducciones</th>
+                    <th style="width: 40%;">Concepto</th>
+                    <th style="width: 15%; text-align: center;">Valor Auxiliar</th>
+                    <th style="width: 22.5%; text-align: right;">Asignación</th>
+                    <th style="width: 22.5%; text-align: right;">Deducción</th>
                 </tr>
             </thead>
             <tbody>
-                <tr class="section-title">
-                    <td colspan="4">Asignaciones</td>
-                </tr>
-                {% for detail in payslip.details.all %}
-                {% if detail.kind == 'EARNING' %}
-                {% if detail.concept_code != 'CESTATICKET' and detail.concept_code != 'COMPLEMENTO' %}
+                {% for row in payslip.processed_rows %}
+                {% if row.tipo_recibo == 'salario' %}
                 <tr>
-                    <td>{{ detail.concept_name }}</td>
-                    <td style="text-align: center;">{% if detail.quantity %}{{ detail.quantity }} {{
-                        detail.unit|default:"" }}{% endif %}</td>
-                    <td class="amount">{{ detail.amount_ves|floatformat:2 }}</td>
-                    <td></td>
-                </tr>
-                {% endif %}
-                {% endif %}
-                {% endfor %}
-
-
-                <tr class="section-title">
-                    <td colspan="4">Deducciones de Ley</td>
-                </tr>
-                {% for detail in payslip.details.all %}
-                {% if detail.kind == 'DEDUCTION' %}
-                <tr>
-                    <td>{{ detail.concept_name }}</td>
-                    <td></td>
-                    <td></td>
-                    <td class="amount">{{ detail.amount_ves|floatformat:2 }}</td>
+                    <td>{{ row.name }}</td>
+                    <td style="text-align: center; font-family: monospace;">
+                        {% if row.quantity %}{{ row.quantity }} {{ row.unit|default:"días" }}{% else %}0{% endif %}
+                    </td>
+                    <td class="amount">
+                        {% if row.earning_amount is not None %}{{ row.earning_amount|floatformat:2 }}{% else %}
+                        0.00{% endif %}
+                    </td>
+                    <td class="amount">
+                        {% if row.deduction_amount is not None %}{{ row.deduction_amount|floatformat:2 }}{% else %}
+                        0.00{% endif %}
+                    </td>
                 </tr>
                 {% endif %}
                 {% endfor %}
+                <tr>
+                    <td colspan="4" style="text-align: center; padding: 20px; color: #999;">
+                        No hay conceptos configurados para este recibo.
+                    </td>
+                </tr>
             </tbody>
         </table>
 
@@ -353,14 +354,14 @@
             <table style="border: none;">
                 <tr>
                     <td style="border: none;">Total Asignaciones:</td>
-                    <td class="amount" style="border: none;">Bs. {{ payslip.total_income_ves|floatformat:2 }}</td>
+                    <td class="amount" style="border: none;">Bs. {{ payslip.total_income_salario|floatformat:2 }}</td>
                     <td style="border: none;">Total Deducciones:</td>
                     <td class="amount" style="border: none;">Bs. {{ payslip.total_deductions_ves|floatformat:2 }}</td>
                 </tr>
                 <tr style="border-top: 1px solid #ccc;">
                     <td colspan="2" style="border: none; padding-top: 10px;">NETO A PAGAR:</td>
                     <td colspan="2" class="amount salario-net" style="border: none; padding-top: 10px;">Bs.
-                        {{ payslip.net_pay_ves|floatformat:2 }}</td>
+                        {{ payslip.net_pay_salario|floatformat:2 }}</td>
                 </tr>
             </table>
         </div>

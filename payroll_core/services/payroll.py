@@ -146,7 +146,10 @@ class PayrollProcessor:
                         concept_name=line['name'],
                         kind=line['kind'],
                         amount_ves=line['amount_ves'],
-                        tipo_recibo=line.get('tipo_recibo', 'salario'), # <--- NUEVO
+                        tipo_recibo=line.get('tipo_recibo', 'salario'),
+                        quantity=line.get('quantity', 0) or 0,
+                        unit=line.get('unit', 'días'),
+                        calculation_trace=line.get('trace', ''),
                         # Referencial en moneda origen (si aplica)
                         amount_src=(line['amount_ves'] / bcv_rate).quantize(Decimal('0.01')) if bcv_rate else 0
                     )

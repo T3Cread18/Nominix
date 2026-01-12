@@ -37,6 +37,13 @@ class PayrollConceptViewSet(viewsets.ModelViewSet):
     serializer_class = PayrollConceptSerializer
     filterset_fields = ['kind', 'active']
 
+    def perform_destroy(self, instance):
+        if instance.is_system:
+            raise serializers.ValidationError(
+                "No se puede eliminar un concepto de sistema."
+            )
+        super().perform_destroy(instance)
+
 class EmployeeConceptViewSet(viewsets.ModelViewSet):
     queryset = EmployeeConcept.objects.all()
     serializer_class = EmployeeConceptSerializer
@@ -172,6 +179,13 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             # Esto automáticamente inyecta Sueldo Base, IVSS, FAOV y Novedades
             result = engine.calculate_payroll()
 
+            # 5. Forzar conversión de Decimals a Float para facilitar el consumo en JS formatCurrency
+            result['totals'] = {k: float(v) if isinstance(v, Decimal) else v for k, v in result.get('totals', {}).items()}
+            for line in result.get('lines', []):
+                for k, v in line.items():
+                    if isinstance(v, Decimal):
+                        line[k] = float(v)
+
             # 5. Retornar el resultado directamente (Ya viene formateado en JSON)
             return Response(result)
 
@@ -247,24 +261,92 @@ class PayrollPeriodViewSet(viewsets.ModelViewSet):
         tipo_recibo = request.query_params.get('tipo', 'todos')
         
         # Obtener recibos asociados a este periodo
-        payslips = period.payslips.select_related('employee', 'employee__department').prefetch_related('details').all()
+        payslips_qs = period.payslips.select_related('employee', 'employee__department').prefetch_related('details').all()
         
-        if not payslips.exists():
+        if not payslips_qs.exists():
             return Response({"error": "No hay recibos generados para este periodo."}, status=404)
+
+        # 1. Obtener conceptos configurados para el recibo (Estructura Fija)
+        configured_concepts = PayrollConcept.objects.filter(
+            appears_on_receipt=True
+        ).order_by('receipt_order')
+        
+        # Mapeo de códigos configurados para referencia rápida
+        configured_codes = {c.code: c for c in configured_concepts}
+
+        # 2. Pre-procesar cada payslip
+        processed_payslips = []
+        for payslip in payslips_qs:
+            actual_details = {d.concept_code: d for d in payslip.details.all()}
+            used_codes = set()
+            payslip_rows = []
+            
+            # Primero, agregar conceptos configurados (Orden Fijo)
+            for concept in configured_concepts:
+                detail = actual_details.get(concept.code)
+                used_codes.add(concept.code)
+                
+                if detail:
+                    row = {
+                        'name': detail.concept_name,
+                        'code': detail.concept_code,
+                        'kind': detail.kind,
+                        'quantity': getattr(detail, 'quantity', 0) or 0,
+                        'unit': getattr(detail, 'unit', '') or '',
+                        'amount_ves': detail.amount_ves,
+                        'tipo_recibo': detail.tipo_recibo,
+                    }
+                elif concept.show_even_if_zero:
+                    row = {
+                        'name': concept.name,
+                        'code': concept.code,
+                        'kind': concept.kind,
+                        'quantity': 0,
+                        'unit': '',
+                        'amount_ves': Decimal('0.00'),
+                        'tipo_recibo': 'salario',
+                    }
+                else:
+                    # Si no hay detalle y no se fuerza el cero, no agregar
+                    used_codes.remove(concept.code) # Marcar como no usado realmente
+                    continue
+                
+                row['earning_amount'] = row['amount_ves'] if row['kind'] == 'EARNING' else None
+                row['deduction_amount'] = row['amount_ves'] if row['kind'] == 'DEDUCTION' else None
+                payslip_rows.append(row)
+            
+            # Segundo, agregar detalles calculados que NO estaban en la configuración fija (Fallback)
+            for code, detail in actual_details.items():
+                if code not in used_codes:
+                    row = {
+                        'name': detail.concept_name,
+                        'code': detail.concept_code,
+                        'kind': detail.kind,
+                        'quantity': getattr(detail, 'quantity', 0) or 0,
+                        'unit': getattr(detail, 'unit', '') or '',
+                        'amount_ves': detail.amount_ves,
+                        'tipo_recibo': detail.tipo_recibo,
+                        'earning_amount': detail.amount_ves if detail.kind == 'EARNING' else None,
+                        'deduction_amount': detail.amount_ves if detail.kind == 'DEDUCTION' else None,
+                    }
+                    payslip_rows.append(row)
+            
+            payslip.processed_rows = payslip_rows
+            processed_payslips.append(payslip)
 
         # Contexto para el Template HTML
         company_config = Company.objects.first()
         context = {
-            'payslips': payslips,
+            'payslips': processed_payslips,
             'period_name': period.name,
             'start_date': period.start_date,
             'end_date': period.end_date,
             'payment_date': period.payment_date,
-            'tenant_name': request.tenant.name,
-            'tenant_rif': request.tenant.rif,
-            'tenant_address': request.tenant.address,
+            'tenant_name': request.tenant.name if hasattr(request, 'tenant') else "Nóminix",
+            'tenant_rif': request.tenant.rif if hasattr(request, 'tenant') else "",
+            'tenant_address': request.tenant.address if hasattr(request, 'tenant') else "",
             'company_config': company_config,
-            'tipo_recibo': tipo_recibo,  # Pasamos el tipo al template
+            'tipo_recibo': tipo_recibo,
         }
 
         # Seleccionar template según tipo de recibo
@@ -391,23 +473,83 @@ class PayslipReadOnlyViewSet(viewsets.ReadOnlyModelViewSet):
     def export_pdf(self, request, pk=None):
         """
         Genera el PDF individual para un recibo de pago.
-        Reuse the logic from Period export but for a single record.
         """
         import weasyprint
         from django.template.loader import render_to_string
         from django.http import HttpResponse
 
         payslip = self.get_object()
+        
+        # 1. Obtener conceptos configurados
+        configured_concepts = PayrollConcept.objects.filter(
+            appears_on_receipt=True
+        ).order_by('receipt_order')
+
+        # 2. Pre-procesar filas
+        actual_details = {d.concept_code: d for d in payslip.details.all()}
+        used_codes = set()
+        payslip_rows = []
+        
+        # Primero, conceptos configurados
+        for concept in configured_concepts:
+            detail = actual_details.get(concept.code)
+            used_codes.add(concept.code)
+            
+            if detail:
+                row = {
+                    'name': detail.concept_name,
+                    'code': detail.concept_code,
+                    'kind': detail.kind,
+                    'quantity': getattr(detail, 'quantity', 0) or 0,
+                    'unit': getattr(detail, 'unit', '') or '',
+                    'amount_ves': detail.amount_ves,
+                    'tipo_recibo': detail.tipo_recibo,
+                }
+            elif concept.show_even_if_zero:
+                row = {
+                    'name': concept.name,
+                    'code': concept.code,
+                    'kind': concept.kind,
+                    'quantity': 0,
+                    'unit': '',
+                    'amount_ves': Decimal('0.00'),
+                    'tipo_recibo': 'salario',
+                }
+            else:
+                used_codes.remove(concept.code)
+                continue
+            
+            row['earning_amount'] = row['amount_ves'] if row['kind'] == 'EARNING' else None
+            row['deduction_amount'] = row['amount_ves'] if row['kind'] == 'DEDUCTION' else None
+            payslip_rows.append(row)
+
+        # Segundo, fallback para detalles no configurados
+        for code, detail in actual_details.items():
+            if code not in used_codes:
+                row = {
+                    'name': detail.concept_name,
+                    'code': detail.concept_code,
+                    'kind': detail.kind,
+                    'quantity': getattr(detail, 'quantity', 0) or 0,
+                    'unit': getattr(detail, 'unit', '') or '',
+                    'amount_ves': detail.amount_ves,
+                    'tipo_recibo': detail.tipo_recibo,
+                    'earning_amount': detail.amount_ves if detail.kind == 'EARNING' else None,
+                    'deduction_amount': detail.amount_ves if detail.kind == 'DEDUCTION' else None,
+                }
+                payslip_rows.append(row)
+        
+        payslip.processed_rows = payslip_rows
         company_config = Company.objects.first()
         
         context = {
-            'payslips': [payslip], # El template espera una lista
+            'payslips': [payslip],
             'period_name': payslip.period.name,
             'start_date': payslip.period.start_date,
             'end_date': payslip.period.end_date,
             'payment_date': payslip.period.payment_date,
-            'tenant_name': request.tenant.name if hasattr(request, 'tenant') else "Nóminix SaaS",
-            'tenant_rif': request.tenant.rif if hasattr(request, 'tenant') else "J-00000000-0",
+            'tenant_name': request.tenant.name if hasattr(request, 'tenant') else "Nóminix",
+            'tenant_rif': request.tenant.rif if hasattr(request, 'tenant') else "",
             'tenant_address': request.tenant.address if hasattr(request, 'tenant') else "",
             'company_config': company_config,
         }
@@ -500,3 +642,23 @@ class LoanPaymentViewSet(viewsets.ModelViewSet):
     serializer_class = LoanPaymentSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['loan', 'payslip']
+
+class PayrollVariablesView(APIView):
+    """
+    Devuelve el inventario de variables disponibles para fórmulas.
+    """
+    def get(self, request):
+        return Response(PayrollEngine.get_variable_inventory())
+
+class ValidateFormulaView(APIView):
+    """
+    Valida una fórmula y devuelve el resultado y la traza.
+    """
+    def post(self, request):
+        formula = request.data.get('formula')
+        context = request.data.get('context', {})
+        if not formula:
+            return Response({"error": "Fórmula no proporcionada"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        result = PayrollEngine.validate_formula(formula, context)
+        return Response(result)

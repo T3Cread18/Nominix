@@ -9,4 +9,6 @@ class PayrollCoreConfig(AppConfig):
     
     default_auto_field: str = 'django.db.models.BigAutoField'
     name: str = 'payroll_core'
-    verbose_name: str = 'Nómina y Recursos Humanos'
+    def ready(self):
+        import payroll_core.signals
+

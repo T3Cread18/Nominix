@@ -8,7 +8,8 @@ from .views import (
     EmployeeViewSet, BranchViewSet, LaborContractViewSet,
     CurrencyViewSet, PayrollConceptViewSet, EmployeeConceptViewSet,
     PayrollPeriodViewSet, PayslipReadOnlyViewSet, PayrollNoveltyViewSet,
-    CompanyConfigView, DepartmentViewSet, LoanViewSet, LoanPaymentViewSet
+    CompanyConfigView, DepartmentViewSet, LoanViewSet, LoanPaymentViewSet,
+    PayrollVariablesView, ValidateFormulaView
 )
 
 app_name = 'payroll_core'
@@ -32,4 +33,6 @@ urlpatterns = [
     path('', include(router.urls)),
     path('company/config/', CompanyConfigView.as_view(), name='company-config'),
     path('exchange-rates/latest/', LatestExchangeRateView.as_view(), name='latest-rate'),
+    path('payroll/variables/', PayrollVariablesView.as_view(), name='payroll-variables'),
+    path('payroll/validate-formula/', ValidateFormulaView.as_view(), name='validate-formula'),
 ]

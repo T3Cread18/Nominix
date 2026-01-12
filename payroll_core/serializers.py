@@ -24,7 +24,22 @@ class PayrollConceptSerializer(serializers.ModelSerializer):
     currency_data = CurrencySerializer(source='currency', read_only=True)
     class Meta:
         model = PayrollConcept
-        fields = ['id', 'code', 'name', 'kind', 'computation_method', 'value', 'currency', 'currency_data', 'is_salary_incidence', 'active', 'formula', 'show_on_payslip']
+        fields = [
+            'id', 'code', 'name', 'kind', 'computation_method', 
+            'value', 'currency', 'currency_data', 'is_salary_incidence', 
+            'active', 'formula', 'show_on_payslip', 'appears_on_receipt',
+            'show_even_if_zero', 'receipt_order', 'is_system'
+        ]
+        read_only_fields = ['is_system']
+
+    def validate(self, attrs):
+        if self.instance and self.instance.is_system:
+            # Solo permitir cambiar ciertos campos estéticos si es sistema? 
+            # El usuario dice "que no se puedan modificar"
+            raise serializers.ValidationError(
+                "Este es un concepto de sistema y no puede ser modificado."
+            )
+        return attrs
 
 class EmployeeConceptSerializer(serializers.ModelSerializer):
     concept_data = PayrollConceptSerializer(source='concept', read_only=True)

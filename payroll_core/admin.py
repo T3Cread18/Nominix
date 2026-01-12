@@ -107,27 +107,52 @@ class PayrollConceptAdmin(admin.ModelAdmin):
         'kind_display', 
         'method_display', 
         'formatted_value', 
+        'receipt_order',
+        'is_system',
         'active'
     )
-    list_filter = ('kind', 'computation_method', 'active', 'currency')
+    list_filter = ('is_system', 'kind', 'computation_method', 'active', 'currency')
     search_fields = ('code', 'name')
-    ordering = ('kind', 'code')
+    ordering = ('receipt_order', 'kind', 'code')
     
     fieldsets = (
         ('Identificación', {
-            'fields': ('code', 'name', 'kind', 'active')
+            'fields': ('code', 'name', 'kind', 'active', 'is_system')
+        }),
+        ('Diseño de Recibo', {
+            'fields': (
+                'appears_on_receipt',
+                'show_even_if_zero',
+                'receipt_order',
+            ),
+            'description': 'Configuración para la impresión del PDF.'
         }),
         ('Reglas de Cálculo', {
             'fields': (
-                ('computation_method', 'value'),
+                'computation_method', 
+                'value',
                 'currency',
+                'formula',
             ),
             'description': 'Si es porcentaje, el valor 4.00 significa 4%.'
         }),
-        ('Configuración', {
-            'fields': ('is_salary_incidence',)
+        ('Configuración Avanzada', {
+            'fields': ('is_salary_incidence', 'show_on_payslip'),
+            'classes': ('collapse',)
         }),
     )
+
+    readonly_fields = ('is_system',)
+
+    def get_readonly_fields(self, request, obj=None):
+        if obj and obj.is_system:
+            return self.readonly_fields + ('code', 'kind', 'computation_method')
+        return self.readonly_fields
+
+    def has_delete_permission(self, request, obj=None):
+        if obj and obj.is_system:
+            return False
+        return super().has_delete_permission(request, obj)
 
     def kind_display(self, obj):
         return format_html(

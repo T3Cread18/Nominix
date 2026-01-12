@@ -80,8 +80,32 @@ class PayrollConcept(models.Model):
     
     show_on_payslip: models.BooleanField = models.BooleanField(
         default=True,
-        verbose_name='Mostrar en Recibo',
+        verbose_name='Mostrar en Recibo (Legacy)',
         help_text='Si se desactiva, este concepto se calculará (si es necesario) pero no aparecerá en el recibo del empleado.'
+    )
+    
+    appears_on_receipt: models.BooleanField = models.BooleanField(
+        default=True,
+        verbose_name='Aparece en Recibo',
+        help_text='Indica si el concepto debe ser considerado para la impresión del recibo.'
+    )
+    
+    show_even_if_zero: models.BooleanField = models.BooleanField(
+        default=False,
+        verbose_name='Mostrar aunque sea Cero',
+        help_text='Si es True, se imprimirá en el recibo incluso si el monto es 0.00'
+    )
+    
+    receipt_order: models.PositiveIntegerField = models.PositiveIntegerField(
+        default=0,
+        verbose_name='Orden en Recibo',
+        help_text='Controla la posición del concepto en el PDF (menor valor aparece primero)'
+    )
+    
+    is_system: models.BooleanField = models.BooleanField(
+        default=False,
+        verbose_name='Concepto de Sistema',
+        help_text='Si es True, el concepto es esencial para el motor y no puede ser modificado o eliminado.'
     )
     
     created_at: models.DateTimeField = models.DateTimeField(
@@ -99,7 +123,7 @@ class PayrollConcept(models.Model):
     class Meta:
         verbose_name = 'Concepto de Nómina'
         verbose_name_plural = 'Conceptos de Nómina'
-        ordering = ['kind', 'code']
+        ordering = ['receipt_order', 'kind', 'code']
     
     def __str__(self) -> str:
         return f"[{self.code}] {self.name} ({self.get_kind_display()})"
