@@ -17,7 +17,8 @@ from .serializers import (
     ClientSerializer, 
     ClientCreateSerializer,
     DomainSerializer,
-    TenantStatsSerializer
+    TenantStatsSerializer,
+    UserManagementSerializer
 )
 from .auth_serializers import LoginSerializer, UserSerializer
 import logging
@@ -306,6 +307,100 @@ class ClientViewSet(viewsets.ModelViewSet):
             'message': f'Suscripción renovada hasta {new_date}',
             'tenant': serializer.data
         })
+
+    @action(detail=True, methods=['get', 'post', 'patch', 'delete'])
+    def users(self, request, pk=None):
+        """
+        Gestión de usuarios dentro de un tenant específico.
+        Permite listar, crear, editar y eliminar usuarios del esquema del tenant.
+        
+        GET: Listar usuarios
+        POST: Crear usuario
+        PATCH: Actualizar usuario (requiere ?user_id=ID)
+        DELETE: Eliminar usuario (requiere ?user_id=ID)
+        """
+        client = self.get_object()
+        schema = client.schema_name
+        
+        from django_tenants.utils import schema_context
+        from django.contrib.auth.models import User
+        
+        try:
+            with schema_context(schema):
+                # --- LISTAR ---
+                if request.method == 'GET':
+                    users = User.objects.all().order_by('id')
+                    serializer = UserManagementSerializer(users, many=True)
+                    return Response(serializer.data)
+                
+                # --- CREAR ---
+                elif request.method == 'POST':
+                    serializer = UserManagementSerializer(data=request.data)
+                    if serializer.is_valid():
+                        data = serializer.validated_data
+                        if User.objects.filter(username=data['username']).exists():
+                            return Response({'error': 'El nombre de usuario ya existe en este tenant'}, status=400)
+                        
+                        user = User.objects.create_user(
+                            username=data['username'],
+                            email=data['email'],
+                            password=data['password']
+                        )
+                        user.first_name = data.get('first_name', '')
+                        user.last_name = data.get('last_name', '')
+                        user.is_staff = data.get('is_staff', False)
+                        user.is_superuser = data.get('is_superuser', False)
+                        user.is_active = data.get('is_active', True)
+                        user.save()
+                        
+                        return Response(UserManagementSerializer(user).data, status=201)
+                    return Response(serializer.errors, status=400)
+                
+                # --- ACTUALIZAR ---
+                elif request.method == 'PATCH':
+                    user_id = request.query_params.get('user_id')
+                    user = get_object_or_404(User, pk=user_id)
+                    
+                    serializer = UserManagementSerializer(initial=request.data, data=request.data, partial=True) # Hack to validate partial data
+                    # Note: Serializer validation might fail if required fields missing, manual update is safer for partial logic without model serializer
+                    
+                    data = request.data
+                    
+                    if 'username' in data and data['username'] != user.username:
+                        if User.objects.filter(username=data['username']).exclude(pk=user.id).exists():
+                            return Response({'error': 'El nombre de usuario ya está en uso'}, status=400)
+                        user.username = data['username']
+                        
+                    if 'email' in data: user.email = data['email']
+                    if 'first_name' in data: user.first_name = data['first_name']
+                    if 'last_name' in data: user.last_name = data['last_name']
+                    if 'is_staff' in data: user.is_staff = data['is_staff']
+                    if 'is_superuser' in data: user.is_superuser = data['is_superuser']
+                    if 'is_active' in data: user.is_active = data['is_active']
+                    
+                    if 'password' in data and data['password']:
+                        user.set_password(data['password'])
+                        
+                    user.save()
+                    return Response(UserManagementSerializer(user).data)
+                
+                # --- ELIMINAR ---
+                elif request.method == 'DELETE':
+                    user_id = request.query_params.get('user_id')
+                    user = get_object_or_404(User, pk=user_id)
+                    
+                    # Prevenir auto-eliminación si es el único superuser (opcional, buena práctica)
+                    if user.is_superuser and User.objects.filter(is_superuser=True).count() == 1:
+                         return Response({'error': 'No puedes eliminar al último superusuario del tenant'}, status=400)
+
+                    user.delete()
+                    return Response({'message': 'Usuario eliminado correctamente'})
+
+        except Exception as e:
+            return Response(
+                {'error': f'Error gestionando usuarios en {schema}: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 class TenantInfoView(APIView):

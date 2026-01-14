@@ -229,3 +229,19 @@ class TenantStatsSerializer(serializers.Serializer):
     active_tenants = serializers.IntegerField()
     trial_tenants = serializers.IntegerField()
     total_domains = serializers.IntegerField()
+
+
+class UserManagementSerializer(serializers.Serializer):
+    """
+    Serializer para creación y edición de usuarios dentro de un tenant.
+    """
+    id = serializers.IntegerField(read_only=True)
+    username = serializers.CharField(max_length=150)
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True, required=False)
+    first_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
+    last_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
+    is_staff = serializers.BooleanField(default=False)
+    is_superuser = serializers.BooleanField(default=False)
+    is_active = serializers.BooleanField(default=True)
+

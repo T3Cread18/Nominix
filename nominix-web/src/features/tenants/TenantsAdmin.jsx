@@ -4,7 +4,7 @@ import {
     Users, Globe, Activity, Plus, Trash2,
     ArrowRight, Loader2, Search, Building2,
     Calendar, ShieldAlert, CheckCircle2, ChevronRight,
-    FileText, CreditCard, Edit, X, RefreshCw, Wallet
+    FileText, CreditCard, Edit, X, RefreshCw, Wallet, UserCog, Shield
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '../../utils/cn';
@@ -394,6 +394,217 @@ const RenewModal = ({ tenant, onClose, onRenewed }) => {
     );
 };
 
+
+const TenantUsersModal = ({ tenant, onClose }) => {
+    const [users, setUsers] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [view, setView] = useState('list'); // list, create, edit
+    const [editingUser, setEditingUser] = useState(null);
+
+    // Form State
+    const [form, setForm] = useState({
+        username: '',
+        email: '',
+        password: '',
+        first_name: '',
+        last_name: '',
+        is_staff: false,
+        is_superuser: false,
+        is_active: true
+    });
+
+    useEffect(() => {
+        fetchUsers();
+    }, [tenant.id]);
+
+    const fetchUsers = async () => {
+        setLoading(true);
+        try {
+            const res = await axiosClient.get(`/tenants/${tenant.id}/users/`);
+            setUsers(res.data);
+        } catch (error) {
+            toast.error('Error cargando usuarios del tenant');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSave = async (e) => {
+        e.preventDefault();
+        try {
+            if (view === 'create') {
+                await axiosClient.post(`/tenants/${tenant.id}/users/`, form);
+                toast.success('Usuario creado');
+            } else if (view === 'edit') {
+                // Clean password if empty
+                const payload = { ...form };
+                if (!payload.password) delete payload.password;
+
+                await axiosClient.patch(`/tenants/${tenant.id}/users/?user_id=${editingUser.id}`, payload);
+                toast.success('Usuario actualizado');
+            }
+            setView('list');
+            fetchUsers();
+        } catch (error) {
+            toast.error(error.response?.data?.error || 'Error guardando usuario');
+        }
+    };
+
+    const handleDelete = async (userId) => {
+        if (!confirm('¿Eliminar usuario? Esta acción es irreversible.')) return;
+        try {
+            await axiosClient.delete(`/tenants/${tenant.id}/users/?user_id=${userId}`);
+            toast.success('Usuario eliminado');
+            fetchUsers();
+        } catch (error) {
+            toast.error(error.response?.data?.error || 'Error eliminando usuario');
+        }
+    };
+
+    const startEdit = (user) => {
+        setEditingUser(user);
+        setForm({
+            username: user.username,
+            email: user.email,
+            password: '', // Password empty by default
+            first_name: user.first_name,
+            last_name: user.last_name,
+            is_staff: user.is_staff,
+            is_superuser: user.is_superuser,
+            is_active: user.is_active
+        });
+        setView('edit');
+    };
+
+    const resetForm = () => {
+        setForm({
+            username: '', email: '', password: '',
+            first_name: '', last_name: '',
+            is_staff: false, is_superuser: false, is_active: true
+        });
+        setView('create');
+    }
+
+    return (
+        <div className="p-8 text-white w-full max-w-4xl mx-auto h-[80vh] flex flex-col">
+            <div className="flex justify-between items-start mb-6 shrink-0">
+                <div>
+                    <h3 className="text-2xl font-black italic tracking-tight flex items-center gap-2">
+                        <UserCog size={24} className="text-nominix-electric" />
+                        Usuarios: {tenant.name}
+                    </h3>
+                    <p className="text-xs text-gray-500 font-bold uppercase tracking-widest mt-1">Gestión de Acceso al Tenant</p>
+                </div>
+                <button onClick={onClose} className="p-2 bg-white/5 hover:bg-white/10 rounded-xl transition-colors"><X size={20} /></button>
+            </div>
+
+            {/* Toolbar */}
+            {view === 'list' && (
+                <div className="flex justify-end mb-4 shrink-0">
+                    <button
+                        onClick={resetForm}
+                        className="px-4 py-2 bg-nominix-electric hover:bg-nominix-electric/90 text-white rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-nominix-electric/10"
+                    >
+                        <Plus size={16} /> Nuevo Usuario
+                    </button>
+                </div>
+            )}
+
+            <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
+                {loading ? (
+                    <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin text-nominix-electric" size={32} /></div>
+                ) : view === 'list' ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {users.map(u => (
+                            <div key={u.id} className="bg-white/5 border border-white/5 rounded-2xl p-4 hover:border-nominix-electric/30 transition-all group">
+                                <div className="flex justify-between items-start mb-2">
+                                    <div className="flex items-center gap-2">
+                                        <div className="p-2 bg-white/5 rounded-lg">
+                                            {u.is_superuser ? <Shield size={16} className="text-amber-500" /> : <Users size={16} className="text-gray-400" />}
+                                        </div>
+                                        <div>
+                                            <p className="font-bold text-sm text-white">{u.username}</p>
+                                            <p className="text-[10px] text-gray-500 uppercase tracking-wider">{u.is_superuser ? 'Super Admin' : (u.is_staff ? 'Staff' : 'Usuario')}</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button onClick={() => startEdit(u)} className="p-1.5 hover:bg-white/10 rounded-lg text-blue-400"><Edit size={14} /></button>
+                                        <button onClick={() => handleDelete(u.id)} className="p-1.5 hover:bg-white/10 rounded-lg text-red-400"><Trash2 size={14} /></button>
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-xs text-gray-400 truncate">{u.email}</p>
+                                    <p className="text-xs text-gray-500">{u.first_name} {u.last_name}</p>
+                                </div>
+                                <div className="mt-3 flex gap-2">
+                                    <span className={cn("text-[9px] px-2 py-0.5 rounded font-black uppercase tracking-widest", u.is_active ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500")}>
+                                        {u.is_active ? 'Activo' : 'Inactivo'}
+                                    </span>
+                                </div>
+                            </div>
+                        ))}
+                        {users.length === 0 && <p className="col-span-2 text-center text-gray-500 py-10">No hay usuarios registrados.</p>}
+                    </div>
+                ) : (
+                    <form onSubmit={handleSave} className="bg-white/5 border border-white/10 rounded-3xl p-6 space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Usuario *</label>
+                                <input className="w-full bg-black/20 border border-white/10 rounded-xl py-2 px-3 text-sm text-white focus:border-nominix-electric/50 outline-none"
+                                    value={form.username} onChange={e => setForm({ ...form, username: e.target.value })} required />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Email *</label>
+                                <input type="email" className="w-full bg-black/20 border border-white/10 rounded-xl py-2 px-3 text-sm text-white focus:border-nominix-electric/50 outline-none"
+                                    value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} required />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Nombre</label>
+                                <input className="w-full bg-black/20 border border-white/10 rounded-xl py-2 px-3 text-sm text-white focus:border-nominix-electric/50 outline-none"
+                                    value={form.first_name} onChange={e => setForm({ ...form, first_name: e.target.value })} />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Apellido</label>
+                                <input className="w-full bg-black/20 border border-white/10 rounded-xl py-2 px-3 text-sm text-white focus:border-nominix-electric/50 outline-none"
+                                    value={form.last_name} onChange={e => setForm({ ...form, last_name: e.target.value })} />
+                            </div>
+                            <div className="col-span-2 space-y-1">
+                                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">
+                                    {view === 'edit' ? 'Nueva Contraseña (Dejar en blanco para mantener)' : 'Contraseña *'}
+                                </label>
+                                <input type="password" className="w-full bg-black/20 border border-white/10 rounded-xl py-2 px-3 text-sm text-white focus:border-nominix-electric/50 outline-none"
+                                    value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} required={view === 'create'} />
+                            </div>
+                        </div>
+
+                        <div className="flex gap-4 py-2">
+                            <label className="flex items-center gap-2 cursor-pointer bg-black/20 px-3 py-2 rounded-xl border border-white/5 hover:border-white/20 transition-all select-none">
+                                <input type="checkbox" checked={form.is_active} onChange={e => setForm({ ...form, is_active: e.target.checked })} className="accent-nominix-electric w-4 h-4" />
+                                <span className="text-xs font-bold text-gray-300">Activo</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer bg-black/20 px-3 py-2 rounded-xl border border-white/5 hover:border-white/20 transition-all select-none">
+                                <input type="checkbox" checked={form.is_staff} onChange={e => setForm({ ...form, is_staff: e.target.checked })} className="accent-nominix-electric w-4 h-4" />
+                                <span className="text-xs font-bold text-gray-300">Staff (Admin Panel)</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer bg-black/20 px-3 py-2 rounded-xl border border-white/5 hover:border-white/20 transition-all select-none">
+                                <input type="checkbox" checked={form.is_superuser} onChange={e => setForm({ ...form, is_superuser: e.target.checked })} className="accent-nominix-electric w-4 h-4" />
+                                <span className="text-xs font-bold text-gray-300">Superuser</span>
+                            </label>
+                        </div>
+
+                        <div className="flex gap-3 pt-4">
+                            <button type="button" onClick={() => setView('list')} className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-gray-400 rounded-xl text-xs font-black uppercase tracking-widest transition-colors">Cancelar</button>
+                            <button type="submit" className="flex-1 py-3 bg-nominix-electric hover:bg-nominix-electric/90 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-nominix-electric/20">
+                                {view === 'create' ? 'Crear Usuario' : 'Guardar Cambios'}
+                            </button>
+                        </div>
+                    </form>
+                )}
+            </div>
+        </div>
+    );
+};
+
 const TenantsAdmin = () => {
     const [tenants, setTenants] = useState([]);
     const [stats, setStats] = useState(null);
@@ -402,7 +613,9 @@ const TenantsAdmin = () => {
     const [showWizard, setShowWizard] = useState(false);
     const [editingTenant, setEditingTenant] = useState(null);
     const [viewingTenant, setViewingTenant] = useState(null);
+
     const [renewingTenant, setRenewingTenant] = useState(null);
+    const [managingUsersTenant, setManagingUsersTenant] = useState(null);
 
     useEffect(() => {
         fetchData();
@@ -583,6 +796,13 @@ const TenantsAdmin = () => {
                                                 >
                                                     <CreditCard size={16} />
                                                 </button>
+                                                <button
+                                                    onClick={() => setManagingUsersTenant(tenant)}
+                                                    className="p-2 bg-purple-500/10 hover:bg-purple-500/20 text-purple-500 rounded-xl transition-all"
+                                                    title="Gestionar Usuarios"
+                                                >
+                                                    <UserCog size={16} />
+                                                </button>
                                                 <a
                                                     href={`http://${tenant.domains?.find(d => d.is_primary)?.domain}`}
                                                     target="_blank"
@@ -650,6 +870,14 @@ const TenantsAdmin = () => {
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-6 backdrop-blur-xl bg-black/60">
                     <div className="bg-[#0a0a0b] border border-white/10 w-full max-w-sm rounded-[40px] shadow-3xl overflow-hidden animate-in fade-in zoom-in duration-300">
                         <RenewModal tenant={renewingTenant} onClose={() => setRenewingTenant(null)} onRenewed={fetchData} />
+                    </div>
+                </div>
+            )}
+
+            {managingUsersTenant && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-6 backdrop-blur-xl bg-black/60">
+                    <div className="bg-[#0a0a0b] border border-white/10 w-full max-w-4xl rounded-[40px] shadow-3xl overflow-hidden animate-in fade-in zoom-in duration-300">
+                        <TenantUsersModal tenant={managingUsersTenant} onClose={() => setManagingUsersTenant(null)} />
                     </div>
                 </div>
             )}
