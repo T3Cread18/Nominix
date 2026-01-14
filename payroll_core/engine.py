@@ -647,8 +647,8 @@ class PayrollEngine:
         trace_rpe = f"({float(base_rpe):.2f} * 12 / 52) * {num_lunes} Lun * 0.5%"
 
         # 4. FAOV (1% sobre Total Integral - Sin tope)
-        faov_ves = (total_income_ves * Decimal('0.01')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-        trace_faov = f"{float(total_income_ves):.2f} * 1%"
+        faov_ves = (sueldo_base_mensual * Decimal('0.01')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        trace_faov = f"{float(sueldo_base_mensual):.2f} * 1%"
 
         return [
             {
@@ -681,8 +681,8 @@ class PayrollEngine:
                 'quantity': 1, 
                 'unit': 'mes', 
                 'trace': trace_faov,
-                'formula': 'TOTAL_INTEGRAL * 0.01',
-                'variables': {'TOTAL_INTEGRAL': float(total_income_ves)}
+                'formula': 'SUELDO_MENSUAL * 0.01',
+                'variables': {'SUELDO_MENSUAL': float(sueldo_base_mensual)}
             }
         ]
 
@@ -696,7 +696,7 @@ class PayrollEngine:
         # 1. Inyectar conceptos del contrato (Asignaciones fijos)
         contract_concepts = self._get_contract_concepts()
         eval_context = self._build_eval_context()
-        
+
         # Cargar configuración de Conceptos de Sistema (Sueldo, Cestaticket, Complemento)
         system_codes = ['SUELDO_BASE', 'CESTATICKET', 'COMPLEMENTO']
         system_concepts_map = {c.code: c for c in PayrollConcept.objects.filter(code__in=system_codes)}

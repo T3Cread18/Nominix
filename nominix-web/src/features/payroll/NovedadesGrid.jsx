@@ -290,7 +290,7 @@ const NovedadesGrid = ({ initialPeriods, initialEmployees }) => {
                     type="number"
                     value={getValue()}
                     onChange={e => handleUpdateCell(index, id, e.target.value)}
-                    className="w-full bg-transparent border-none focus:bg-white focus:ring-2 focus:ring-red-100 text-right font-black text-red-500 p-2 rounded-lg transition-all"
+                    className="w-full bg-slate-50 border border-transparent focus:border-red-200 focus:bg-white focus:ring-4 focus:ring-red-100 text-right font-black text-red-500 p-3 rounded-xl transition-all outline-none placeholder:text-red-200"
                     placeholder="0"
                 />
             )

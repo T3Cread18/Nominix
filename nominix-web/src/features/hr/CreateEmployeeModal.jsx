@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import axiosClient from '../../api/axiosClient';
 import { X, Save, Loader2, Briefcase, User, Calendar, Building2 } from 'lucide-react';
 import DepartmentSelector from '../../components/DepartmentSelector';
+import InputField from '../../components/ui/InputField';
+import SelectField from '../../components/ui/SelectField';
 
 const CreateEmployeeModal = ({ isOpen, onClose, onSuccess }) => {
     const [loading, setLoading] = useState(false);
@@ -96,123 +98,86 @@ const CreateEmployeeModal = ({ isOpen, onClose, onSuccess }) => {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {/* Nombres */}
-                        <div className="space-y-2">
-                            <label className="text-xs font-black text-gray-400 uppercase tracking-wider">Nombres</label>
-                            <div className="relative">
-                                <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-                                <input
-                                    type="text"
-                                    name="first_name"
-                                    required
-                                    className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:bg-white focus:border-nominix-electric focus:ring-0 outline-none font-bold text-nominix-dark transition-all"
-                                    placeholder="Ej. Juan Andrés"
-                                    value={formData.first_name}
-                                    onChange={handleChange}
-                                />
-                            </div>
-                        </div>
+                        <InputField
+                            label="Nombres"
+                            name="first_name"
+                            value={formData.first_name}
+                            onChange={handleChange}
+                            required
+                            placeholder="Ej. Juan Andrés"
+                            icon={User}
+                        />
 
                         {/* Apellidos */}
-                        <div className="space-y-2">
-                            <label className="text-xs font-black text-gray-400 uppercase tracking-wider">Apellidos</label>
-                            <div className="relative">
-                                <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-                                <input
-                                    type="text"
-                                    name="last_name"
-                                    required
-                                    className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:bg-white focus:border-nominix-electric focus:ring-0 outline-none font-bold text-nominix-dark transition-all"
-                                    placeholder="Ej. Pérez López"
-                                    value={formData.last_name}
-                                    onChange={handleChange}
-                                />
-                            </div>
-                        </div>
+                        <InputField
+                            label="Apellidos"
+                            name="last_name"
+                            value={formData.last_name}
+                            onChange={handleChange}
+                            required
+                            placeholder="Ej. Pérez López"
+                            icon={User}
+                        />
 
                         {/* Cédula */}
-                        <div className="space-y-2">
-                            <label className="text-xs font-black text-gray-400 uppercase tracking-wider">Cédula de Identidad</label>
-                            <input
-                                type="text"
-                                name="national_id"
-                                required
-                                className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:bg-white focus:border-nominix-electric focus:ring-0 outline-none font-bold text-nominix-dark transition-all"
-                                placeholder="V-12345678"
-                                value={formData.national_id}
-                                onChange={handleChange}
-                            />
-                        </div>
+                        <InputField
+                            label="Cédula de Identidad"
+                            name="national_id"
+                            value={formData.national_id}
+                            onChange={handleChange}
+                            required
+                            placeholder="V-12345678"
+                        />
 
                         {/* Email */}
-                        <div className="space-y-2">
-                            <label className="text-xs font-black text-gray-400 uppercase tracking-wider">Correo Electrónico</label>
-                            <input
-                                type="email"
-                                name="email"
-                                className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:bg-white focus:border-nominix-electric focus:ring-0 outline-none font-bold text-nominix-dark transition-all"
-                                placeholder="juan@correo.com"
-                                value={formData.email}
-                                onChange={handleChange}
-                            />
-                        </div>
+                        <InputField
+                            label="Correo Electrónico"
+                            name="email"
+                            value={formData.email}
+                            onChange={handleChange}
+                            type="email"
+                            placeholder="juan@correo.com"
+                        />
                     </div>
 
                     {/* Sede (Branch) - Prerequisite for Department */}
-                    <div className="space-y-2">
-                        <label className="text-xs font-black text-gray-400 uppercase tracking-wider">Sede</label>
-                        <div className="relative">
-                            <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-                            <select
-                                name="branch"
-                                required
-                                className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:bg-white focus:border-nominix-electric focus:ring-0 outline-none font-bold text-nominix-dark transition-all appearance-none"
-                                value={formData.branch}
-                                onChange={handleChange}
-                            >
-                                <option value="">-- Seleccionar Sede --</option>
-                                {branches.map(b => (
-                                    <option key={b.id} value={b.id}>{b.name}</option>
-                                ))}
-                            </select>
-                        </div>
-                    </div>
+                    <SelectField
+                        label="Sede"
+                        name="branch"
+                        value={formData.branch}
+                        onChange={handleChange}
+                        required
+                        icon={Building2}
+                        options={[
+                            { value: "", label: "-- Seleccionar Sede --" },
+                            ...branches.map(b => ({ value: b.id, label: b.name }))
+                        ]}
+                    />
 
                     {/* Cargo */}
-                    <div className="space-y-2">
-                        <label className="text-xs font-black text-gray-400 uppercase tracking-wider">Cargo Inicial</label>
-                        <div className="relative">
-                            <Briefcase className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-                            <input
-                                type="text"
-                                name="position"
-                                required
-                                className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:bg-white focus:border-nominix-electric focus:ring-0 outline-none font-bold text-nominix-dark transition-all"
-                                placeholder="Ej. Farmacéutico"
-                                value={formData.position}
-                                onChange={handleChange}
-                            />
-                        </div>
-                    </div>
+                    <InputField
+                        label="Cargo Inicial"
+                        name="position"
+                        value={formData.position}
+                        onChange={handleChange}
+                        required
+                        placeholder="Ej. Farmacéutico"
+                        icon={Briefcase}
+                    />
 
                     {/* Fecha de Ingreso */}
-                    <div className="space-y-2">
-                        <label className="text-xs font-black text-gray-400 uppercase tracking-wider">Fecha de Ingreso</label>
-                        <div className="relative">
-                            <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-                            <input
-                                type="date"
-                                name="hire_date"
-                                required
-                                className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:bg-white focus:border-nominix-electric focus:ring-0 outline-none font-bold text-nominix-dark transition-all"
-                                value={formData.hire_date}
-                                onChange={handleChange}
-                            />
-                        </div>
-                    </div>
+                    <InputField
+                        label="Fecha de Ingreso"
+                        name="hire_date"
+                        value={formData.hire_date}
+                        onChange={handleChange}
+                        required
+                        type="date"
+                        icon={Calendar}
+                    />
 
-                    {/* Departamento */}
-                    <div className="space-y-2">
-                        <label className="text-xs font-black text-gray-400 uppercase tracking-wider">Departamento</label>
+                    <div className="space-y-1.5 pt-2">
+                        <label className="text-[10px] font-black uppercase text-gray-400 pl-3">Departamento</label>
                         <DepartmentSelector
                             branchId={formData.branch}
                             value={formData.department}

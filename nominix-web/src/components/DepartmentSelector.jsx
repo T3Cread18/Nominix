@@ -128,11 +128,10 @@ export default function DepartmentSelector({ value, onChange, error, branchId, d
                         onChange={(e) => onChange(e.target.value)}
                         disabled={!branchId || disabled}
                         className={cn(
-                            "w-full pl-11 pr-8 py-3 bg-gray-50 border rounded-2xl outline-none font-bold text-sm appearance-none cursor-pointer transition-all h-full",
-                            error
-                                ? "border-red-300 text-red-900 focus:border-red-500"
-                                : "border-gray-100 focus:bg-white focus:border-nominix-electric text-nominix-dark",
-                            (!branchId || disabled) && "opacity-60 cursor-not-allowed bg-gray-100"
+                            "w-full pl-10 pr-10 p-4 bg-slate-50 border border-gray-100/50 rounded-2xl font-bold text-sm text-nominix-dark appearance-none cursor-pointer",
+                            "focus:bg-white focus:border-nominix-electric focus:ring-4 focus:ring-nominix-electric/5 outline-none transition-all duration-300",
+                            error ? "border-red-300 focus:border-red-500" : "border-gray-100/50",
+                            (!branchId || disabled) && "opacity-60 cursor-not-allowed bg-gray-100/50"
                         )}
                     >
                         <option value="">
@@ -147,7 +146,7 @@ export default function DepartmentSelector({ value, onChange, error, branchId, d
 
                     {/* Flecha Custom */}
                     <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">
-                        <ChevronDown size={14} />
+                        <ChevronDown size={16} strokeWidth={3} />
                     </div>
                 </div>
 
@@ -156,7 +155,7 @@ export default function DepartmentSelector({ value, onChange, error, branchId, d
                     type="button"
                     onClick={() => setIsCreating(true)}
                     disabled={!branchId || disabled}
-                    className="h-full aspect-square flex items-center justify-center bg-gray-100 text-gray-400 rounded-xl hover:bg-nominix-electric hover:text-white border border-transparent hover:border-nominix-electric/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="aspect-square flex items-center justify-center bg-slate-50 text-gray-400 rounded-2xl hover:bg-nominix-electric hover:text-white border border-gray-100/50 hover:border-nominix-electric/50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
                     title="Crear nuevo departamento"
                 >
                     <Plus size={20} />

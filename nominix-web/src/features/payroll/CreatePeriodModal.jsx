@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { X, Calendar, Type, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
 import payrollService from '../../services/payroll.service';
-import { toast } from 'sonner'; // <--- 1. Importamos Toast
+import { toast } from 'sonner';
+import InputField from '../../components/ui/InputField';
 
 const CreatePeriodModal = ({ isOpen, onClose, onSuccess }) => {
     const [loading, setLoading] = useState(false);
@@ -71,60 +72,44 @@ const CreatePeriodModal = ({ isOpen, onClose, onSuccess }) => {
 
                 <form onSubmit={handleSubmit} className="p-8 space-y-6">
                     <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-2">
-                            <Type size={14} /> Nombre del Periodo
-                        </label>
-                        <input
-                            type="text"
+                        <InputField
+                            label="Nombre del Periodo"
                             name="name"
-                            required
-                            placeholder="Ej: 1ra Quincena Enero 2026"
-                            className="w-full px-4 py-3 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-nominix-electric/20 text-nominix-dark font-medium placeholder:text-gray-300 transition-all focus:bg-white"
                             value={formData.name}
                             onChange={handleChange}
+                            required
+                            placeholder="Ej: 1ra Quincena Enero 2026"
+                            icon={Type}
                         />
                     </div>
 
                     <div className="grid grid-cols-2 gap-6">
-                        <div>
-                            <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">
-                                Fecha Inicio
-                            </label>
-                            <input
-                                type="date"
-                                name="start_date"
-                                required
-                                className="w-full px-4 py-3 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-nominix-electric/20 text-nominix-dark font-medium transition-all focus:bg-white"
-                                value={formData.start_date}
-                                onChange={handleChange}
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">
-                                Fecha Fin
-                            </label>
-                            <input
-                                type="date"
-                                name="end_date"
-                                required
-                                className="w-full px-4 py-3 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-nominix-electric/20 text-nominix-dark font-medium transition-all focus:bg-white"
-                                value={formData.end_date}
-                                onChange={handleChange}
-                            />
-                        </div>
+                        <InputField
+                            label="Fecha Inicio"
+                            name="start_date"
+                            value={formData.start_date}
+                            onChange={handleChange}
+                            required
+                            type="date"
+                        />
+                        <InputField
+                            label="Fecha Fin"
+                            name="end_date"
+                            value={formData.end_date}
+                            onChange={handleChange}
+                            required
+                            type="date"
+                        />
                     </div>
 
                     <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">
-                            Fecha de Pago (Cierre)
-                        </label>
-                        <input
-                            type="date"
+                        <InputField
+                            label="Fecha de Pago (Cierre)"
                             name="payment_date"
-                            required
-                            className="w-full px-4 py-3 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-nominix-electric/20 text-nominix-dark font-medium transition-all focus:bg-white"
                             value={formData.payment_date}
                             onChange={handleChange}
+                            required
+                            type="date"
                         />
                         <div className="mt-2 flex items-start gap-2 text-amber-600 bg-amber-50 p-3 rounded-lg border border-amber-100">
                             <AlertCircle size={14} className="mt-0.5 shrink-0" />

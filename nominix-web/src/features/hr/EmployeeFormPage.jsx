@@ -13,6 +13,8 @@ import {
     UserX, UserCheck, Trash2 // <--- 2. NUEVOS ICONOS
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
+import InputField from '../../components/ui/InputField';
+import SelectField from '../../components/ui/SelectField';
 
 const EmployeeFormPage = () => {
     const { id } = useParams();
@@ -441,24 +443,29 @@ const EmployeeFormPage = () => {
                     <form id="employee-form" onSubmit={handleSave} className="space-y-8 animate-in fade-in">
                         <Section title="Información Básica">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <InputField label="Nombres" value={employee.first_name} onChange={v => handleProfileChange('first_name', v)} required />
-                                <InputField label="Apellidos" value={employee.last_name} onChange={v => handleProfileChange('last_name', v)} required />
-                                <InputField label="Cédula / ID" value={employee.national_id} onChange={v => handleProfileChange('national_id', v)} required disabled={isEditing} bg={isEditing ? 'bg-gray-100' : 'bg-gray-50'} />
-                                <InputField label="Correo Electrónico" value={employee.email} onChange={v => handleProfileChange('email', v)} type="email" />
-                                <InputField label="Teléfono" value={employee.phone} onChange={v => handleProfileChange('phone', v)} />
-                                <SelectField label="Género" value={employee.gender} onChange={v => handleProfileChange('gender', v)}>
-                                    <option value="">Seleccione...</option>
-                                    <option value="M">Masculino</option>
-                                    <option value="F">Femenino</option>
-                                </SelectField>
-                                <InputField label="Fecha Nacimiento" value={employee.date_of_birth} onChange={v => handleProfileChange('date_of_birth', v)} type="date" />
-                                <InputField label="Dirección" value={employee.address} onChange={v => handleProfileChange('address', v)} className="md:col-span-2" />
+                                <InputField label="Nombres" name="first_name" value={employee.first_name} onChange={e => handleProfileChange('first_name', e.target.value)} required />
+                                <InputField label="Apellidos" name="last_name" value={employee.last_name} onChange={e => handleProfileChange('last_name', e.target.value)} required />
+                                <InputField label="Cédula / ID" name="national_id" value={employee.national_id} onChange={e => handleProfileChange('national_id', e.target.value)} required disabled={isEditing} className={isEditing ? 'opacity-80' : ''} />
+                                <InputField label="Correo Electrónico" name="email" value={employee.email} onChange={e => handleProfileChange('email', e.target.value)} type="email" />
+                                <InputField label="Teléfono" name="phone" value={employee.phone} onChange={e => handleProfileChange('phone', e.target.value)} />
+                                <SelectField
+                                    label="Género"
+                                    name="gender"
+                                    value={employee.gender}
+                                    onChange={e => handleProfileChange('gender', e.target.value)}
+                                    options={[
+                                        { value: "M", label: "Masculino" },
+                                        { value: "F", label: "Femenino" }
+                                    ]}
+                                />
+                                <InputField label="Fecha Nacimiento" name="date_of_birth" value={employee.date_of_birth} onChange={e => handleProfileChange('date_of_birth', e.target.value)} type="date" />
+                                <InputField label="Dirección" name="address" value={employee.address} onChange={e => handleProfileChange('address', e.target.value)} className="md:col-span-2" />
                             </div>
                         </Section>
 
                         <Section title="Datos Organizativos">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <InputField label="Fecha Ingreso" value={employee.hire_date} onChange={v => handleProfileChange('hire_date', v)} type="date" required />
+                                <InputField label="Fecha Ingreso" name="hire_date" value={employee.hire_date} onChange={e => handleProfileChange('hire_date', e.target.value)} type="date" required />
 
                                 {activeJobPosition && typeof activeJobPosition === 'object' ? (
                                     <div className="space-y-2 group">
@@ -475,38 +482,38 @@ const EmployeeFormPage = () => {
                                         </div>
                                     </div>
                                 ) : (
-                                    <div className="space-y-2 group">
-                                        <label className="text-[9px] font-black uppercase text-gray-400 pl-3">Cargo (Selección)</label>
-                                        <div className="relative">
-                                            <Briefcase className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={16} />
-                                            <select
-                                                className="w-full pl-10 p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold text-sm focus:bg-white focus:border-nominix-electric outline-none appearance-none cursor-pointer"
-                                                value={typeof employee.job_position === 'object' ? employee.job_position?.id : employee.job_position || ''}
-                                                onChange={e => {
-                                                    const val = e.target.value;
-                                                    // Buscamos el objeto para actualizar nombre también (legacy field)
-                                                    const selectedObj = availableJobPositions.find(p => p.id == val);
-                                                    setEmployee(prev => ({
-                                                        ...prev,
-                                                        job_position: val,
-                                                        position: selectedObj ? selectedObj.name : prev.position // Auto-fill legacy text
-                                                    }));
-                                                }}
-                                            >
-                                                <option value="">-- Seleccionar Cargo --</option>
-                                                {availableJobPositions.map(pos => (
-                                                    <option key={pos.id} value={pos.id}>{pos.name}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                    </div>
+                                    <SelectField
+                                        label="Cargo (Selección)"
+                                        name="job_position"
+                                        value={typeof employee.job_position === 'object' ? employee.job_position?.id : employee.job_position || ''}
+                                        onChange={e => {
+                                            const val = e.target.value;
+                                            const selectedObj = availableJobPositions.find(p => p.id == val);
+                                            setEmployee(prev => ({
+                                                ...prev,
+                                                job_position: val,
+                                                position: selectedObj ? selectedObj.name : prev.position
+                                            }));
+                                        }}
+                                        options={[
+                                            { value: "", label: "-- Seleccionar Cargo --" },
+                                            ...availableJobPositions.map(pos => ({ value: pos.id, label: pos.name }))
+                                        ]}
+                                        icon={Briefcase}
+                                    />
                                 )}
-                                <InputField label="Cargo (Texto Manual)" value={employee.position} onChange={v => handleProfileChange('position', v)} />
+                                <InputField label="Cargo (Texto Manual)" name="position" value={employee.position} onChange={e => handleProfileChange('position', e.target.value)} />
 
-                                <SelectField label="Sede" value={typeof employee.branch === 'object' ? employee.branch?.id : employee.branch} onChange={v => handleProfileChange('branch', v)}>
-                                    <option value="">Sin Sede</option>
-                                    {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                                </SelectField>
+                                <SelectField
+                                    label="Sede"
+                                    name="branch"
+                                    value={typeof employee.branch === 'object' ? employee.branch?.id : employee.branch}
+                                    onChange={e => handleProfileChange('branch', e.target.value)}
+                                    options={[
+                                        { value: "", label: "Sin Sede" },
+                                        ...branches.map(b => ({ value: b.id, label: b.name }))
+                                    ]}
+                                />
                                 <div className="space-y-2 group">
                                     <label className="text-[9px] font-black uppercase text-gray-400 pl-3">Departamento</label>
                                     <DepartmentSelector
@@ -520,13 +527,18 @@ const EmployeeFormPage = () => {
 
                         <Section title="Información Bancaria">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <InputField label="Banco" value={employee.bank_name} onChange={v => handleProfileChange('bank_name', v)} />
-                                <SelectField label="Tipo de Cuenta" value={employee.bank_account_type} onChange={v => handleProfileChange('bank_account_type', v)}>
-                                    <option value="">Seleccione...</option>
-                                    <option value="CURRENT">Corriente</option>
-                                    <option value="SAVINGS">Ahorro</option>
-                                </SelectField>
-                                <InputField label="Número de Cuenta" value={employee.bank_account_number} onChange={v => handleProfileChange('bank_account_number', v)} className="md:col-span-2" />
+                                <InputField label="Banco" name="bank_name" value={employee.bank_name} onChange={e => handleProfileChange('bank_name', e.target.value)} />
+                                <SelectField
+                                    label="Tipo de Cuenta"
+                                    name="bank_account_type"
+                                    value={employee.bank_account_type}
+                                    onChange={e => handleProfileChange('bank_account_type', e.target.value)}
+                                    options={[
+                                        { value: "CURRENT", label: "Corriente" },
+                                        { value: "SAVINGS", label: "Ahorro" }
+                                    ]}
+                                />
+                                <InputField label="Número de Cuenta" name="bank_account_number" value={employee.bank_account_number} onChange={e => handleProfileChange('bank_account_number', e.target.value)} className="md:col-span-2" />
                             </div>
                         </Section>
                     </form>
@@ -580,38 +592,6 @@ const TabButton = ({ id, icon: Icon, label, active, onClick }) => (
     >
         <Icon size={16} /> {label}
     </button>
-);
-
-const InputField = ({ label, value, onChange, disabled, type = "text", required, className, bg = "bg-gray-50" }) => (
-    <div className={cn("space-y-2 group", className)}>
-        <label className="text-[9px] font-black uppercase text-gray-400 pl-3">{label}</label>
-        <input
-            type={type}
-            className={cn("w-full p-4 border border-gray-100 rounded-2xl font-bold text-sm focus:bg-white focus:border-nominix-electric outline-none transition-all disabled:opacity-60 disabled:cursor-not-allowed", bg)}
-            value={value || ''}
-            onChange={e => onChange && onChange(e.target.value)}
-            disabled={disabled}
-            required={required}
-        />
-    </div>
-);
-
-const SelectField = ({ label, value, onChange, children }) => (
-    <div className="space-y-2">
-        <label className="text-[9px] font-black uppercase text-gray-400 pl-3">{label}</label>
-        <div className="relative">
-            <select
-                className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold text-sm focus:bg-white focus:border-nominix-electric outline-none appearance-none cursor-pointer"
-                value={value || ''}
-                onChange={e => onChange(e.target.value)}
-            >
-                {children}
-            </select>
-            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
-                <ChevronLeft className="-rotate-90" size={14} />
-            </div>
-        </div>
-    </div>
 );
 
 export default EmployeeFormPage;

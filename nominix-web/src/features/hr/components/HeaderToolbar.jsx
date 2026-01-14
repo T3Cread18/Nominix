@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { UserPlus, Search, Building2, X } from 'lucide-react';
+import { UserPlus, Search, Building2, X, ChevronDown } from 'lucide-react';
 
 const HeaderToolbar = ({
     searchTerm,
@@ -25,7 +25,7 @@ const HeaderToolbar = ({
                     {/* SELECTOR DE SEDE */}
                     <div className="relative group w-full sm:w-48">
                         <select
-                            className="w-full pl-10 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-nominix-electric focus:ring-4 focus:ring-nominix-electric/5 focus:outline-none font-bold text-xs transition-all text-slate-600 appearance-none cursor-pointer"
+                            className="w-full pl-10 pr-10 p-4 bg-slate-50 border border-gray-100/50 rounded-2xl font-bold text-xs text-nominix-dark appearance-none cursor-pointer focus:bg-white focus:border-nominix-electric focus:ring-4 focus:ring-nominix-electric/5 outline-none transition-all duration-300"
                             value={selectedBranch}
                             onChange={(e) => setSelectedBranch(e.target.value)}
                         >
@@ -34,11 +34,9 @@ const HeaderToolbar = ({
                                 <option key={b.id} value={b.id}>{b.name}</option>
                             ))}
                         </select>
-                        <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                            <svg width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M1 1L5 5L9 1" stroke="#94A3B8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
+                        <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={16} />
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                            <ChevronDown size={14} strokeWidth={3} />
                         </div>
                     </div>
 
@@ -47,15 +45,15 @@ const HeaderToolbar = ({
                         <input
                             type="text"
                             placeholder="Buscar por nombre, cédula..."
-                            className="w-full pl-10 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-nominix-electric focus:ring-4 focus:ring-nominix-electric/5 focus:outline-none font-bold text-xs transition-all text-slate-600 placeholder:text-slate-400"
+                            className="w-full pl-10 pr-10 p-4 bg-slate-50 border border-gray-100/50 rounded-2xl font-bold text-xs text-nominix-dark placeholder:text-gray-300 focus:bg-white focus:border-nominix-electric focus:ring-4 focus:ring-nominix-electric/5 outline-none transition-all duration-300"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-nominix-electric" size={16} />
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-nominix-electric transition-colors" size={16} />
                         {searchTerm && (
                             <button
                                 onClick={() => setSearchTerm('')}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500"
+                                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500 transition-colors"
                             >
                                 <X size={14} />
                             </button>
@@ -65,7 +63,7 @@ const HeaderToolbar = ({
                     {/* BOTÓN NUEVO */}
                     <button
                         onClick={onNewClick}
-                        className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 bg-nominix-dark text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all shadow-lg shadow-slate-200 active:scale-95 whitespace-nowrap"
+                        className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-4 bg-nominix-dark text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all shadow-xl shadow-slate-200 active:scale-95 whitespace-nowrap"
                     >
                         <UserPlus size={16} /> <span className="hidden sm:inline">Nuevo</span>
                     </button>

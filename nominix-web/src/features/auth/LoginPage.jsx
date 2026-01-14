@@ -96,7 +96,7 @@ const LoginPage = () => {
                                     type="text"
                                     required
                                     autoFocus // <--- Pequeña mejora de UX
-                                    className="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:bg-white focus:border-nominix-electric focus:ring-0 focus:outline-none font-bold text-slate-700 transition-all pr-12 placeholder:text-gray-300"
+                                    className="w-full p-4 bg-slate-50 border border-gray-100/50 rounded-2xl font-bold text-sm text-nominix-dark placeholder:text-gray-300 focus:bg-white focus:border-nominix-electric focus:ring-4 focus:ring-nominix-electric/5 outline-none transition-all duration-300 pr-12"
                                     placeholder="Ej: admin"
                                     value={formData.username}
                                     onChange={(e) => setFormData({ ...formData, username: e.target.value })}
@@ -113,7 +113,7 @@ const LoginPage = () => {
                                 <input
                                     type="password"
                                     required
-                                    className="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:bg-white focus:border-nominix-electric focus:ring-0 focus:outline-none font-bold text-slate-700 transition-all pr-12 placeholder:text-gray-300"
+                                    className="w-full p-4 bg-slate-50 border border-gray-100/50 rounded-2xl font-bold text-sm text-nominix-dark placeholder:text-gray-300 focus:bg-white focus:border-nominix-electric focus:ring-4 focus:ring-nominix-electric/5 outline-none transition-all duration-300 pr-12"
                                     placeholder="••••••••"
                                     value={formData.password}
                                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}

@@ -9,6 +9,9 @@ import {
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import OrganizationManager from './OrganizationManager';
+import InputField from '../../components/ui/InputField';
+import SelectField from '../../components/ui/SelectField';
+import ToggleField from '../../components/ui/ToggleField';
 
 const CompanySettings = () => {
     const [activeTab, setActiveTab] = useState('company');
@@ -138,10 +141,10 @@ const CompanyForm = ({ initialData, onRefresh }) => {
         <form onSubmit={handleSave} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Columna Izquierda: Logo y Resumen */}
             <div className="lg:col-span-1 space-y-6">
-                <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 flex flex-col items-center text-center relative overflow-hidden">
-                    <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-b from-gray-50 to-white z-0" />
-                    <div className="relative z-10 w-32 h-32 rounded-full bg-white border-4 border-gray-50 shadow-xl flex items-center justify-center mb-4 group cursor-pointer overflow-hidden">
-                        <Building2 size={48} className="text-gray-300" />
+                <div className="bg-white p-8 rounded-[2.5rem] shadow-xl shadow-slate-200/40 border border-slate-100 flex flex-col items-center text-center relative overflow-hidden group">
+                    <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-slate-50 to-white z-0" />
+                    <div className="relative z-10 w-32 h-32 rounded-full bg-white border-4 border-slate-50 shadow-xl flex items-center justify-center mb-6 group-hover:scale-105 transition-transform duration-500 cursor-pointer overflow-hidden">
+                        <Building2 size={48} className="text-slate-300 group-hover:text-nominix-electric transition-colors" />
                     </div>
                     <h3 className="text-lg font-black text-nominix-dark relative z-10">{company.name || 'Sin Nombre'}</h3>
                     <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-6 relative z-10">{company.rif || 'J-...'}</p>
@@ -149,8 +152,8 @@ const CompanyForm = ({ initialData, onRefresh }) => {
             </div>
 
             {/* Columna Derecha: Campos */}
-            <div className="lg:col-span-2 space-y-6">
-                <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100">
+            <div className="lg:col-span-2 space-y-8">
+                <div className="bg-white p-8 md:p-10 rounded-[2.5rem] shadow-xl shadow-slate-200/40 border border-slate-100">
                     <h3 className="text-xs font-black uppercase text-gray-400 mb-6 flex items-center gap-2"><Building2 size={14} /> Identidad Fiscal & Parametrización</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         <InputField label="Razón Social" name="name" value={company.name} onChange={handleChange} />
@@ -176,19 +179,17 @@ const CompanyForm = ({ initialData, onRefresh }) => {
                             <DollarSign size={14} /> Estrategia de Retribución
                         </h4>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div className="space-y-1">
-                                <label className="text-[9px] font-black uppercase text-gray-400 pl-3">Modo de División Salarial</label>
-                                <select
-                                    name="salary_split_mode"
-                                    value={company.salary_split_mode || 'PERCENTAGE'}
-                                    onChange={handleChange}
-                                    className="w-full p-4 bg-gray-50 border border-gray-100 rounded-xl font-bold text-sm focus:bg-white focus:border-nominix-electric outline-none appearance-none"
-                                >
-                                    <option value="PERCENTAGE">Por Porcentaje</option>
-                                    <option value="FIXED_BASE">Base Fija (Monto)</option>
-                                    <option value="FIXED_BONUS">Bono Fijo (Monto)</option>
-                                </select>
-                            </div>
+                            <SelectField
+                                label="Modo de División Salarial"
+                                name="salary_split_mode"
+                                value={company.salary_split_mode || 'PERCENTAGE'}
+                                onChange={handleChange}
+                                options={[
+                                    { value: 'PERCENTAGE', label: 'Por Porcentaje' },
+                                    { value: 'FIXED_BASE', label: 'Base Fija (Monto)' },
+                                    { value: 'FIXED_BONUS', label: 'Bono Fijo (Monto)' }
+                                ]}
+                            />
 
                             {company.salary_split_mode === 'PERCENTAGE' && (
                                 <InputField
@@ -247,34 +248,30 @@ const CompanyForm = ({ initialData, onRefresh }) => {
                     </div>
                 </div>
 
-                <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100">
+                <div className="bg-white p-8 md:p-10 rounded-[2.5rem] shadow-xl shadow-slate-200/40 border border-slate-100">
                     <h3 className="text-xs font-black uppercase text-gray-400 mb-6 flex items-center gap-2"><Clock size={14} /> Frecuencias de Pago</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        <div className="space-y-1">
-                            <label className="text-[9px] font-black uppercase text-gray-400 pl-3">Frecuencia Nómina Salarial</label>
-                            <select
-                                name="payroll_journey"
-                                value={company.payroll_journey}
-                                onChange={handleChange}
-                                className="w-full p-4 bg-gray-50 border border-gray-100 rounded-xl font-bold text-sm focus:bg-white focus:border-nominix-electric outline-none appearance-none"
-                            >
-                                <option value="WEEKLY">Semanal</option>
-                                <option value="BIWEEKLY">Quincenal</option>
-                                <option value="MONTHLY">Mensual</option>
-                            </select>
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-[9px] font-black uppercase text-gray-400 pl-3">Frecuencia Cestaticket</label>
-                            <select
-                                name="cestaticket_journey"
-                                value={company.cestaticket_journey}
-                                onChange={handleChange}
-                                className="w-full p-4 bg-gray-50 border border-gray-100 rounded-xl font-bold text-sm focus:bg-white focus:border-nominix-electric outline-none appearance-none"
-                            >
-                                <option value="MONTHLY">Mensual (Fecha única)</option>
-                                <option value="PERIODIC">Proporcional cada pago</option>
-                            </select>
-                        </div>
+                        <SelectField
+                            label="Frecuencia Nómina Salarial"
+                            name="payroll_journey"
+                            value={company.payroll_journey}
+                            onChange={handleChange}
+                            options={[
+                                { value: 'WEEKLY', label: 'Semanal' },
+                                { value: 'BIWEEKLY', label: 'Quincenal' },
+                                { value: 'MONTHLY', label: 'Mensual' }
+                            ]}
+                        />
+                        <SelectField
+                            label="Frecuencia Cestaticket"
+                            name="cestaticket_journey"
+                            value={company.cestaticket_journey}
+                            onChange={handleChange}
+                            options={[
+                                { value: 'MONTHLY', label: 'Mensual (Fecha única)' },
+                                { value: 'PERIODIC', label: 'Proporcional cada pago' }
+                            ]}
+                        />
                         {company.cestaticket_journey === 'MONTHLY' && (
                             <InputField
                                 label="Día de Pago Cestaticket"
@@ -288,12 +285,17 @@ const CompanyForm = ({ initialData, onRefresh }) => {
                     </div>
                 </div>
 
-                <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100">
+                <div className="bg-white p-8 md:p-10 rounded-[2.5rem] shadow-xl shadow-slate-200/40 border border-slate-100">
                     <h3 className="text-xs font-black uppercase text-gray-400 mb-6 flex items-center gap-2"><MapPin size={14} /> Ubicación & Contacto</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="md:col-span-2">
-                            <label className="text-[9px] font-black uppercase text-gray-400 pl-3 mb-1 block">Dirección Fiscal</label>
-                            <textarea name="address" value={company.address || ''} onChange={handleChange} className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold text-sm outline-none resize-none h-24" />
+                            <label className="text-[9px] font-black uppercase text-gray-400 pl-3 mb-1 block tracking-wider">Dirección Fiscal</label>
+                            <textarea
+                                name="address"
+                                value={company.address || ''}
+                                onChange={handleChange}
+                                className="w-full p-4 bg-slate-50 border border-gray-100/50 rounded-2xl font-bold text-sm text-nominix-dark outline-none resize-none h-24 focus:bg-white focus:border-nominix-electric focus:ring-4 focus:ring-nominix-electric/5 transition-all duration-300"
+                            />
                         </div>
                         <InputField label="Teléfono" name="phone" value={company.phone} onChange={handleChange} />
                         <InputField label="Email" name="email" value={company.email} onChange={handleChange} />
@@ -481,44 +483,5 @@ const BranchFormModal = ({ branch, onClose, onSuccess }) => {
         </div>
     );
 };
-
-// Componente Helper Input
-const InputField = ({ label, name, value, onChange, required, placeholder, type = "text", step }) => (
-    <div className="space-y-1">
-        <label className="text-[9px] font-black uppercase text-gray-400 pl-3">{label} {required && '*'}</label>
-        <input
-            className="w-full p-4 bg-gray-50 border border-gray-100 rounded-xl font-bold text-sm focus:bg-white focus:border-nominix-electric outline-none transition-all placeholder:text-gray-300 placeholder:font-normal"
-            name={name}
-            value={value || ''}
-            onChange={onChange}
-            required={required}
-            placeholder={placeholder}
-            type={type}
-            step={step}
-        />
-    </div>
-);
-
-const ToggleField = ({ label, name, checked, onChange }) => (
-    <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100">
-        <div className="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
-            <input
-                type="checkbox"
-                name={name}
-                id={name}
-                checked={checked || false}
-                onChange={(e) => onChange({ target: { name, value: e.target.checked } })}
-                className="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer peer checked:right-0 right-5"
-            />
-            <label
-                htmlFor={name}
-                className={`toggle-label block overflow-hidden h-5 rounded-full cursor-pointer ${checked ? 'bg-nominix-electric' : 'bg-gray-300'}`}
-            ></label>
-        </div>
-        <label htmlFor={name} className="text-[10px] font-bold uppercase text-gray-500 cursor-pointer select-none">
-            {label}
-        </label>
-    </div>
-);
 
 export default CompanySettings;

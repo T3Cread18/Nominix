@@ -190,13 +190,13 @@ const PayrollDetail = ({ period, allEmployees, initialConcepts }) => {
                     <div className="relative">
                         {/* Input de Búsqueda */}
                         <div
-                            className="flex items-center bg-gray-50 rounded-xl border border-transparent focus-within:border-nominix-electric focus-within:ring-2 focus-within:ring-nominix-electric/20 transition-all"
+                            className="flex items-center bg-slate-50 border border-gray-100/50 rounded-2xl focus-within:bg-white focus-within:border-nominix-electric focus-within:ring-4 focus-within:ring-nominix-electric/5 transition-all duration-300"
                             onClick={() => setIsSearchOpen(true)}
                         >
-                            <Search size={16} className="ml-4 text-gray-400" />
+                            <Search size={16} className="ml-4 text-gray-300" />
                             <input
                                 type="text"
-                                className="w-full p-4 bg-transparent border-none focus:ring-0 font-bold text-sm text-slate-700 placeholder:text-gray-400 outline-none"
+                                className="w-full p-4 bg-transparent border-none focus:ring-0 font-bold text-sm text-nominix-dark placeholder:text-gray-300 outline-none"
                                 placeholder="Buscar por nombre o cédula..."
                                 value={searchTerm}
                                 onChange={(e) => {
@@ -205,7 +205,7 @@ const PayrollDetail = ({ period, allEmployees, initialConcepts }) => {
                                 }}
                                 onFocus={() => setIsSearchOpen(true)}
                             />
-                            <ChevronDown size={16} className="mr-4 text-gray-400" />
+                            <ChevronDown size={16} strokeWidth={3} className="mr-4 text-gray-400" />
                         </div>
 
                         {/* Dropdown de Resultados */}
