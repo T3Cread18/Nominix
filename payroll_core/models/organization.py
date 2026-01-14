@@ -1,8 +1,14 @@
 """
-Modelos de estructura organizacional: Sedes, Departamentos, Empresa.
+Modelos de estructura organizacional: Sedes, Departamentos, Cargos, Empresa.
+
+Jerarquía:
+    Company (Tenant/Esquema) -> Branch (Sede) -> Department -> JobPosition (Cargo)
 """
 from django.db import models
+from django.core.validators import MinValueValidator, MaxValueValidator
 from decimal import Decimal
+
+from .currency import Currency
 
 
 class Branch(models.Model):
@@ -45,6 +51,12 @@ class Branch(models.Model):
         help_text='Indica si la sede está operativa'
     )
     
+    is_main: models.BooleanField = models.BooleanField(
+        default=False,
+        verbose_name='Sede Principal',
+        help_text='Indica si es la sede principal del tenant. Solo puede haber una.'
+    )
+    
     created_at: models.DateTimeField = models.DateTimeField(
         auto_now_add=True,
         verbose_name='Fecha de Creación'
@@ -61,10 +73,20 @@ class Branch(models.Model):
     class Meta:
         verbose_name = 'Sede'
         verbose_name_plural = 'Sedes'
-        ordering = ['name']
+        ordering = ['-is_main', 'name']  # Sede principal primero
     
     def __str__(self) -> str:
-        return f"{self.name} ({self.code})"
+        suffix = ' (Principal)' if self.is_main else ''
+        return f"{self.name} ({self.code}){suffix}"
+    
+    def save(self, *args, **kwargs) -> None:
+        """
+        Asegura que solo una sede sea la principal.
+        Si se marca como principal, desmarca las demás.
+        """
+        if self.is_main:
+            Branch.objects.filter(is_main=True).exclude(pk=self.pk).update(is_main=False)
+        super().save(*args, **kwargs)
 
 
 class Department(models.Model):
@@ -90,10 +112,116 @@ class Department(models.Model):
     class Meta:
         verbose_name = 'Departamento'
         verbose_name_plural = 'Departamentos'
-        ordering = ['name']
+        ordering = ['branch', 'name']
     
     def __str__(self) -> str:
+        if self.branch:
+            return f"{self.name} ({self.branch.name})"
         return self.name
+
+
+class JobPosition(models.Model):
+    """
+    Modelo de Cargo (Posición Laboral).
+    
+    Define los cargos disponibles dentro de un departamento, junto con
+    el sueldo base por defecto para contratos asociados a este cargo.
+    
+    Jerarquía: Branch -> Department -> JobPosition -> LaborContract
+    
+    Attributes:
+        department: Departamento al que pertenece el cargo
+        name: Nombre del cargo (ej: Gerente de Operaciones)
+        code: Código interno único del cargo (ej: GER-OPS-001)
+        default_total_salary: Sueldo mensual total por defecto para este cargo
+        currency: Moneda del sueldo (generalmente USD)
+    """
+    
+    department: models.ForeignKey = models.ForeignKey(
+        Department,
+        on_delete=models.PROTECT,
+        related_name='job_positions',
+        verbose_name='Departamento',
+        help_text='Departamento al que pertenece este cargo'
+    )
+    
+    name: models.CharField = models.CharField(
+        max_length=100,
+        verbose_name='Nombre del Cargo',
+        help_text='Nombre descriptivo del cargo (ej: Analista Senior)'
+    )
+    
+    code: models.CharField = models.CharField(
+        max_length=20,
+        unique=True,
+        verbose_name='Código',
+        help_text='Código interno único del cargo (ej: ANA-SR-001)'
+    )
+    
+    description: models.TextField = models.TextField(
+        blank=True,
+        verbose_name='Descripción',
+        help_text='Descripción de funciones y responsabilidades del cargo'
+    )
+    
+    # ==========================================================================
+    # CONFIGURACIÓN SALARIAL POR DEFECTO
+    # ==========================================================================
+    
+    default_total_salary: models.DecimalField = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        validators=[MinValueValidator(Decimal('0.00'))],
+        verbose_name='Sueldo Total Mensual',
+        help_text='Sueldo mensual base para contratos con este cargo (en moneda seleccionada)'
+    )
+    
+    currency: models.ForeignKey = models.ForeignKey(
+        Currency,
+        on_delete=models.PROTECT,
+        default='USD',
+        related_name='job_positions',
+        verbose_name='Moneda',
+        help_text='Moneda del sueldo base (generalmente USD)'
+    )
+    
+    # ==========================================================================
+    # ESTADO Y METADATA
+    # ==========================================================================
+    
+    is_active: models.BooleanField = models.BooleanField(
+        default=True,
+        verbose_name='Activo',
+        help_text='Indica si el cargo está disponible para nuevos contratos'
+    )
+    
+    created_at: models.DateTimeField = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='Fecha de Creación'
+    )
+    
+    updated_at: models.DateTimeField = models.DateTimeField(
+        auto_now=True,
+        verbose_name='Última Actualización'
+    )
+    
+    class Meta:
+        verbose_name = 'Cargo'
+        verbose_name_plural = 'Cargos'
+        ordering = ['department', 'name']
+        indexes = [
+            models.Index(fields=['department', 'is_active']),
+            models.Index(fields=['code']),
+        ]
+    
+    def __str__(self) -> str:
+        return f"{self.name} ({self.department.name})"
+    
+    @property
+    def branch(self):
+        """Retorna la sede a través del departamento."""
+        return self.department.branch if self.department else None
 
 
 class Company(models.Model):
@@ -126,6 +254,48 @@ class Company(models.Model):
     )
     
     base_currency_symbol = models.CharField(max_length=5, default="Bs.", verbose_name="Símbolo Moneda Base")
+    
+    # ==========================================================================
+    # ESTRATEGIA SALARIAL (Distribución Base + Complemento)
+    # ==========================================================================
+    
+    class SalarySplitMode(models.TextChoices):
+        """
+        Modos de distribución del salario total entre base y complemento.
+        
+        - PERCENTAGE: El sueldo base es un % del total (ej: 30% base, 70% complemento)
+        - FIXED_BASE: El sueldo base es fijo, el resto es complemento variable
+        - FIXED_BONUS: El complemento es fijo, la base es variable
+        """
+        PERCENTAGE = 'PERCENTAGE', 'Porcentaje (Base = % del Total)'
+        FIXED_BASE = 'FIXED_BASE', 'Base Fija + Complemento Variable'
+        FIXED_BONUS = 'FIXED_BONUS', 'Complemento Fijo + Base Variable'
+    
+    salary_split_mode = models.CharField(
+        max_length=15,
+        choices=SalarySplitMode.choices,
+        default=SalarySplitMode.PERCENTAGE,
+        verbose_name="Modo de Distribución Salarial",
+        help_text="Cómo se divide el salario total entre base y complemento"
+    )
+    
+    split_percentage_base = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal('30.00'),
+        validators=[MinValueValidator(Decimal('0.00')), MaxValueValidator(Decimal('100.00'))],
+        verbose_name="Porcentaje Base (%)",
+        help_text="Para modo PERCENTAGE: porcentaje del total que es sueldo base (ej: 30.00)"
+    )
+    
+    split_fixed_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        validators=[MinValueValidator(Decimal('0.00'))],
+        verbose_name="Monto Fijo",
+        help_text="Para modos FIXED_BASE o FIXED_BONUS: monto fijo en la moneda del contrato"
+    )
 
     # Configuración de Frecuencias y Pagos
     PAYROLL_JOURNEY_CHOICES = [

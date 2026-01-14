@@ -8,6 +8,7 @@ import {
     DollarSign, Clock
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
+import OrganizationManager from './OrganizationManager';
 
 const CompanySettings = () => {
     const [activeTab, setActiveTab] = useState('company');
@@ -67,7 +68,16 @@ const CompanySettings = () => {
                         activeTab === 'branches' ? "border-nominix-electric text-nominix-electric" : "border-transparent text-gray-400 hover:text-gray-600"
                     )}
                 >
-                    <Store size={16} /> Sedes / Sucursales
+                    <Store size={16} /> Sedes
+                </button>
+                <button
+                    onClick={() => setActiveTab('organization')}
+                    className={cn(
+                        "flex items-center gap-2 pb-4 text-xs font-black uppercase tracking-widest border-b-2 transition-all",
+                        activeTab === 'organization' ? "border-nominix-electric text-nominix-electric" : "border-transparent text-gray-400 hover:text-gray-600"
+                    )}
+                >
+                    <Hash size={16} /> Estructura Organizativa
                 </button>
             </div>
 
@@ -87,6 +97,9 @@ const CompanySettings = () => {
                             initialBranches={branches}
                             onRefresh={loadData}
                         />
+                    </div>
+                    <div className={cn(activeTab !== 'organization' && "hidden")}>
+                        <OrganizationManager />
                     </div>
                 </div>
             )}
@@ -154,6 +167,57 @@ const CompanyForm = ({ initialData, onRefresh }) => {
                             <p className="text-[9px] text-amber-600 font-bold uppercase tracking-wider mt-2 px-3">
                                 <DollarSign size={10} className="inline mr-1" /> Base para topes de IVSS y RPE
                             </p>
+                        </div>
+                    </div>
+
+                    {/* Nueva Sección: Estrategia Salarial */}
+                    <div className="mt-8 pt-8 border-t border-gray-50">
+                        <h4 className="text-[10px] font-black uppercase text-gray-400 mb-4 flex items-center gap-2">
+                            <DollarSign size={14} /> Estrategia de Retribución
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div className="space-y-1">
+                                <label className="text-[9px] font-black uppercase text-gray-400 pl-3">Modo de División Salarial</label>
+                                <select
+                                    name="salary_split_mode"
+                                    value={company.salary_split_mode || 'PERCENTAGE'}
+                                    onChange={handleChange}
+                                    className="w-full p-4 bg-gray-50 border border-gray-100 rounded-xl font-bold text-sm focus:bg-white focus:border-nominix-electric outline-none appearance-none"
+                                >
+                                    <option value="PERCENTAGE">Por Porcentaje</option>
+                                    <option value="FIXED_BASE">Base Fija (Monto)</option>
+                                    <option value="FIXED_BONUS">Bono Fijo (Monto)</option>
+                                </select>
+                            </div>
+
+                            {company.salary_split_mode === 'PERCENTAGE' && (
+                                <InputField
+                                    label="% Salario Base"
+                                    name="split_percentage_base"
+                                    type="number"
+                                    step="0.01"
+                                    placeholder="Ej: 30.00"
+                                    value={company.split_percentage_base}
+                                    onChange={handleChange}
+                                />
+                            )}
+
+                            {(company.salary_split_mode === 'FIXED_BASE' || company.salary_split_mode === 'FIXED_BONUS') && (
+                                <InputField
+                                    label="Monto Fijo Referencia"
+                                    name="split_fixed_amount"
+                                    type="number"
+                                    step="0.01"
+                                    placeholder="0.00"
+                                    value={company.split_fixed_amount}
+                                    onChange={handleChange}
+                                />
+                            )}
+                            <div className="md:col-span-3 lg:col-span-3 text-[10px] text-gray-400 italic bg-gray-50 p-3 rounded-xl border border-dashed border-gray-200">
+                                {company.salary_split_mode === 'PERCENTAGE' && `El ${company.split_percentage_base || 0}% del Ingreso Total será Salario Base, el resto será Bono.`}
+                                {company.salary_split_mode === 'FIXED_BASE' && `El Salario Base será fijo (${company.split_fixed_amount || 0}), todo excedente será Bono.`}
+                                {company.salary_split_mode === 'FIXED_BONUS' && `El Bono será fijo (${company.split_fixed_amount || 0}), todo excedente será Salario Base.`}
+                            </div>
                         </div>
                     </div>
 

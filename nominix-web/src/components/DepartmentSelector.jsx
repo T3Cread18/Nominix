@@ -4,7 +4,7 @@ import { Plus, Check, ChevronDown, Loader2, X, Layers } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '../utils/cn';
 
-export default function DepartmentSelector({ value, onChange, error, branchId }) {
+export default function DepartmentSelector({ value, onChange, error, branchId, disabled }) {
     const [departments, setDepartments] = useState([]);
     const [loading, setLoading] = useState(false);
     const [isCreating, setIsCreating] = useState(false);
@@ -126,13 +126,13 @@ export default function DepartmentSelector({ value, onChange, error, branchId })
                     <select
                         value={value || ''}
                         onChange={(e) => onChange(e.target.value)}
-                        disabled={!branchId}
+                        disabled={!branchId || disabled}
                         className={cn(
                             "w-full pl-11 pr-8 py-3 bg-gray-50 border rounded-2xl outline-none font-bold text-sm appearance-none cursor-pointer transition-all h-full",
                             error
                                 ? "border-red-300 text-red-900 focus:border-red-500"
                                 : "border-gray-100 focus:bg-white focus:border-nominix-electric text-nominix-dark",
-                            !branchId && "opacity-60 cursor-not-allowed bg-gray-100"
+                            (!branchId || disabled) && "opacity-60 cursor-not-allowed bg-gray-100"
                         )}
                     >
                         <option value="">
@@ -155,7 +155,7 @@ export default function DepartmentSelector({ value, onChange, error, branchId })
                 <button
                     type="button"
                     onClick={() => setIsCreating(true)}
-                    disabled={!branchId}
+                    disabled={!branchId || disabled}
                     className="h-full aspect-square flex items-center justify-center bg-gray-100 text-gray-400 rounded-xl hover:bg-nominix-electric hover:text-white border border-transparent hover:border-nominix-electric/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     title="Crear nuevo departamento"
                 >

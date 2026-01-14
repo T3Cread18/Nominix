@@ -16,10 +16,10 @@ from .models import (
     ExchangeRate, 
     PayrollPeriod, 
     PayrollNovelty,
-    PayrollNovelty,
     Company,
     Loan
 )
+from .services.salary import SalarySplitter
 
 # Constantes de Configuración
 FALLBACK_SALARIO_MINIMO = Decimal('130.00')
@@ -453,6 +453,11 @@ class PayrollEngine:
             trace = f"({float(salary_ves):.2f} * {float(base_val):.2f}%) / 100"
 
         elif concept.computation_method == PayrollConcept.ComputationMethod.DYNAMIC_FORMULA:
+            # Si hay un override_value (novedad), inyectarlo al contexto bajo el código del concepto
+            # Esto permite que fórmulas como "BONO_X * 2" usen el valor de la novedad BONO_X
+            if override_value is not None:
+                context[concept.code] = float(override_value)
+            
             if concept.formula:
                 try:
                     result = simple_eval(
@@ -467,6 +472,10 @@ class PayrollEngine:
                 except Exception as e:
                     print(f"Error evaluando fórmula [{concept.code}]: {concept.formula} -> {e}")
                     trace = f"Error: {str(e)}"
+            elif override_value is not None:
+                # Si no hay fórmula pero hay override, usar el valor directo
+                amount = Decimal(str(override_value)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                trace = f"Valor manual: {float(override_value):.2f}"
 
         return {
             'amount': amount,
@@ -495,13 +504,25 @@ class PayrollEngine:
             elif company.payroll_journey == 'WEEKLY':
                 salary_factor = Decimal('7') / Decimal('30')
         
-        # Valores del contrato proporcionados
-        base_salary_bs = Decimal(str(self.contract.base_salary_bs or 0)) * salary_factor
-        total_package_usd = (self.contract.salary_amount or Decimal('0')) * salary_factor
+        # =========================================================================
+        # NUEVA LÓGICA CON SalarySplitter
+        # =========================================================================
         
-        sueldo_base_ves = base_salary_bs
+        # 1. Obtener desglose Mensual (en moneda del contrato, ej: USD)
+        breakdown = SalarySplitter.get_salary_breakdown(self.contract)
+        monthly_base = breakdown['base']
+        monthly_complement = breakdown['complement']
         
-        # 2. Cestaticket (Lógica especial - Híbrida)
+        # 2. Aplicar Factor de Frecuencia (Proporción del periodo)
+        # Ejemplo: Si es Quincenal, pagamos el 50% del mensual
+        period_base_amount = monthly_base * salary_factor
+        period_complement_amount = monthly_complement * salary_factor
+        
+        # 3. Convertir a Moneda de Pago (Bs.)
+        # rate ya fue calculado al inicio de la función (Tasa de la moneda del contrato)
+        sueldo_base_ves = period_base_amount * rate
+        
+        # 4. Lógica de Cestaticket (Se mantiene igual que la original)
         cestaticket_ves = Decimal('0.00')
         
         # Intentar obtener configuración de DB para el monto
@@ -533,11 +554,15 @@ class PayrollEngine:
                     # Si es simulación sin periodo, asumimos el pago completo para que el usuario lo vea
                     cestaticket_ves = ct_base_amount * ct_rate
         
-        # Complemento = (Total USD * Tasa) - Sueldo Base - Cestaticket
-        total_package_ves = total_package_usd * rate
-        complemento_ves = total_package_ves - sueldo_base_ves - cestaticket_ves
-        if complemento_ves < 0:
-            complemento_ves = Decimal('0.00')
+        # 5. Calcular Complemento Final en Bs.
+        # El complemento calculado por Splitter también se convierte y ajusta
+        # Nota: El cálculo original restaba Cestaticket del "Total Package". 
+        # Dependiendo de la estrategia (PERCENTAGE del SALARIO INTEGRAL), el Cestaticket es APARTE.
+        # Asumiremos que el "Total Salary" del contrato NO INCLUYE Cestaticket (es Salario + Bono).
+        # Si la estrategia del cliente es que el Cestaticket se reste del Bono, lo hacemos aquí.
+        # Pero SalarySplitter dividió el "SalaryAmount".
+        
+        complemento_ves = period_complement_amount * rate
         
         # Redondeo final
         sueldo_base_ves = sueldo_base_ves.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
@@ -548,7 +573,7 @@ class PayrollEngine:
         
         # 1. DÍAS TRABAJADOS (Sueldo Base)
         if not company or company.show_base_salary:
-            st = f"{float(self.contract.base_salary_bs):.2f} * {float(salary_factor):.2f} (Proporción)"
+            st = f"{float(monthly_base):.2f} {self.contract.salary_currency.code} (Base) * {float(salary_factor):.2f} (Factor) * {float(rate):.2f} (Tasa)"
             concepts.append({
                 'code': 'SUELDO_BASE',
                 'name': 'Días Trabajados',
@@ -571,7 +596,7 @@ class PayrollEngine:
 
         # 3. COMPLEMENTO
         if not company or company.show_supplement:
-            st = f"({float(self.contract.salary_amount):.2f} USD * {float(rate):.4f}) - {float(sueldo_base_ves):.2f} - {float(cestaticket_ves):.2f}"
+            st = f"{float(monthly_complement):.2f} (Comp. Men) * {float(salary_factor):.2f} (Fac) * {float(rate):.2f} (Tasa)"
             concepts.append({
                 'code': 'COMPLEMENTO',
                 'name': 'Complemento Salarial',
@@ -808,8 +833,18 @@ class PayrollEngine:
                 continue
 
             # Prioridad: Novedad Manual > Valor Fijo Empleado
-            # Si el código existe en input_variables, es un override manual (Novedad)
+            # Buscar por código exacto del concepto
             override_val = self.input_variables.get(concept.code)
+            
+            # Si no se encuentra, buscar por nombre de variable mapeada (alias reverso)
+            if override_val is None:
+                # Buscar si alguna key de input_variables mapea a este concepto
+                for input_key, input_val in self.input_variables.items():
+                    mapped_var = self.NOVELTY_MAP.get(input_key.upper(), input_key.upper())
+                    # Si el código del concepto coincide con el input_key o con el mapped_var
+                    if concept.code.upper() == input_key.upper() or concept.code.upper() == mapped_var:
+                        override_val = input_val
+                        break
             
             # Si NO es novedad, pero tiene un valor fijo configurado para el empleado
             if override_val is None:

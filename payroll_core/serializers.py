@@ -2,7 +2,7 @@ from rest_framework import serializers
 from .models import (
     Employee, LaborContract, Branch, PayrollConcept, 
     EmployeeConcept, Currency, PayrollPeriod, Payslip, PayslipDetail,
-    PayrollNovelty, Company, Department, Loan, LoanPayment
+    PayrollNovelty, Company, Department, Loan, LoanPayment, JobPosition
 )
 
 class PayrollNoveltySerializer(serializers.ModelSerializer):
@@ -52,6 +52,14 @@ class DepartmentSerializer(serializers.ModelSerializer):
         model = Department
         fields = '__all__'
 
+class JobPositionSerializer(serializers.ModelSerializer):
+    department_name = serializers.CharField(source='department.name', read_only=True)
+    currency_data = CurrencySerializer(source='currency', read_only=True)
+    
+    class Meta:
+        model = JobPosition
+        fields = ['id', 'name', 'code', 'department', 'department_name', 'default_total_salary', 'currency', 'currency_data']
+
 class LaborContractSerializer(serializers.ModelSerializer):
     currency_data = CurrencySerializer(source='salary_currency', read_only=True)
 
@@ -61,13 +69,16 @@ class LaborContractSerializer(serializers.ModelSerializer):
             'id', 'employee', 'branch', 'contract_type', 'salary_amount', 
             'base_salary_bs', 'includes_cestaticket',  # Campos para conceptos
             'salary_currency', 'currency_data', 'payment_frequency', 'start_date', 
-            'end_date', 'is_active', 'position', 'department', 'work_schedule'
+            'end_date', 'is_active', 'position', 'job_position', 'department', 'work_schedule',
+            'total_salary_override'
         ]
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
         if instance.department:
             representation['department'] = DepartmentSerializer(instance.department).data
+        if instance.job_position:
+            representation['job_position'] = JobPositionSerializer(instance.job_position).data
         return representation
 
 
@@ -91,7 +102,10 @@ class EmployeeSerializer(serializers.ModelSerializer):
             'bank_account_number': {'required': False, 'allow_null': True, 'allow_blank': True},
             'bank_name': {'required': False, 'allow_null': True, 'allow_blank': True},
             'employee_code': {'required': False, 'allow_null': True, 'allow_blank': True},
+            'employee_code': {'required': False, 'allow_null': True, 'allow_blank': True},
             'position': {'required': False, 'allow_blank': True},
+            'job_position': {'required': False, 'allow_null': True},
+            'address': {'required': False, 'allow_blank': True},
             'address': {'required': False, 'allow_blank': True},
             'phone': {'required': False, 'allow_blank': True},
             'termination_date': {'required': False, 'allow_null': True},
@@ -105,6 +119,8 @@ class EmployeeSerializer(serializers.ModelSerializer):
             representation['branch'] = BranchSerializer(instance.branch).data
         if instance.department:
             representation['department'] = DepartmentSerializer(instance.department).data
+        if instance.job_position:
+            representation['job_position'] = JobPositionSerializer(instance.job_position).data
         return representation
 
 class PayrollPeriodSerializer(serializers.ModelSerializer):

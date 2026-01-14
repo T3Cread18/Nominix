@@ -7,7 +7,7 @@ from django.utils import timezone
 from decimal import Decimal
 
 from .base import tenant_upload_path
-from .organization import Branch, Department
+from .organization import Branch, Department, JobPosition
 from .currency import Currency
 
 
@@ -193,7 +193,17 @@ class Employee(models.Model):
     position: models.CharField = models.CharField(
         max_length=100,
         blank=True,
-        verbose_name='Cargo'
+        verbose_name='Cargo (Texto Legacy)'
+    )
+    
+    job_position = models.ForeignKey(
+        JobPosition,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='employees',
+        verbose_name='Cargo Estructurado',
+        help_text='Cargo asociado de la estructura organizacional'
     )
     
     # ==========================================================================
@@ -347,6 +357,29 @@ class LaborContract(models.Model):
     )
     
     # ==========================================================================
+    # CARGO Y JERARQUÍA
+    # ==========================================================================
+    
+    job_position = models.ForeignKey(
+        JobPosition,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='contracts',
+        verbose_name='Cargo Estructurado',
+        help_text='Cargo seleccionado de la estructura organizacional'
+    )
+    
+    total_salary_override = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name='Override Sueldo Mensual',
+        help_text='Si se define, sobreescribe el sueldo base del cargo. (Monto Mensual)'
+    )
+    
+    # ==========================================================================
     # INFORMACIÓN SALARIAL
     # ==========================================================================
     
@@ -463,8 +496,18 @@ class LaborContract(models.Model):
     @property
     def monthly_salary(self) -> Decimal:
         """
-        Calcula el salario mensual equivalent basado en la frecuencia.
+        Calcula el salario mensual personal (base + complementos fijos).
+        Prioridad: Override -> Cargo -> Cálculo Legacy
         """
+        # 1. Override manual (si existe)
+        if self.total_salary_override is not None:
+            return self.total_salary_override
+            
+        # 2. Por defecto del cargo (si existe)
+        if self.job_position:
+            return self.job_position.default_total_salary
+            
+        # 3. Fallback: Cálculo legacy basado en frecuencia
         if self.payment_frequency == self.PaymentFrequency.WEEKLY:
             return self.salary_amount * Decimal('4.33')  # Promedio semanas/mes
         elif self.payment_frequency == self.PaymentFrequency.BIWEEKLY:
@@ -487,4 +530,13 @@ class LaborContract(models.Model):
             self.employee.department = self.department
             self.employee.save()
             
+        # Sincronización de campos legacy y defaults
+        if self.job_position:
+            # 1. Copiar nombre del cargo al campo legacy
+            self.position = self.job_position.name
+            
+            # 2. Copiar departamento si no está definido manualmente
+            if not self.department:
+                self.department = self.job_position.department
+        
         super().save(*args, **kwargs)

@@ -55,8 +55,15 @@ const EmployeeFormPage = () => {
     const [exchangeRate, setExchangeRate] = useState(60.00);
     const [loadingSubs, setLoadingSubs] = useState(false);
 
+    // Lista de cargos para selector
+    const [availableJobPositions, setAvailableJobPositions] = useState([]);
+
     const fileInputRef = useRef(null);
     const hasLoaded = useRef(false);
+
+    // Helpers de Contrato
+    const activeContract = contracts.find(c => c.is_active);
+    const activeJobPosition = activeContract?.job_position; // Objeto (si el serializer lo trae) o ID
 
     // --- CARGA INICIAL ---
     useEffect(() => {
@@ -111,6 +118,23 @@ const EmployeeFormPage = () => {
             setLoading(false);
         }
     };
+
+    // --- CARGA DE CARGOS CUANDO CAMBIA EL DEPARTAMENTO O SEDE ---
+    useEffect(() => {
+        const fetchJobPositions = async () => {
+            // Si hay departamento seleccionado, cargar cargos de ese depto
+            const deptId = typeof employee.department === 'object' ? employee.department?.id : employee.department;
+            if (deptId) {
+                try {
+                    const res = await axiosClient.get(`/job-positions/?department=${deptId}`);
+                    setAvailableJobPositions(res.data.results || res.data);
+                } catch (e) { console.error(e); }
+            } else {
+                setAvailableJobPositions([]);
+            }
+        };
+        fetchJobPositions();
+    }, [employee.department]);
 
     // --- MANEJADORES DE FOTO ---
     const handlePhotoSelect = (e) => {
@@ -200,6 +224,7 @@ const EmployeeFormPage = () => {
         // Convertimos objetos a IDs si es necesario
         if (payload.branch && typeof payload.branch === 'object') payload.branch = payload.branch.id;
         if (payload.department && typeof payload.department === 'object') payload.department = payload.department.id;
+        if (payload.job_position && typeof payload.job_position === 'object') payload.job_position = payload.job_position.id;
 
         // Limpiar campos que no deben ir en el payload o que son de lectura
         delete payload.photo;
@@ -434,7 +459,50 @@ const EmployeeFormPage = () => {
                         <Section title="Datos Organizativos">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <InputField label="Fecha Ingreso" value={employee.hire_date} onChange={v => handleProfileChange('hire_date', v)} type="date" required />
-                                <InputField label="Cargo Inicial" value={employee.position} onChange={v => handleProfileChange('position', v)} />
+
+                                {activeJobPosition && typeof activeJobPosition === 'object' ? (
+                                    <div className="space-y-2 group">
+                                        <label className="text-[9px] font-black uppercase text-gray-400 pl-3">Cargo (Estructura)</label>
+                                        <div className="relative">
+                                            <input
+                                                readOnly
+                                                className="w-full p-4 bg-gray-100 border border-gray-100 rounded-2xl font-bold text-sm text-gray-600 outline-none cursor-not-allowed"
+                                                value={`${activeJobPosition.name} (${activeJobPosition.code})`}
+                                            />
+                                            <div className="absolute right-4 top-1/2 -translate-y-1/2 text-nominix-electric" title="Definido por contrato">
+                                                <Briefcase size={16} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2 group">
+                                        <label className="text-[9px] font-black uppercase text-gray-400 pl-3">Cargo (Selección)</label>
+                                        <div className="relative">
+                                            <Briefcase className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={16} />
+                                            <select
+                                                className="w-full pl-10 p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold text-sm focus:bg-white focus:border-nominix-electric outline-none appearance-none cursor-pointer"
+                                                value={typeof employee.job_position === 'object' ? employee.job_position?.id : employee.job_position || ''}
+                                                onChange={e => {
+                                                    const val = e.target.value;
+                                                    // Buscamos el objeto para actualizar nombre también (legacy field)
+                                                    const selectedObj = availableJobPositions.find(p => p.id == val);
+                                                    setEmployee(prev => ({
+                                                        ...prev,
+                                                        job_position: val,
+                                                        position: selectedObj ? selectedObj.name : prev.position // Auto-fill legacy text
+                                                    }));
+                                                }}
+                                            >
+                                                <option value="">-- Seleccionar Cargo --</option>
+                                                {availableJobPositions.map(pos => (
+                                                    <option key={pos.id} value={pos.id}>{pos.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+                                )}
+                                <InputField label="Cargo (Texto Manual)" value={employee.position} onChange={v => handleProfileChange('position', v)} />
+
                                 <SelectField label="Sede" value={typeof employee.branch === 'object' ? employee.branch?.id : employee.branch} onChange={v => handleProfileChange('branch', v)}>
                                     <option value="">Sin Sede</option>
                                     {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}

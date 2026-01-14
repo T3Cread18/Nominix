@@ -3,12 +3,17 @@ import { X, Save, Loader2, Calendar, DollarSign, Briefcase, Building2, Info, Cal
 import axiosClient from '../../../api/axiosClient';
 import { toast } from 'sonner';
 import DepartmentSelector from '../../../components/DepartmentSelector';
+import { cn } from '../../../utils/cn';
 
 const UpsertContractModal = ({ isOpen, onClose, onSuccess, employeeId, employeeData, contractToEdit = null }) => {
     const [loading, setLoading] = useState(false);
 
     // --- NUEVO: ESTADO PARA TASA DE CAMBIO ---
-    const [tasaCambio, setTasaCambio] = useState(0); // Iniciamos en 0 para detectar carga
+    const [tasaCambio, setTasaCambio] = useState(0);
+    const [companyConfig, setCompanyConfig] = useState(null);
+    const [branches, setBranches] = useState([]);
+    // jobPositions ahora almacenará solo los cargos del departamento seleccionado
+    const [jobPositions, setJobPositions] = useState([]);
     const [loadingTasa, setLoadingTasa] = useState(true);
 
     // Constante fija solo para el Cestaticket (Valor de Ley)
@@ -24,37 +29,65 @@ const UpsertContractModal = ({ isOpen, onClose, onSuccess, employeeId, employeeD
         salary_currency: 'USD',
         payment_frequency: 'BIWEEKLY',
         position: '',
+        branch: '',
         department: '',
+        job_position: '',
         work_schedule: 'Lunes a Viernes 8:00 AM - 5:00 PM',
         notes: ''
     };
 
     const [formData, setFormData] = useState(initialForm);
 
-    // --- 1. CARGAR TASA BCV AL ABRIR ---
+    // --- 1. CARGAR DATOS INICIALES (TASA, CONFIG, SEDES) ---
     useEffect(() => {
-        const fetchRate = async () => {
+        const fetchInitialData = async () => {
             if (!isOpen) return;
             setLoadingTasa(true);
             try {
-                // Ajusta esta URL a tu endpoint real de Django
-                // Ejemplo: Devuelve { "rate": 64.50, "date": "2025-01-02" }
-                const res = await axiosClient.get('/exchange-rates/latest/?currency=USD');
+                const [rateRes, configRes, branchesRes] = await Promise.all([
+                    axiosClient.get('/exchange-rates/latest/?currency=USD'),
+                    axiosClient.get('/company/config/'),
+                    axiosClient.get('/branches/')
+                ]);
 
-                // Si tu API devuelve directo el número o un objeto, ajústalo aquí:
-                const rate = res.data.rate || res.data.value || 60.00;
+                // Tasa
+                const rate = rateRes.data.rate || rateRes.data.value || 60.00;
                 setTasaCambio(parseFloat(rate));
+
+                // Config
+                setCompanyConfig(configRes.data);
+
+                // Sedes Globales
+                setBranches(branchesRes.data.results || branchesRes.data);
+
             } catch (error) {
-                console.error("Error obteniendo tasa BCV:", error);
-                toast.error("No se pudo obtener tasa BCV. Usando referencia.");
-                setTasaCambio(60.00); // Fallback de seguridad
+                console.error("Error cargando datos iniciales:", error);
+                toast.error("Error conexión inicial.");
+                setTasaCambio(60.00);
             } finally {
                 setLoadingTasa(false);
             }
         };
 
-        fetchRate();
+        fetchInitialData();
     }, [isOpen]);
+
+    // EFECTO: Cargar Cargos cuando cambia Departamento
+    useEffect(() => {
+        const fetchJobs = async () => {
+            if (formData.department) {
+                try {
+                    // Si es objeto, usas .id, si no, directo
+                    const deptId = typeof formData.department === 'object' ? formData.department.id : formData.department;
+                    const res = await axiosClient.get(`/job-positions/?department=${deptId}`);
+                    setJobPositions(res.data.results || res.data);
+                } catch (e) { console.error(e); }
+            } else {
+                setJobPositions([]);
+            }
+        };
+        fetchJobs();
+    }, [formData.department]);
 
     // Inicializar Formulario
     useEffect(() => {
@@ -63,16 +96,20 @@ const UpsertContractModal = ({ isOpen, onClose, onSuccess, employeeId, employeeD
                 setFormData({
                     ...contractToEdit,
                     end_date: contractToEdit.end_date || '',
+                    branch: contractToEdit.branch?.id || contractToEdit.branch || '',
                     department: contractToEdit.department?.id || contractToEdit.department || '',
+                    job_position: contractToEdit.job_position?.id || contractToEdit.job_position || '',
                     notes: contractToEdit.notes || '',
                     base_salary_bs: contractToEdit.base_salary_bs || '130'
                 });
             } else {
                 setFormData(initialForm);
-                if (employeeData?.department) {
+                // Pre-llenar con datos del empleado si existen
+                if (employeeData) {
                     setFormData(prev => ({
                         ...prev,
-                        department: employeeData.department.id || employeeData.department
+                        branch: employeeData.branch?.id || employeeData.branch || '',
+                        department: employeeData.department?.id || employeeData.department || ''
                     }));
                 }
             }
@@ -103,6 +140,48 @@ const UpsertContractModal = ({ isOpen, onClose, onSuccess, employeeId, employeeD
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
+    };
+
+    const handleJobPositionChange = (e) => {
+        const val = e.target.value;
+        const job = jobPositions.find(j => j.id == val);
+
+        if (!job) {
+            setFormData(prev => ({ ...prev, job_position: '', position: '' }));
+            return;
+        }
+
+        // --- CÁLCULO INTELIGENTE DE ESTRATEGIA SALARIAL ---
+        const totalSalary = parseFloat(job.default_total_salary || 0);
+        let calculatedBaseBs = 130; // Default mínimo
+
+        if (companyConfig && totalSalary > 0) {
+            const currentRate = tasaCambio || 1;
+            const splitMode = companyConfig.salary_split_mode || 'PERCENTAGE';
+
+            if (splitMode === 'PERCENTAGE') {
+                const pct = parseFloat(companyConfig.split_percentage_base) || 30; // 30% default
+                calculatedBaseBs = (totalSalary * currentRate * (pct / 100));
+            } else if (splitMode === 'FIXED_BASE') {
+                // Asumimos que split_fixed_amount está en USD para standardizar
+                // Si estuviera en Bs, no multiplicamos por rate. Vamos a asumir USD.
+                const fixedBaseUsd = parseFloat(companyConfig.split_fixed_amount) || 0;
+                calculatedBaseBs = fixedBaseUsd * currentRate;
+            } else if (splitMode === 'FIXED_BONUS') {
+                const fixedBonusUsd = parseFloat(companyConfig.split_fixed_amount) || 0;
+                const baseUsd = totalSalary - fixedBonusUsd;
+                calculatedBaseBs = baseUsd > 0 ? (baseUsd * currentRate) : 130;
+            }
+        }
+
+        setFormData(prev => ({
+            ...prev,
+            job_position: val,
+            position: job.name, // Auto-sets legacy text
+            salary_amount: totalSalary,
+            base_salary_bs: calculatedBaseBs.toFixed(2),
+            salary_currency: job.currency?.code || job.currency || 'USD'
+        }));
     };
 
     const handleSubmit = async (e) => {
@@ -300,28 +379,87 @@ const UpsertContractModal = ({ isOpen, onClose, onSuccess, employeeId, employeeD
                             </div>
 
                             {/* Detalles de Cargo y Depto */}
-                            <div className="space-y-2">
-                                <label className="text-xs font-black text-gray-400 uppercase tracking-wider">Cargo</label>
-                                <div className="relative">
-                                    <Briefcase className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+                            {/* DETALLES ORGANIZACIONALES (JERARQUÍA) */}
+                            <div className="space-y-4 pt-4 border-t border-gray-50">
+                                <h4 className="text-xs font-black uppercase text-gray-400 tracking-widest flex items-center gap-2">
+                                    <Building2 size={14} /> Estructura Organizativa
+                                </h4>
+
+                                {/* 1. SEDE (BRANCH) */}
+                                <div className="space-y-2 group">
+                                    <label className="text-xs font-black text-gray-400 uppercase tracking-wider">Sede / Sucursal</label>
+                                    <div className="relative">
+                                        <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+                                        <select
+                                            name="branch"
+                                            className={cn(
+                                                "w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:bg-white focus:border-nominix-electric outline-none font-bold text-sm text-nominix-dark transition-all appearance-none cursor-pointer",
+                                                employeeData?.branch && "opacity-60 cursor-not-allowed bg-gray-100"
+                                            )}
+                                            value={formData.branch}
+                                            onChange={(e) => {
+                                                setFormData(prev => ({ ...prev, branch: e.target.value, department: '', job_position: '', position: '' }));
+                                            }}
+                                            disabled={!!employeeData?.branch} // Bloqueado si el empleado ya tiene sede
+                                        >
+                                            <option value="">-- Seleccionar Sede --</option>
+                                            {branches.map(b => (
+                                                <option key={b.id} value={b.id}>{b.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+
+                                {/* 2. DEPARTAMENTO (DEPARTMENT) */}
+                                <div className="space-y-2 group">
+                                    <label className="text-xs font-black text-gray-400 uppercase tracking-wider">Departamento</label>
+                                    <DepartmentSelector
+                                        branchId={formData.branch}
+                                        value={formData.department}
+                                        onChange={(val) => setFormData(prev => ({ ...prev, department: val, job_position: '', position: '' }))}
+                                        disabled={!!employeeData?.department || !formData.branch} // Bloqueado si el empleado ya tiene depto
+                                    />
+                                </div>
+
+                                {/* 3. CARGO (JOB POSITION) */}
+                                <div className="space-y-2">
+                                    <label className="text-xs font-black text-gray-400 uppercase tracking-wider flex justify-between">
+                                        <span>Cargo Estructurado</span>
+                                        {formData.job_position && <span className="text-[9px] text-green-500 font-bold">Auto-completado</span>}
+                                    </label>
+                                    <div className="relative">
+                                        <Briefcase className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+                                        <select
+                                            name="job_position"
+                                            className={cn(
+                                                "w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:bg-white focus:border-nominix-electric outline-none font-bold text-sm text-nominix-dark transition-all appearance-none cursor-pointer",
+                                                !formData.department && "opacity-50 cursor-not-allowed bg-gray-100"
+                                            )}
+                                            value={formData.job_position}
+                                            onChange={handleJobPositionChange}
+                                            disabled={!formData.department}
+                                        >
+                                            <option value="">
+                                                {formData.department ? "-- Seleccionar Cargo --" : "Departamento Requerido"}
+                                            </option>
+                                            {jobPositions.map(pos => (
+                                                <option key={pos.id} value={pos.id}>{pos.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-xs font-black text-gray-400 uppercase tracking-wider">Cargo (Texto en Recibo)</label>
                                     <input
                                         type="text"
                                         name="position"
-                                        className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:bg-white focus:border-nominix-electric focus:ring-0 outline-none font-bold text-nominix-dark transition-all"
+                                        className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:border-nominix-electric focus:ring-0 outline-none font-bold text-nominix-dark transition-all"
                                         value={formData.position}
                                         onChange={handleChange}
                                         placeholder="Ej. Gerente"
                                     />
                                 </div>
-                            </div>
-
-                            <div className="space-y-2 group">
-                                <label className="text-xs font-black text-gray-400 uppercase tracking-wider">Departamento</label>
-                                <DepartmentSelector
-                                    branchId={employeeData?.branch?.id || employeeData?.branch}
-                                    value={formData.department}
-                                    onChange={(val) => setFormData(prev => ({ ...prev, department: val }))}
-                                />
                             </div>
 
                             <div className="col-span-2 space-y-2">

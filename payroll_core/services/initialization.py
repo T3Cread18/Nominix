@@ -93,6 +93,14 @@ def create_system_concepts():
             'computation_method': 'VALUE',
             'receipt_order': 230,
         },
+        {
+            'code': 'INCES',
+            'name': 'INCES (0.5%)',
+            'kind': 'DEDUCTION',
+            'computation_method': 'FORMULA',
+            'receipt_order': 240,
+            'show_even_if_zero': False,
+        },
     ]
 
     from decimal import Decimal

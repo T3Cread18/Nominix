@@ -28,8 +28,21 @@ const CreateContractModal = ({ isOpen, onClose, onSuccess, employeeId, currencie
         payment_frequency: 'MONTHLY',
         start_date: new Date().toISOString().split('T')[0],
         end_date: '',
-        is_active: true
+        is_active: true,
+        job_position: '', // Nuevo campo
+        department: ''
     });
+
+    const [jobPositions, setJobPositions] = useState([]);
+
+    // Cargar Cargos
+    useEffect(() => {
+        if (isOpen) {
+            axiosClient.get('/job-positions/').then(res => {
+                setJobPositions(res.data.results || res.data);
+            });
+        }
+    }, [isOpen]);
 
     // Resetear formulario al abrir
     useEffect(() => {
@@ -65,6 +78,23 @@ const CreateContractModal = ({ isOpen, onClose, onSuccess, employeeId, currencie
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
+    };
+
+    const handleJobPositionChange = (e) => {
+        const selectedId = e.target.value;
+        const pos = jobPositions.find(p => p.id == selectedId);
+        if (pos) {
+            setFormData(prev => ({
+                ...prev,
+                job_position: pos.id,
+                position: pos.name,
+                salary_amount: pos.default_total_salary,
+                salary_currency: pos.currency,
+                department: pos.department
+            }));
+        } else {
+            setFormData(prev => ({ ...prev, job_position: '' }));
+        }
     };
 
     const handleSubmit = async (e) => {
@@ -119,27 +149,35 @@ const CreateContractModal = ({ isOpen, onClose, onSuccess, employeeId, currencie
                 <div className="overflow-y-auto p-8">
                     <form id="contract-form" onSubmit={handleSubmit} className="space-y-6">
 
-                        {/* Cargo */}
+                        {/* Cargo (Selector) */}
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Cargo / Puesto</label>
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Cargo Estructurado</label>
                             <div className="relative">
                                 <Briefcase className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={16} />
-                                <input
-                                    type="text"
-                                    name="position"
+                                <select
+                                    name="job_position"
                                     required
-                                    className="w-full pl-10 p-3 bg-gray-50 border border-gray-100 rounded-xl font-bold text-sm focus:border-nominix-electric outline-none text-nominix-dark"
-                                    placeholder="Ej. Farmacéutico Regente"
-                                    value={formData.position}
-                                    onChange={handleChange}
-                                />
+                                    className="w-full pl-10 p-3 bg-gray-50 border border-gray-100 rounded-xl font-bold text-sm focus:border-nominix-electric outline-none text-nominix-dark appearance-none"
+                                    value={formData.job_position}
+                                    onChange={handleJobPositionChange}
+                                >
+                                    <option value="">-- Seleccionar Cargo --</option>
+                                    {jobPositions.map(pos => (
+                                        <option key={pos.id} value={pos.id}>
+                                            {pos.name} ({pos.department_name})
+                                        </option>
+                                    ))}
+                                </select>
                             </div>
                         </div>
 
                         {/* Salario y Moneda */}
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Monto Salarial</label>
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex justify-between">
+                                    <span>Monto Salarial (Total)</span>
+                                    {formData.job_position && <span className="text-nominix-electric cursor-help" title="Autocargado desde Cargo">*</span>}
+                                </label>
                                 <div className="relative">
                                     <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={16} />
                                     <input

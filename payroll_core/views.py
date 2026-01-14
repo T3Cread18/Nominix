@@ -18,13 +18,13 @@ from rest_framework.views import APIView
 from .models import (
     Employee, LaborContract, ExchangeRate, PayrollConcept, 
     EmployeeConcept, Branch, Currency, PayrollPeriod, Payslip,
-    PayrollNovelty, Company, Department, Loan, LoanPayment
+    PayrollNovelty, Company, Department, Loan, LoanPayment, JobPosition
 )
 from .serializers import (
     EmployeeSerializer, BranchSerializer, LaborContractSerializer,
     CurrencySerializer, PayrollConceptSerializer, EmployeeConceptSerializer,
     PayrollPeriodSerializer, PayslipSerializer, PayrollNoveltySerializer, CompanySerializer,
-    DepartmentSerializer, LoanSerializer, LoanPaymentSerializer
+    DepartmentSerializer, LoanSerializer, LoanPaymentSerializer, JobPositionSerializer
 )
 from .engine import PayrollEngine
 
@@ -114,7 +114,15 @@ class DepartmentViewSet(viewsets.ModelViewSet):
     serializer_class = DepartmentSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     search_fields = ['name']
+    search_fields = ['name']
     filterset_fields = ['branch']
+
+class JobPositionViewSet(viewsets.ModelViewSet):
+    queryset = JobPosition.objects.all()
+    serializer_class = JobPositionSerializer
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    search_fields = ['name', 'code']
+    filterset_fields = ['department']
 
 
 class EmployeeViewSet(viewsets.ModelViewSet):

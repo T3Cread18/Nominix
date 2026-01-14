@@ -12,7 +12,7 @@ Este paquete contiene los modelos divididos por dominio:
 # Importar desde módulos individuales
 from .base import tenant_upload_path
 from .currency import Currency, ExchangeRate
-from .organization import Branch, Department, Company
+from .organization import Branch, Department, Company, JobPosition
 from .employee import Employee, LaborContract
 from .concepts import PayrollConcept, EmployeeConcept
 from .payroll import PayrollPeriod, Payslip, PayslipDetail, PayrollNovelty
@@ -28,6 +28,7 @@ __all__ = [
     # Organization
     'Branch',
     'Department',
+    'JobPosition',
     'Company',
     # Employee
     'Employee',
