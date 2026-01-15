@@ -340,8 +340,65 @@ class Company(models.Model):
     def __str__(self):
         return self.name
 
-    def save(self, *args, **kwargs):
-        # Garantizar que solo haya 1 registro (Singleton pattern simple)
-        if not self.pk and Company.objects.exists():
-            raise Exception("Solo puede haber una configuración de empresa.")
         super().save(*args, **kwargs)
+
+
+class PayrollPolicy(models.Model):
+    """
+    Políticas de Nómina y Factores Globales.
+    
+    Este modelo centraliza los factores de cálculo que aplican a toda la empresa,
+    permitiendo ajustar porcentajes de recargos sin modificar fórmulas.
+    """
+    company = models.OneToOneField(
+        Company, 
+        on_delete=models.CASCADE, 
+        related_name='policy',
+        verbose_name="Empresa"
+    )
+    
+    # Factores de pago (Multiplicadores)
+    holiday_payout_factor = models.DecimalField(
+        max_digits=5, decimal_places=2, 
+        default=Decimal('1.50'),
+        verbose_name="Factor Feriados",
+        help_text="Multiplicador para días feriados trabajados (ej: 1.50)"
+    )
+    
+    rest_day_payout_factor = models.DecimalField(
+        max_digits=5, decimal_places=2, 
+        default=Decimal('1.50'),
+        verbose_name="Factor Descansos",
+        help_text="Multiplicador para días de descanso trabajados"
+    )
+    
+    overtime_day_factor = models.DecimalField(
+        max_digits=5, decimal_places=2, 
+        default=Decimal('1.50'),
+        verbose_name="Horas Extra Diurnas",
+        help_text="Recargo para horas extras diurnas (ej: 1.50 = 50% recargo)"
+    )
+    
+    overtime_night_factor = models.DecimalField(
+        max_digits=5, decimal_places=2, 
+        default=Decimal('1.50'),
+        verbose_name="Horas Extra Nocturnas",
+        help_text="Recargo para horas extras nocturnas"
+    )
+    
+    night_bonus_rate = models.DecimalField(
+        max_digits=5, decimal_places=2, 
+        default=Decimal('0.30'),
+        verbose_name="Bono Nocturno (%)",
+        help_text="Porcentaje de recargo por bono nocturno (ej: 0.30 = 30%)"
+    )
+
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Política de Nómina"
+        verbose_name_plural = "Políticas de Nómina"
+
+    def __str__(self):
+        return f"Políticas de {self.company.name}"
+

@@ -7,7 +7,8 @@ from decimal import Decimal
 
 from .employee import Employee
 from .currency import Currency
-from .payroll import Payslip
+from .payroll import PayrollReceipt
+
 
 
 class Loan(models.Model):
@@ -154,8 +155,8 @@ class LoanPayment(models.Model):
         verbose_name='Préstamo'
     )
     
-    payslip = models.ForeignKey(
-        Payslip,
+    receipt = models.ForeignKey(
+        PayrollReceipt,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
@@ -163,6 +164,7 @@ class LoanPayment(models.Model):
         verbose_name='Recibo de Nómina',
         help_text='Nómina donde se realizó el descuento (opcional si es abono manual)'
     )
+
     
     amount = models.DecimalField(
         max_digits=12,

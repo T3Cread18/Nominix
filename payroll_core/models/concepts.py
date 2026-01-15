@@ -78,6 +78,14 @@ class PayrollConcept(models.Model):
         verbose_name='Activo'
     )
     
+    incidences = models.JSONField(
+        default=list,
+        blank=True,
+        verbose_name='Incidencias (Tags)',
+        help_text='Lista de etiquetas de incidencia (ej: ["FAOV_BASE", "ISLR_BASE"])'
+    )
+
+    
     show_on_payslip: models.BooleanField = models.BooleanField(
         default=True,
         verbose_name='Mostrar en Recibo (Legacy)',

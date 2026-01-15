@@ -9,11 +9,14 @@ from django.utils import timezone
 
 from ..engine import PayrollEngine
 from ..models import (
-    PayrollPeriod, Payslip, PayslipDetail, PayrollNovelty, 
+    PayrollPeriod, PayrollReceipt, PayrollReceiptLine, PayrollNovelty, 
     Employee, Currency, ExchangeRate, PayrollConcept,
     Loan, LoanPayment
+
 )
 from .currency import SalaryConverter, CurrencyNotFoundError, ExchangeRateNotFoundError
+from .payroll_persistence import PayrollPersistenceService
+
 
 
 class PayrollProcessor:
@@ -112,88 +115,16 @@ class PayrollProcessor:
             if not result_lines:
                 continue
 
-            # 5. Guardar Snapshot e Inmutabilidad
-            snapshot = {
-                'position': contract.position,
-                'salary_amount': str(contract.salary_amount),
-                'salary_currency': contract.salary_currency.code,
-                'payment_frequency': contract.payment_frequency,
-                'hire_date': str(employee.hire_date),
-                'department': contract.department.name if contract.department else None,
-                'base_salary_bs': str(contract.base_salary_bs)
-            }
-
-            payslip = Payslip.objects.create(
+            # 5. Persistir usando el nuevo Servicio Especializado
+            # El servicio maneja snapshots, líneas, auditoría y préstamos.
+            PayrollPersistenceService.save_payroll_calculation(
+                contract=contract,
                 period=period,
-                employee=employee,
-                contract_snapshot=snapshot,
-                total_income_ves=totals.get('income_ves', 0),
-                total_deductions_ves=totals.get('deductions_ves', 0),
-                net_pay_ves=totals.get('net_pay_ves', 0),
-                exchange_rate_applied=bcv_rate,
-                currency_code='VES',
-                status=Payslip.PayslipStatus.DRAFT
+                calculation_result=calculation_result,
+                user=user
             )
 
-            # Bulk create de detalles
-            detail_objs = []
-            for line in result_lines:
-                # line = {'code', 'name', 'kind', 'amount_ves'}
-                detail_objs.append(
-                    PayslipDetail(
-                        payslip=payslip,
-                        concept_code=line['code'],
-                        concept_name=line['name'],
-                        kind=line['kind'],
-                        amount_ves=line['amount_ves'],
-                        tipo_recibo=line.get('tipo_recibo', 'salario'),
-                        quantity=line.get('quantity', 0) or 0,
-                        unit=line.get('unit', 'días'),
-                        calculation_trace=line.get('trace', ''),
-                        # Referencial en moneda origen (si aplica)
-                        amount_src=(line['amount_ves'] / bcv_rate).quantize(Decimal('0.01')) if bcv_rate else 0
-                    )
-                )
 
-                # Procesamiento de Préstamos (Amortización)
-                if line.get('code') == 'PRESTAMO' and line.get('loan_id'):
-                    try:
-                        loan = Loan.objects.get(id=line['loan_id'])
-                        
-                        # Crear registro del pago
-                        payment_amount = line['amount_ves']
-                        exchange_rate_val = Decimal('1.00')
-                        
-                        # Si el préstamo es en divisa, debemos convertir el monto descontado (VES)
-                        # de vuelta a la moneda del préstamo para restar del saldo
-                        if loan.currency.code != 'VES':
-                            # Usamos la tasa aplicada en este cierre (bcv_rate)
-                            exchange_rate_val = bcv_rate or Decimal('1.00')
-                            payment_amount = (line['amount_ves'] / exchange_rate_val).quantize(Decimal('0.01'))
-                        
-                        LoanPayment.objects.create(
-                            loan=loan,
-                            payslip=payslip,
-                            amount=payment_amount,
-                            payment_date=period.payment_date,
-                            exchange_rate_applied=exchange_rate_val,
-                            reference=f"Deducción Nómina {period.name}"
-                        )
-                        
-                        # Actualizar saldo
-                        loan.balance -= payment_amount
-                        
-                        # Verificar si se pagó completo (o si quedó saldo negativo insignificante por redondeo)
-                        if loan.balance <= Decimal('0.01'):
-                            loan.balance = Decimal('0.00')
-                            loan.status = Loan.LoanStatus.Paid
-                        
-                        loan.save()
-                        
-                    except Loan.DoesNotExist:
-                        pass # Should not happen given engine logic
-
-            PayslipDetail.objects.bulk_create(detail_objs)
 
             processed_count += 1
             total_income_ves += totals.get('net_pay_ves', 0)

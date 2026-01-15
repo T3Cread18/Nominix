@@ -16,21 +16,33 @@ import csv
 from .services import BCVRateService
 from rest_framework.views import APIView
 from .models import (
-    Employee, LaborContract, ExchangeRate, PayrollConcept, 
-    EmployeeConcept, Branch, Currency, PayrollPeriod, Payslip,
-    PayrollNovelty, Company, Department, Loan, LoanPayment, JobPosition
+    PayrollPeriod, PayrollReceipt, PayrollNovelty, Employee, 
+    LaborContract, PayrollConcept, Company, Loan, Branch,
+    ExchangeRate, EmployeeConcept, Currency, Department, LoanPayment, JobPosition
 )
 from .serializers import (
-    EmployeeSerializer, BranchSerializer, LaborContractSerializer,
-    CurrencySerializer, PayrollConceptSerializer, EmployeeConceptSerializer,
-    PayrollPeriodSerializer, PayslipSerializer, PayrollNoveltySerializer, CompanySerializer,
-    DepartmentSerializer, LoanSerializer, LoanPaymentSerializer, JobPositionSerializer
+    PayrollPeriodSerializer, PayrollReceiptSerializer, PayrollNoveltySerializer,
+    EmployeeSerializer, LaborContractSerializer, PayrollConceptSerializer,
+    CompanySerializer, LoanSerializer, BranchSerializer,
+    CurrencySerializer, EmployeeConceptSerializer, DepartmentSerializer, 
+    LoanPaymentSerializer, JobPositionSerializer
 )
 from .engine import PayrollEngine
 
 class CurrencyViewSet(viewsets.ModelViewSet):
     queryset = Currency.objects.all()
     serializer_class = CurrencySerializer
+
+class PayrollReceiptViewSet(viewsets.ModelViewSet):
+    queryset = PayrollReceipt.objects.all()
+    serializer_class = PayrollReceiptSerializer
+    
+    def get_queryset(self):
+        queryset = PayrollReceipt.objects.all()
+        period_id = self.request.query_params.get('period', None)
+        if period_id:
+            queryset = queryset.filter(period_id=period_id)
+        return queryset
 
 class PayrollConceptViewSet(viewsets.ModelViewSet):
     queryset = PayrollConcept.objects.all()

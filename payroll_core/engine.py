@@ -607,84 +607,191 @@ class PayrollEngine:
         
         return concepts
 
-    def _get_law_deductions(self, total_income_ves: Decimal) -> list:
+    def _handle_salary_base(self, cc, eval_context, company):
         """
-        Calcula las deducciones de ley venezolana (IVSS, FAOV, PIE/RPE)
-        siguiendo las reglas de topes y base semanal.
+        Handler para desglosar el sueldo base en días trabajados, descansos y feriados.
+        Aplica los factores de la política de la empresa si existen.
         """
-        sueldo_base_mensual = Decimal(str(self.contract.base_salary_bs or 0))
+        lines = []
+        total_days = eval_context.get('DIAS', 15)
+        amount_per_day = cc['amount_ves'] / Decimal(str(total_days))
         
-        # Obtener Salario Mínimo de la configuración de la empresa
+        # Obtener política de la empresa
+        policy = getattr(company, 'policy', None)
+        holiday_factor = Decimal(str(policy.holiday_payout_factor)) if policy else Decimal('1.50')
+        rest_factor = Decimal(str(policy.rest_day_payout_factor)) if policy else Decimal('1.50')
+
+        # Días registrados
+        sun_days = eval_context.get('DIAS_DOMINGO', 0)
+        hol_days = eval_context.get('DIAS_FERIADO', 0)
+        sat_days = eval_context.get('DIAS_SABADO', 0) 
+        
+        # 1. Días Trabajados (Remanente ordinario)
+        work_days = total_days - sun_days - hol_days - sat_days
+        if work_days > 0:
+            lines.append({
+                'code': 'SUELDO_BASE',
+                'name': cc['name'],
+                'kind': 'EARNING',
+                'amount_ves': (amount_per_day * Decimal(str(work_days))).quantize(Decimal('0.01')),
+                'quantity': work_days,
+                'unit': 'días',
+                'tipo_recibo': 'salario',
+                'trace': f"({float(cc['amount_ves']):.2f} / {total_days}) * {work_days} Días Ord.",
+                'formula': '(QUINCENA / DIAS_PERIOD) * DIAS_TRAB',
+                'variables': {'QUINCENA': float(cc['amount_ves']), 'DIAS_PERIOD': total_days, 'DIAS_TRAB': work_days}
+            })
+
+        # 2. Días Descanso (Sábados/Descansos) - Aplica Rest Factor
+        if sat_days > 0:
+            lines.append({
+                'code': 'DIAS_DESCANSO',
+                'name': 'Días Descanso Trabajados',
+                'kind': 'EARNING',
+                'amount_ves': (amount_per_day * rest_factor * Decimal(str(sat_days))).quantize(Decimal('0.01')),
+                'quantity': sat_days,
+                'unit': 'días',
+                'tipo_recibo': 'salario',
+                'trace': f"({float(cc['amount_ves']):.2f} / {total_days}) * {rest_factor} (Factor) * {sat_days} Días",
+                'formula': '(DIARIO * FACTOR_DESC) * DIAS',
+                'variables': {'DIARIO': float(amount_per_day), 'FACTOR_DESC': float(rest_factor), 'DIAS': sat_days}
+            })
+
+        # 3. Días Domingo - Aplica Rest Factor (Generalmente igual a descanso)
+        if sun_days > 0:
+            lines.append({
+                'code': 'DIAS_DOMINGO',
+                'name': 'Días de Descanso (Domingo)',
+                'kind': 'EARNING',
+                'amount_ves': (amount_per_day * rest_factor * Decimal(str(sun_days))).quantize(Decimal('0.01')),
+                'quantity': sun_days,
+                'unit': 'días',
+                'tipo_recibo': 'salario',
+                'trace': f"({float(cc['amount_ves']):.2f} / {total_days}) * {rest_factor} (Factor) * {sun_days} Días",
+                'formula': '(DIARIO * FACTOR_DESC) * DIAS',
+                'variables': {'DIARIO': float(amount_per_day), 'FACTOR_DESC': float(rest_factor), 'DIAS': sun_days}
+            })
+
+        # 4. Días Feriados - Aplica Holiday Factor
+        if hol_days > 0:
+            lines.append({
+                'code': 'DIAS_FERIADO',
+                'name': 'Días Feriados Trabajados',
+                'kind': 'EARNING',
+                'amount_ves': (amount_per_day * holiday_factor * Decimal(str(hol_days))).quantize(Decimal('0.01')),
+                'quantity': hol_days,
+                'unit': 'días',
+                'tipo_recibo': 'salario',
+                'trace': f"({float(cc['amount_ves']):.2f} / {total_days}) * {holiday_factor} (Factor) * {hol_days} Días",
+                'formula': '(DIARIO * FACTOR_FER) * DIAS',
+                'variables': {'DIARIO': float(amount_per_day), 'FACTOR_FER': float(holiday_factor), 'DIAS': hol_days}
+            })
+            
+        return lines
+
+    def _handle_law_deduction(self, code, context, sm, params, num_lunes):
+        """
+        Handler general para deducciones de ley.
+        Soporta base de acumuladores dinámicos.
+        """
+        # Determinar la base de cálculo
+        if params.get('base_source') == 'ACCUMULATOR':
+            # Obtener del acumulador (ej: TOTAL_FAOV_BASE)
+            tag = params.get('tag', code + '_BASE')
+            base_salary = Decimal(str(context.get(f'TOTAL_{tag}', 0)))
+        else:
+            # Por defecto: Salario Base Mensual del contrato
+            base_salary = params.get('fixed_base', Decimal('0.00'))
+
+        if base_salary <= 0:
+            return None
+
+        rate = Decimal(str(params.get('rate', 0)))
+        tope_multiplier = params.get('tope_sm')
+        
+        # Aplicar tope si existe
+        if tope_multiplier:
+            tope = tope_multiplier * sm
+            base_calc = min(base_salary, tope)
+            trace_base = f"MIN({float(base_salary):.2f}, {float(tope):.2f})"
+        else:
+            base_calc = base_salary
+            trace_base = f"{float(base_salary):.2f}"
+
+        amount = Decimal('0.00')
+        trace = ""
+        variables = {'SM': float(sm), 'BASE': float(base_salary)}
+
+        if params.get('is_weekly'):
+            # Lógica SSO/SPF: (Base * 12 / 52) * Lunes * Rate
+            semanal = (base_calc * 12) / 52
+            amount = (semanal * num_lunes * rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            trace = f"({trace_base} * 12 / 52) * {num_lunes} Lun * {float(rate)*100}%"
+            variables.update({'LUNES': num_lunes, 'RATE': float(rate)})
+        else:
+            # Lógica Simple: Base * Rate
+            amount = (base_calc * rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            trace = f"{trace_base} * {float(rate)*100}%"
+            variables.update({'RATE': float(rate)})
+
+        return {
+            'code': code,
+            'name': params.get('name', code),
+            'kind': 'DEDUCTION',
+            'amount_ves': amount,
+            'quantity': num_lunes if params.get('is_weekly') else 1,
+            'unit': 'lunes' if params.get('is_weekly') else 'mes',
+            'trace': trace,
+            'formula': params.get('formula_text', ''),
+            'variables': variables
+        }
+
+    def _get_law_deductions(self, context: Dict[str, Any]) -> list:
+        """
+        Calcula las deducciones de ley venezolana (IVSS, FAOV, PIE/RPE).
+        """
         company = Company.objects.first()
         sm = company.national_minimum_salary if company else FALLBACK_SALARIO_MINIMO
-        
-        if sueldo_base_mensual <= 0:
-            return []
+        contract_base = Decimal(str(self.contract.base_salary_bs or 0))
 
-        # 1. Contar Lunes del periodo (Misma lógica que eval_context)
-        num_lunes = 0
-        if self.period:
-            curr = self.period.start_date
-            while curr <= self.period.end_date:
-                if curr.weekday() == 0: num_lunes += 1
-                curr += timedelta(days=1)
-        else:
-            # Fallback 4 semanas si no hay periodo (simulación)
-            num_lunes = 4
+        # 1. Contar Lunes
+        num_lunes = context.get('LUNES', 4)
 
-        # 2. IVSS (Tope 5 SM)
-        tope_ivss = 5 * sm
-        base_ivss = min(sueldo_base_mensual, tope_ivss)
-        semanal_ivss = (base_ivss * 12) / 52
-        ivss_ves = (semanal_ivss * num_lunes * Decimal('0.04')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-        trace_ivss = f"({float(base_ivss):.2f} * 12 / 52) * {num_lunes} Lun * 4%"
-
-        # 3. RPE / Paro Forzoso (Tope 10 SM)
-        tope_rpe = 10 * sm
-        base_rpe = min(sueldo_base_mensual, tope_rpe)
-        semanal_rpe = (base_rpe * 12) / 52
-        rpe_ves = (semanal_rpe * num_lunes * Decimal('0.005')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-        trace_rpe = f"({float(base_rpe):.2f} * 12 / 52) * {num_lunes} Lun * 0.5%"
-
-        # 4. FAOV (1% sobre Total Integral - Sin tope)
-        faov_ves = (sueldo_base_mensual * Decimal('0.01')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-        trace_faov = f"{float(sueldo_base_mensual):.2f} * 1%"
-
-        return [
-            {
-                'code': 'IVSS', 
-                'name': f'Seguro Social IVSS (4% - {num_lunes} Lun)', 
-                'kind': 'DEDUCTION', 
-                'amount_ves': ivss_ves, 
-                'quantity': num_lunes, 
-                'unit': 'lunes', 
-                'trace': trace_ivss,
-                'formula': '(MIN(SUELDO_MENSUAL, TOPE) * 12 / 52) * LUNES * 0.04',
-                'variables': {'SUELDO_MENSUAL': float(sueldo_base_mensual), 'TOPE': float(tope_ivss), 'LUNES': num_lunes}
+        # 2. Configuración de Deducciones
+        LAW_CONFIG = {
+            'IVSS': {
+                'name': f'Seguro Social IVSS (4% - {num_lunes} Lun)',
+                'rate': '0.04',
+                'tope_sm': 5,
+                'is_weekly': True,
+                'fixed_base': contract_base,
+                'formula_text': '(MIN(BASE, 5*SM) * 12 / 52) * LUNES * 0.04'
             },
-            {
-                'code': 'PIE', 
-                'name': f'Paro Forzoso RPE (0.5% - {num_lunes} Lun)', 
-                'kind': 'DEDUCTION', 
-                'amount_ves': rpe_ves, 
-                'quantity': num_lunes, 
-                'unit': 'lunes', 
-                'trace': trace_rpe,
-                'formula': '(MIN(SUELDO_MENSUAL, TOPE) * 12 / 52) * LUNES * 0.005',
-                'variables': {'SUELDO_MENSUAL': float(sueldo_base_mensual), 'TOPE': float(tope_rpe), 'LUNES': num_lunes}
+            'PIE': {
+                'name': f'Paro Forzoso RPE (0.5% - {num_lunes} Lun)',
+                'rate': '0.005',
+                'tope_sm': 10,
+                'is_weekly': True,
+                'fixed_base': contract_base,
+                'formula_text': '(MIN(BASE, 10*SM) * 12 / 52) * LUNES * 0.005'
             },
-            {
-                'code': 'FAOV', 
-                'name': 'Bono Vivienda FAOV (1%)', 
-                'kind': 'DEDUCTION', 
-                'amount_ves': faov_ves, 
-                'quantity': 1, 
-                'unit': 'mes', 
-                'trace': trace_faov,
-                'formula': 'SUELDO_MENSUAL * 0.01',
-                'variables': {'SUELDO_MENSUAL': float(sueldo_base_mensual)}
+            'FAOV': {
+                'name': 'Bono Vivienda FAOV (1%)',
+                'rate': '0.01',
+                'base_source': 'ACCUMULATOR',
+                'tag': 'FAOV_BASE',
+                'formula_text': 'TOTAL_FAOV_BASE * 0.01'
             }
-        ]
+        }
+
+        results = []
+        for code, params in LAW_CONFIG.items():
+            res = self._handle_law_deduction(code, context, sm, params, num_lunes)
+            if res:
+                results.append(res)
+                
+        return results
+
 
     def calculate_payroll(self) -> Dict[str, Any]:
         """Orquesta el cálculo completo incluyendo conceptos del contrato y de ley."""
@@ -696,6 +803,19 @@ class PayrollEngine:
         # 1. Inyectar conceptos del contrato (Asignaciones fijos)
         contract_concepts = self._get_contract_concepts()
         eval_context = self._build_eval_context()
+        
+        # --- INICIALIZACIÓN DE ACUMULADORES DINÁMICOS ---
+        accumulators = {}
+        # Pre-poblar el contexto con acumuladores en 0
+        all_incidence_tags = set()
+        for c in PayrollConcept.objects.filter(active=True):
+            if c.incidences:
+                all_incidence_tags.update(c.incidences)
+        
+        for tag in all_incidence_tags:
+            accumulators[tag] = 0.0
+            eval_context[f'TOTAL_{tag}'] = 0.0
+
 
         # Cargar configuración de Conceptos de Sistema (Sueldo, Cestaticket, Complemento)
         system_codes = ['SUELDO_BASE', 'CESTATICKET', 'COMPLEMENTO']
@@ -727,80 +847,18 @@ class PayrollEngine:
 
                 # LÓGICA ESPECIAL: Desglosar SUELDO_BASE si el usuario lo requiere
                 if cc['code'] == 'SUELDO_BASE':
-                    total_days = eval_context.get('DIAS', 15)
-                    amount_per_day = cc['amount_ves'] / Decimal(str(total_days))
+                    salary_lines = self._handle_salary_base(cc, eval_context, company)
+                    results_lines.extend(salary_lines)
+                    
+                    # --- ACTUALIZAR ACUMULADORES (Líneas Desglosadas) ---
+                    if db_concept and db_concept.incidences:
+                        for sl in salary_lines:
+                            for tag in db_concept.incidences:
+                                accumulators[tag] += float(sl['amount_ves'])
+                                eval_context[f'TOTAL_{tag}'] = accumulators[tag]
 
-                    # Calculamos los días que NO son descanso/feriado para que el Sueldo Base sea el remanente
-                    sun_days = eval_context.get('DIAS_DOMINGO', 0)
-                    hol_days = eval_context.get('DIAS_FERIADO', 0)
-                    sat_days = eval_context.get('DIAS_SABADO', 0) 
-                    
-                    # Días trabajados = Total - (Descansos y Feriados reportados)
-                    work_days = total_days - sun_days - hol_days - sat_days
-                    
-                    if work_days > 0:
-                        results_lines.append({
-                            'code': 'SUELDO_BASE',
-                            'name': cc['name'],
-                            'kind': 'EARNING',
-                            'amount_ves': (amount_per_day * Decimal(str(work_days))).quantize(Decimal('0.01')),
-                            'quantity': work_days,
-                            'unit': 'días',
-                            'tipo_recibo': 'salario',
-                            'trace': f"({float(cc['amount_ves']):.2f} / {total_days}) * {work_days} Días Trab.",
-                            'formula': '(QUINCENA / DIAS_TOTALES) * (DIAS - DESC - FER)',
-                            'variables': {'QUINCENA': float(cc['amount_ves']), 'DIAS_TOTALES': total_days, 'DIAS_TRAB': work_days}
-                        })
-                    
-                    # 2. Días Descanso (Sábados)
-                    sat_days = eval_context.get('DIAS_SABADO', 0)
-                    if sat_days > 0:
-                        results_lines.append({
-                            'code': 'DIAS_DESCANSO',
-                            'name': 'Días Descanso Trabajados',
-                            'kind': 'EARNING',
-                            'amount_ves': (amount_per_day * Decimal(str(sat_days))).quantize(Decimal('0.01')),
-                            'quantity': sat_days,
-                            'unit': 'días',
-                            'tipo_recibo': 'salario',
-                            'trace': f"({float(cc['amount_ves']):.2f} / {total_days}) * {sat_days} Sábados",
-                            'formula': '(QUINCENA / DIAS_TOTALES) * DIAS_SABADO',
-                            'variables': {'QUINCENA': float(cc['amount_ves']), 'DIAS_TOTALES': total_days, 'DIAS_SABADO': sat_days}
-                        })
-
-                    # 3. Días Domingo
-                    sun_days = eval_context.get('DIAS_DOMINGO', 0)
-                    if sun_days > 0:
-                        results_lines.append({
-                            'code': 'DIAS_DOMINGO',
-                            'name': 'Días de Descanso (Domingo)',
-                            'kind': 'EARNING',
-                            'amount_ves': (amount_per_day * Decimal(str(sun_days))).quantize(Decimal('0.01')),
-                            'quantity': sun_days,
-                            'unit': 'días',
-                            'tipo_recibo': 'salario',
-                            'trace': f"({float(cc['amount_ves']):.2f} / {total_days}) * {sun_days} Dom",
-                            'formula': '(QUINCENA / DIAS_TOTALES) * DIAS_DOMINGO',
-                            'variables': {'QUINCENA': float(cc['amount_ves']), 'DIAS_TOTALES': total_days, 'DIAS_DOMINGO': sun_days}
-                        })
-
-                    # 4. Días Feriados
-                    hol_days = eval_context.get('DIAS_FERIADO', 0)
-                    if hol_days > 0:
-                        results_lines.append({
-                            'code': 'DIAS_FERIADO',
-                            'name': 'Días Feriados',
-                            'kind': 'EARNING',
-                            'amount_ves': (amount_per_day * Decimal(str(hol_days))).quantize(Decimal('0.01')),
-                            'quantity': hol_days,
-                            'unit': 'días',
-                            'tipo_recibo': 'salario',
-                            'trace': f"({float(cc['amount_ves']):.2f} / {total_days}) * {hol_days} Fer",
-                            'formula': '(QUINCENA / DIAS_TOTALES) * DIAS_FERIADO',
-                            'variables': {'QUINCENA': float(cc['amount_ves']), 'DIAS_TOTALES': total_days, 'DIAS_FERIADO': hol_days}
-                        })
-                    
                     integral_income += cc['amount_ves']
+
                 else:
                     results_lines.append({
                         'code': cc['code'],
@@ -816,6 +874,13 @@ class PayrollEngine:
                         integral_income += cc['amount_ves']
                 
                 total_income += cc['amount_ves']
+                
+                # --- ACTUALIZAR ACUMULADORES (Conceptos de Sistema No Desglosados) ---
+                if cc['code'] != 'SUELDO_BASE' and db_concept and db_concept.incidences:
+                    for tag in db_concept.incidences:
+                        accumulators[tag] += float(cc['amount_ves'])
+                        eval_context[f'TOTAL_{tag}'] = accumulators[tag]
+
 
         # 2. Procesar conceptos dinámicos de ASIGNACIÓN
         all_concepts = PayrollConcept.objects.filter(active=True).order_by('id')
@@ -854,9 +919,9 @@ class PayrollEngine:
             if override_val is None and not concept.show_on_payslip:
                 continue
                 
-            calc_res = self.calculate_concept(concept, override_value=override_val, context=eval_context)
-            amount = calc_res['amount']
-            trace = calc_res['trace']
+            res = self.calculate_concept(concept, override_value=override_val, context=eval_context)
+            amount = res['amount']
+            trace = res['trace']
             
             if amount > 0:
                 # Determinar tipo de recibo para dinámicos
@@ -873,8 +938,8 @@ class PayrollEngine:
                     'amount_ves': amount,
                     'tipo_recibo': tipo,
                     'trace': trace,
-                    'formula': calc_res.get('formula', ''),
-                    'variables': calc_res.get('variables', {})
+                    'formula': res['formula'],
+                    'variables': res['variables']
                 }
                 
                 # Inyectar cantidad...
@@ -884,9 +949,17 @@ class PayrollEngine:
                     line['unit'] = 'hrs' if 'HOURS' in var_name else 'días'
                 
                 results_lines.append(line)
+
+                # --- ACTUALIZAR ACUMULADORES (Conceptos Dinámicos ASIGNACIÓN) ---
+                if concept.incidences:
+                    for tag in concept.incidences:
+                        accumulators[tag] += float(res['amount'])
+                        eval_context[f'TOTAL_{tag}'] = accumulators[tag]
+
                 total_income += amount
                 if concept.is_salary_incidence:
                     integral_income += amount
+
 
         # 3. Inyectar deducciones de ley (USANDO integral_income)
         law_concepts_config = {
@@ -894,7 +967,7 @@ class PayrollEngine:
             for c in PayrollConcept.objects.filter(code__in=['IVSS', 'PIE', 'FAOV', 'RPE'])
         }
 
-        law_deductions = self._get_law_deductions(integral_income)
+        law_deductions = self._get_law_deductions(eval_context)
         for ld in law_deductions:
             is_visible = law_concepts_config.get(ld['code'], True)
             if ld['amount_ves'] > 0 and is_visible:
@@ -960,9 +1033,9 @@ class PayrollEngine:
             if override_val is None and not concept.show_on_payslip:
                 continue
                 
-            calc_res = self.calculate_concept(concept, override_value=override_val, context=eval_context)
-            amount = calc_res['amount']
-            trace = calc_res['trace']
+            res = self.calculate_concept(concept, override_value=override_val, context=eval_context)
+            amount = res['amount']
+            trace = res['trace']
             
             if amount > 0:
                 results_lines.append({
@@ -972,10 +1045,18 @@ class PayrollEngine:
                     'amount_ves': amount,
                     'tipo_recibo': 'salario',
                     'trace': trace,
-                    'formula': calc_res.get('formula', ''),
-                    'variables': calc_res.get('variables', {})
+                    'formula': res['formula'],
+                    'variables': res['variables']
                 })
+                
+                # --- ACTUALIZAR ACUMULADORES (Conceptos Dinámicos DEDUCCIÓN) ---
+                if concept.incidences:
+                    for tag in concept.incidences:
+                        accumulators[tag] += float(res['amount'])
+                        eval_context[f'TOTAL_{tag}'] = accumulators[tag]
+
                 total_deductions += amount
+
 
         # Recalcular totales reales basados en las líneas finales para consistencia absoluta
         total_income = sum(l['amount_ves'] for l in results_lines if l['kind'] == 'EARNING')
