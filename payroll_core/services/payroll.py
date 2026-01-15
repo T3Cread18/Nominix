@@ -127,7 +127,7 @@ class PayrollProcessor:
 
 
             processed_count += 1
-            total_income_ves += totals.get('net_pay_ves', 0)
+            total_income_ves += totals.get('net_pay_ves', Decimal('0.00'))
 
         # 6. Finalizar Periodo
         period.status = PayrollPeriod.Status.CLOSED
@@ -199,6 +199,12 @@ class PayrollProcessor:
             calc = engine.calculate_payroll()
             totals = calc.get('totals', {})
             
+            # Asegurar que los montos en las líneas sean floats para el JSON del frontend
+            lines = calc.get('lines', [])
+            for l in lines:
+                if isinstance(l.get('amount_ves'), Decimal):
+                    l['amount_ves'] = float(l['amount_ves'])
+
             results.append({
                 'employee_id': employee.id,
                 'full_name': employee.full_name,
@@ -207,9 +213,9 @@ class PayrollProcessor:
                 'deductions_ves': float(totals.get('deductions_ves', 0)),
                 'net_pay_ves': float(totals.get('net_pay_ves', 0)),
                 'net_pay_usd_ref': float(totals.get('net_pay_usd_ref', 0)),
-                'lines': calc.get('lines', []) # <--- ADICIONADO PARA DETALLE
+                'lines': lines
             })
-            total_net_ves += totals.get('net_pay_ves', 0)
+            total_net_ves += totals.get('net_pay_ves', Decimal('0.00'))
 
         return {
             "period_name": period.name,

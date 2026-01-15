@@ -1,131 +1,244 @@
-"""
-Servicio para la inicialización de datos maestros en nuevos tenants.
-"""
 from django.db import transaction
+from decimal import Decimal
 from ..models import PayrollConcept, Currency
 
 def create_system_concepts():
     """
-    Crea los conceptos básicos de ley y sistema para el tenant actual.
+    Crea los conceptos básicos de ley y sistema para el tenant actual,
+    integrando la lógica detallada de Venezuela (LOTTT).
     """
     # Moneda principal (VES por defecto en Vzla)
     ves, _ = Currency.objects.get_or_create(code='VES', defaults={'name': 'Bolívares', 'symbol': 'Bs.'})
     
     system_concepts = [
-        # ASIGNACIONES
+        # === ASIGNACIONES ===
         {
             'code': 'SUELDO_BASE',
-            'name': 'Días Trabajados',
-            'kind': 'EARNING',
-            'computation_method': PayrollConcept.ComputationMethod.DYNAMIC_FORMULA,
+            'name': 'Sueldo Base',
+            'kind': PayrollConcept.ConceptKind.EARNING,
+            'computation_method': PayrollConcept.ComputationMethod.FIXED_AMOUNT,
+            'value': Decimal('0.00'),
+            'behavior': PayrollConcept.ConceptBehavior.SALARY_BASE,
+            'incidences': ['FAOV_BASE', 'IVSS_BASE', 'RPE_BASE', 'ISLR_BASE', 'PRESTACIONES_BASE'],
             'receipt_order': 10,
-            'show_even_if_zero': True,
-            'is_system': True,
+            'appears_on_receipt': True,
         },
         {
             'code': 'DIAS_DESCANSO',
-            'name': 'Días Descanso Trabajados',
-            'kind': 'EARNING',
+            'name': 'Días de Descanso',
+            'kind': PayrollConcept.ConceptKind.EARNING,
             'computation_method': PayrollConcept.ComputationMethod.DYNAMIC_FORMULA,
-            'receipt_order': 20,
-            'show_even_if_zero': True,
-            'is_system': True,
+            'formula': 'SALARIO_DIARIO * DIAS_SABADO * FACTOR_DESCANSO',
+            'value': Decimal('0.00'),
+            'behavior': PayrollConcept.ConceptBehavior.FIXED,
+            'incidences': ['FAOV_BASE', 'IVSS_BASE', 'RPE_BASE', 'PRESTACIONES_BASE'],
+            'receipt_order': 11,
+            'appears_on_receipt': True,
         },
         {
-            'code': 'DIAS_FERIADOS',
-            'name': 'Días Feriados',
-            'kind': 'EARNING',
+            'code': 'DIAS_DOMINGO',
+            'name': 'Días Domingo',
+            'kind': PayrollConcept.ConceptKind.EARNING,
             'computation_method': PayrollConcept.ComputationMethod.DYNAMIC_FORMULA,
-            'receipt_order': 30,
-            'show_even_if_zero': True,
-            'is_system': True,
+            'formula': 'SALARIO_DIARIO * DIAS_DOMINGO * FACTOR_DESCANSO',
+            'value': Decimal('0.00'),
+            'behavior': PayrollConcept.ConceptBehavior.FIXED,
+            'incidences': ['FAOV_BASE', 'IVSS_BASE', 'RPE_BASE', 'PRESTACIONES_BASE'],
+            'receipt_order': 12,
+            'appears_on_receipt': True,
         },
+        {
+            'code': 'DIAS_FERIADO',
+            'name': 'Días Feriados',
+            'kind': PayrollConcept.ConceptKind.EARNING,
+            'computation_method': PayrollConcept.ComputationMethod.DYNAMIC_FORMULA,
+            'formula': 'SALARIO_DIARIO * DIAS_FERIADO * FACTOR_FERIADO',
+            'value': Decimal('0.00'),
+            'behavior': PayrollConcept.ConceptBehavior.FIXED,
+            'incidences': ['FAOV_BASE', 'IVSS_BASE', 'RPE_BASE', 'PRESTACIONES_BASE'],
+            'receipt_order': 13,
+            'appears_on_receipt': True,
+        },
+        
+        # --- HORAS EXTRAS Y RECARGOS ---
+        {
+            'code': 'H_EXTRA_DIURNA',
+            'name': 'Horas Extras Diurnas',
+            'kind': PayrollConcept.ConceptKind.EARNING,
+            'computation_method': PayrollConcept.ComputationMethod.DYNAMIC_FORMULA,
+            'formula': '(SALARIO_DIARIO / 8) * H_EXTRA_DIURNA * FACTOR_HED',
+            'value': Decimal('0.00'),
+            'behavior': PayrollConcept.ConceptBehavior.DYNAMIC,
+            'incidences': ['FAOV_BASE', 'IVSS_BASE', 'RPE_BASE', 'PRESTACIONES_BASE'],
+            'receipt_order': 20,
+            'appears_on_receipt': True,
+        },
+        {
+            'code': 'H_EXTRA_NOCTURNA',
+            'name': 'Horas Extras Nocturnas',
+            'kind': PayrollConcept.ConceptKind.EARNING,
+            'computation_method': PayrollConcept.ComputationMethod.DYNAMIC_FORMULA,
+            'formula': '(SALARIO_DIARIO / 8) * H_EXTRA_NOCTURNA * FACTOR_HEN',
+            'value': Decimal('0.00'),
+            'behavior': PayrollConcept.ConceptBehavior.DYNAMIC,
+            'incidences': ['FAOV_BASE', 'IVSS_BASE', 'RPE_BASE', 'PRESTACIONES_BASE'],
+            'receipt_order': 21,
+            'appears_on_receipt': True,
+        },
+        {
+            'code': 'BONO_NOCTURNO',
+            'name': 'Bono Nocturno',
+            'kind': PayrollConcept.ConceptKind.EARNING,
+            'computation_method': PayrollConcept.ComputationMethod.DYNAMIC_FORMULA,
+            'formula': '(SALARIO_DIARIO / 8) * BONO_NOCTURNO * TASA_BONO_NOCTURNO',
+            'value': Decimal('0.00'),
+            'behavior': PayrollConcept.ConceptBehavior.DYNAMIC,
+            'incidences': ['FAOV_BASE', 'IVSS_BASE', 'RPE_BASE', 'PRESTACIONES_BASE'],
+            'receipt_order': 22,
+            'appears_on_receipt': True,
+        },
+
         {
             'code': 'BONIFICACION',
             'name': 'Bonificación Especial',
-            'kind': 'EARNING',
+            'kind': PayrollConcept.ConceptKind.EARNING,
             'computation_method': PayrollConcept.ComputationMethod.DYNAMIC_FORMULA,
+            'value': Decimal('0.00'),
+            'behavior': PayrollConcept.ConceptBehavior.DYNAMIC,
             'receipt_order': 40,
-            'is_system': True,
-        },
-        {
-            'code': 'CESTATICKET',
-            'name': 'Cestaticket Socialista',
-            'kind': 'EARNING',
-            'computation_method': PayrollConcept.ComputationMethod.FIXED_AMOUNT,
-            'receipt_order': 100,
-            'is_salary_incidence': False,
-            'is_system': True,
+            'appears_on_receipt': True,
         },
         {
             'code': 'COMPLEMENTO',
-            'name': 'Complemento de Salario',
-            'kind': 'EARNING',
+            'name': 'Complemento Salarial',
+            'kind': PayrollConcept.ConceptKind.EARNING,
             'computation_method': PayrollConcept.ComputationMethod.FIXED_AMOUNT,
-            'receipt_order': 110,
+            'value': Decimal('0.00'),
+            'behavior': PayrollConcept.ConceptBehavior.COMPLEMENT,
+            'incidences': ['FAOV_BASE', 'IVSS_BASE', 'RPE_BASE', 'PRESTACIONES_BASE'],
+            'receipt_order': 45,
+            'appears_on_receipt': True,
+        },
+        {
+            'code': 'CESTATICKET',
+            'name': 'Cestaticket',
+            'kind': PayrollConcept.ConceptKind.EARNING,
+            'computation_method': PayrollConcept.ComputationMethod.FIXED_AMOUNT,
+            'value': Decimal('0.00'),
             'is_salary_incidence': False,
-            'is_system': True,
+            'behavior': PayrollConcept.ConceptBehavior.CESTATICKET,
+            'receipt_order': 50,
+            'appears_on_receipt': True,
         },
         
-        # DEDUCCIONES
+        # === DEDUCCIONES DE LEY ===
         {
             'code': 'IVSS',
-            'name': 'S.S.O. (IVSS)',
-            'kind': 'DEDUCTION',
+            'name': 'Seguro Social Obligatorio (IVSS)',
+            'kind': PayrollConcept.ConceptKind.DEDUCTION,
             'computation_method': PayrollConcept.ComputationMethod.DYNAMIC_FORMULA,
-            'receipt_order': 200,
+            'value': Decimal('4.00'),
+            'behavior': PayrollConcept.ConceptBehavior.LAW_DEDUCTION,
+            'system_params': {
+                'rate': 0.04,
+                'base_source': 'ACCUMULATOR',
+                'base_label': 'IVSS_BASE',
+                'cap_multiplier': 5,
+                'multiplier_var': 'LUNES',
+                'is_weekly': True,
+            },
+            'receipt_order': 100,
+            'appears_on_receipt': True,
             'show_even_if_zero': True,
-            'is_system': True,
         },
         {
             'code': 'RPE',
-            'name': 'Paro Forzoso (R.P.E.)',
-            'kind': 'DEDUCTION',
+            'name': 'Régimen Prestacional de Empleo (Paro Forzoso)',
+            'kind': PayrollConcept.ConceptKind.DEDUCTION,
             'computation_method': PayrollConcept.ComputationMethod.DYNAMIC_FORMULA,
-            'receipt_order': 210,
+            'value': Decimal('0.50'),
+            'behavior': PayrollConcept.ConceptBehavior.LAW_DEDUCTION,
+            'system_params': {
+                'rate': 0.005,
+                'base_source': 'ACCUMULATOR',
+                'base_label': 'RPE_BASE',
+                'cap_multiplier': 10,
+                'multiplier_var': 'LUNES',
+                'is_weekly': True,
+            },
+            'receipt_order': 101,
+            'appears_on_receipt': True,
             'show_even_if_zero': True,
-            'is_system': True,
         },
         {
             'code': 'FAOV',
-            'name': 'F.A.O.V.',
-            'kind': 'DEDUCTION',
+            'name': 'Fondo de Ahorro Obligatorio para Vivienda (FAOV)',
+            'kind': PayrollConcept.ConceptKind.DEDUCTION,
             'computation_method': PayrollConcept.ComputationMethod.DYNAMIC_FORMULA,
-            'receipt_order': 220,
+            'value': Decimal('1.00'),
+            'behavior': PayrollConcept.ConceptBehavior.LAW_DEDUCTION,
+            'system_params': {
+                'rate': 0.01,
+                'base_source': 'ACCUMULATOR',
+                'base_label': 'FAOV_BASE',
+                'cap_multiplier': None,
+                'multiplier_var': None,
+                'is_weekly': False,
+            },
+            'receipt_order': 102,
+            'appears_on_receipt': True,
             'show_even_if_zero': True,
-            'is_system': True,
         },
         {
             'code': 'ISLR',
             'name': 'I.S.L.R.',
-            'kind': 'DEDUCTION',
+            'kind': PayrollConcept.ConceptKind.DEDUCTION,
             'computation_method': PayrollConcept.ComputationMethod.FIXED_AMOUNT,
-            'receipt_order': 230,
-            'is_system': True,
+            'behavior': PayrollConcept.ConceptBehavior.DYNAMIC,
+            'receipt_order': 110,
+            'appears_on_receipt': True,
         },
         {
             'code': 'INCES',
             'name': 'INCES (0.5%)',
-            'kind': 'DEDUCTION',
+            'kind': PayrollConcept.ConceptKind.DEDUCTION,
             'computation_method': PayrollConcept.ComputationMethod.DYNAMIC_FORMULA,
-            'receipt_order': 240,
-            'show_even_if_zero': False,
+            'behavior': PayrollConcept.ConceptBehavior.DYNAMIC,
+            'receipt_order': 120,
+            'appears_on_receipt': True,
+        },
+        {
+            'code': 'PRESTAMO',
+            'name': 'Préstamo / Anticipo',
+            'kind': PayrollConcept.ConceptKind.DEDUCTION,
+            'computation_method': PayrollConcept.ComputationMethod.FIXED_AMOUNT,
+            'value': Decimal('0.00'),
+            'behavior': PayrollConcept.ConceptBehavior.LOAN,
+            'receipt_order': 130,
+            'appears_on_receipt': True,
         },
     ]
 
-    from decimal import Decimal
     with transaction.atomic():
         for data in system_concepts:
             code = data.pop('code')
+            # Extraer incidences y system_params si existen
+            incidences = data.pop('incidences', [])
+            system_params = data.pop('system_params', {})
+            
             PayrollConcept.objects.update_or_create(
                 code=code,
                 defaults={
                     **data,
-                    'value': Decimal('0.00'),
                     'currency': ves,
                     'is_system': True,
-                    'appears_on_receipt': True,
+                    'incidences': incidences,
+                    'system_params': system_params,
                     'active': True
                 }
             )
+            
+        # Limpieza de códigos antiguos/obsoletos
+        PayrollConcept.objects.filter(code='DIAS_FERIADOS').delete()
+
     return len(system_concepts)

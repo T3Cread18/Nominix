@@ -134,9 +134,7 @@ const PayrollPreviewModal = ({ isOpen, onClose, data, companyConfig }) => {
                                                                     // Filtro de Visibilidad según Configuración de Empresa
                                                                     if (line.code === 'CESTATICKET' && companyConfig?.show_tickets === false) return false;
                                                                     if (line.code === 'COMPLEMENTO' && companyConfig?.show_supplement === false) return false;
-                                                                    // NOTA: 'Sueldo Base' no suele venir como línea "separada" en este array, 
-                                                                    // sino que es implícito en el cálculo, pero si viniera con código BASE_SALARY:
-                                                                    if (line.code === 'BASE_SALARY' && companyConfig?.show_base_salary === false) return false;
+                                                                    if (line.code === 'SUELDO_BASE' && companyConfig?.show_base_salary === false) return false;
                                                                     return true;
                                                                 }).map((line, idx) => (
                                                                     <div key={idx} className="flex justify-between items-center py-2 group/line">

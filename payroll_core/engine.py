@@ -270,7 +270,7 @@ class PayrollEngine:
         Construye SOLO las VARIABLES (Datos).
         """
         contract_rate = self._get_exchange_rate_value(self.contract.salary_currency)
-        salary_ves = float(self.contract.salary_amount * contract_rate)
+        salary_ves = float(self.contract.salary_base * contract_rate)
         
         # Cálculo de Lunes y desglose de días por tipo
         mondays = 0
@@ -376,7 +376,28 @@ class PayrollEngine:
             'DIAS_FALTAS': 0.0,
             'DIAS_REPOSO': 0.0,
             'FERIADOS_TRABAJADOS': 0.0,
+            'H_EXTRA_DIURNA': 0.0,
+            'H_EXTRA_NOCTURNA': 0.0,
+            'BONO_NOCTURNO': 0.0,
+            
+            # Polítitcas y Factores (de la base de datos)
+            'FACTOR_HED': 1.50,
+            'FACTOR_HEN': 1.80,
+            'TASA_BONO_NOCTURNO': 0.30,
+            'FACTOR_FERIADO': 1.50,
+            'FACTOR_DESCANSO': 1.50,
         }
+
+        # Intentar cargar factores reales de la política de la empresa
+        if company and hasattr(company, 'policy'):
+            policy = company.policy
+            context.update({
+                'FACTOR_HED': float(policy.overtime_day_factor),
+                'FACTOR_HEN': float(policy.overtime_night_factor),
+                'TASA_BONO_NOCTURNO': float(policy.night_bonus_rate),
+                'FACTOR_FERIADO': float(policy.holiday_payout_factor),
+                'FACTOR_DESCANSO': float(policy.rest_day_payout_factor),
+            })
 
         # Mapeo de códigos de novedades (DB) a nombres de variables (Fórmulas)
         self.NOVELTY_MAP = {
@@ -393,6 +414,9 @@ class PayrollEngine:
             'DIAS_DOMINGO': 'DIAS_DOMINGO',
             'DIAS_FERIADO': 'DIAS_FERIADO',
             'DIAS_FERIADOS': 'DIAS_FERIADO',
+            'HED': 'H_EXTRA_DIURNA',
+            'HEN': 'H_EXTRA_NOCTURNA',
+            'BN': 'BONO_NOCTURNO',
         }
 
         for key, val in self.input_variables.items():
@@ -484,128 +508,6 @@ class PayrollEngine:
             'formula': concept.formula
         }
 
-    def _get_contract_concepts(self) -> list:
-        """
-        Genera los 3 conceptos fijos derivados del contrato activo,
-        respetando la frecuencia configurada en la empresa.
-        """
-        rate = self._get_exchange_rate_value(self.contract.salary_currency)
-        company = Company.objects.first()
-        
-        # 1. Determinar el factor de proporción para el salario base según la jornada de la empresa
-        # Si la empresa paga Quincenal (BIWEEKLY), el factor es 0.5 (15 días / 30 días)
-        # Si la empresa paga Mensual (MONTHLY), el factor es 1.0 (30 días / 30 días)
-        # Si la empresa paga Semanal (WEEKLY), el factor es 7/30 (~0.2333)
-        
-        salary_factor = Decimal('1.0')
-        if company:
-            if company.payroll_journey == 'BIWEEKLY':
-                salary_factor = Decimal('0.5')
-            elif company.payroll_journey == 'WEEKLY':
-                salary_factor = Decimal('7') / Decimal('30')
-        
-        # =========================================================================
-        # NUEVA LÓGICA CON SalarySplitter
-        # =========================================================================
-        
-        # 1. Obtener desglose Mensual (en moneda del contrato, ej: USD)
-        breakdown = SalarySplitter.get_salary_breakdown(self.contract)
-        monthly_base = breakdown['base']
-        monthly_complement = breakdown['complement']
-        
-        # 2. Aplicar Factor de Frecuencia (Proporción del periodo)
-        # Ejemplo: Si es Quincenal, pagamos el 50% del mensual
-        period_base_amount = monthly_base * salary_factor
-        period_complement_amount = monthly_complement * salary_factor
-        
-        # 3. Convertir a Moneda de Pago (Bs.)
-        # rate ya fue calculado al inicio de la función (Tasa de la moneda del contrato)
-        sueldo_base_ves = period_base_amount * rate
-        
-        # 4. Lógica de Cestaticket (Se mantiene igual que la original)
-        cestaticket_ves = Decimal('0.00')
-        
-        # Intentar obtener configuración de DB para el monto
-        ct_concept = PayrollConcept.objects.filter(code='CESTATICKET').first()
-        ct_base_amount = MONTO_CESTATICKET_USD
-        ct_currency = self.contract.salary_currency # Default USD (asumido por MONTO_CESTATICKET_USD)
-        
-        if ct_concept and ct_concept.value > 0:
-            ct_base_amount = ct_concept.value
-            if ct_concept.currency:
-                ct_currency = ct_concept.currency
-            elif ct_concept.currency_code: # Fallback
-                ct_currency = Currency.objects.filter(code=ct_concept.currency_code).first() or ct_currency
-
-        if self.contract.includes_cestaticket and company:
-            # Calcular la tasa para la moneda del concepto (puede ser diferente a la del contrato)
-            ct_rate = self._get_exchange_rate_value(ct_currency)
-            
-            if company.cestaticket_journey == 'PERIODIC':
-                # Se paga proporcional según la frecuencia de la nómina
-                cestaticket_ves = ct_base_amount * ct_rate * salary_factor
-            else:
-                # Se paga en una fecha específica (MENSUAL)
-                # Solo se incluye si el periodo actual contiene el día de pago configurado
-                payment_day = company.cestaticket_payment_day
-                if self.period and self.period.start_date.day <= payment_day <= self.period.end_date.day:
-                    cestaticket_ves = ct_base_amount * ct_rate
-                elif not self.period:
-                    # Si es simulación sin periodo, asumimos el pago completo para que el usuario lo vea
-                    cestaticket_ves = ct_base_amount * ct_rate
-        
-        # 5. Calcular Complemento Final en Bs.
-        # El complemento calculado por Splitter también se convierte y ajusta
-        # Nota: El cálculo original restaba Cestaticket del "Total Package". 
-        # Dependiendo de la estrategia (PERCENTAGE del SALARIO INTEGRAL), el Cestaticket es APARTE.
-        # Asumiremos que el "Total Salary" del contrato NO INCLUYE Cestaticket (es Salario + Bono).
-        # Si la estrategia del cliente es que el Cestaticket se reste del Bono, lo hacemos aquí.
-        # Pero SalarySplitter dividió el "SalaryAmount".
-        
-        complemento_ves = period_complement_amount * rate
-        
-        # Redondeo final
-        sueldo_base_ves = sueldo_base_ves.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-        cestaticket_ves = cestaticket_ves.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-        complemento_ves = complemento_ves.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-        
-        concepts = []
-        
-        # 1. DÍAS TRABAJADOS (Sueldo Base)
-        if not company or company.show_base_salary:
-            st = f"{float(monthly_base):.2f} {self.contract.salary_currency.code} (Base) * {float(salary_factor):.2f} (Factor) * {float(rate):.2f} (Tasa)"
-            concepts.append({
-                'code': 'SUELDO_BASE',
-                'name': 'Días Trabajados',
-                'kind': 'EARNING',
-                'amount_ves': sueldo_base_ves,
-                'trace': st
-            })
-
-        # 2. CESTATICKET
-        if not company or company.show_tickets:
-             st = f"{float(ct_base_amount):.2f} {ct_currency.code} * {float(ct_rate):.4f}"
-             if salary_factor != 1: st += f" * {float(salary_factor):.2f}"
-             concepts.append({
-                'code': 'CESTATICKET',
-                'name': 'Cestaticket',
-                'kind': 'EARNING',
-                'amount_ves': cestaticket_ves,
-                'trace': st
-            })
-
-        # 3. COMPLEMENTO
-        if not company or company.show_supplement:
-            st = f"{float(monthly_complement):.2f} (Comp. Men) * {float(salary_factor):.2f} (Fac) * {float(rate):.2f} (Tasa)"
-            concepts.append({
-                'code': 'COMPLEMENTO',
-                'name': 'Complemento Salarial',
-                'kind': 'EARNING',
-                'amount_ves': complemento_ves,
-                'trace': st
-            })
-        
-        return concepts
 
     def _handle_salary_base(self, cc, eval_context, company):
         """
@@ -746,206 +648,146 @@ class PayrollEngine:
             'variables': variables
         }
 
-    def _get_law_deductions(self, context: Dict[str, Any]) -> list:
-        """
-        Calcula las deducciones de ley venezolana (IVSS, FAOV, PIE/RPE).
-        """
-        company = Company.objects.first()
-        sm = company.national_minimum_salary if company else FALLBACK_SALARIO_MINIMO
-        contract_base = Decimal(str(self.contract.base_salary_bs or 0))
-
-        # 1. Contar Lunes
-        num_lunes = context.get('LUNES', 4)
-
-        # 2. Configuración de Deducciones
-        LAW_CONFIG = {
-            'IVSS': {
-                'name': f'Seguro Social IVSS (4% - {num_lunes} Lun)',
-                'rate': '0.04',
-                'tope_sm': 5,
-                'is_weekly': True,
-                'fixed_base': contract_base,
-                'formula_text': '(MIN(BASE, 5*SM) * 12 / 52) * LUNES * 0.04'
-            },
-            'PIE': {
-                'name': f'Paro Forzoso RPE (0.5% - {num_lunes} Lun)',
-                'rate': '0.005',
-                'tope_sm': 10,
-                'is_weekly': True,
-                'fixed_base': contract_base,
-                'formula_text': '(MIN(BASE, 10*SM) * 12 / 52) * LUNES * 0.005'
-            },
-            'FAOV': {
-                'name': 'Bono Vivienda FAOV (1%)',
-                'rate': '0.01',
-                'base_source': 'ACCUMULATOR',
-                'tag': 'FAOV_BASE',
-                'formula_text': 'TOTAL_FAOV_BASE * 0.01'
-            }
-        }
-
-        results = []
-        for code, params in LAW_CONFIG.items():
-            res = self._handle_law_deduction(code, context, sm, params, num_lunes)
-            if res:
-                results.append(res)
-                
-        return results
 
 
     def calculate_payroll(self) -> Dict[str, Any]:
-        """Orquesta el cálculo completo incluyendo conceptos del contrato y de ley."""
+        """
+        Orquesta el cálculo completo recorriendo la tabla de conceptos y 
+        despachando la lógica según el campo 'behavior'.
+        """
         results_lines = []
-        total_income = Decimal('0.00')
-        integral_income = Decimal('0.00') # Base para deducciones de ley (Salario Integral)
-        total_deductions = Decimal('0.00')
-
-        # Obtener compañía para pasar a los handlers
         company = Company.objects.first()
-
-        # 1. Inyectar conceptos del contrato (Asignaciones fijos)
-        contract_concepts = self._get_contract_concepts()
         eval_context = self._build_eval_context()
         
-        # --- INICIALIZACIÓN DE ACUMULADORES DINÁMICOS ---
+        # --- 0. INICIALIZACIÓN DE ACUMULADORES DINÁMICOS ---
         accumulators = {}
-        # Pre-poblar el contexto con acumuladores en 0
-        all_incidence_tags = set()
-        for c in PayrollConcept.objects.filter(active=True):
+        all_concepts = PayrollConcept.objects.filter(active=True).order_by('receipt_order', 'id')
+        
+        # Pre-poblar acumuladores basados en el inventario de la tabla
+        for c in all_concepts:
             if c.incidences:
-                all_incidence_tags.update(c.incidences)
+                for tag in c.incidences:
+                    accumulators[tag] = 0.0
+                    eval_context[f'TOTAL_{tag}'] = 0.0
+
+        # --- 1. PRE-CÁLCULO DE VALORES DE CONTRATO (SalarySplitter) ---
+        # Obtenemos el desglose base/complemento para usarlos cuando el loop llegue a esos comportamientos
+        breakdown = SalarySplitter.get_salary_breakdown(self.contract)
         
-        for tag in all_incidence_tags:
-            accumulators[tag] = 0.0
-            eval_context[f'TOTAL_{tag}'] = 0.0
-
-
-        # Cargar configuración de Conceptos de Sistema (Sueldo, Cestaticket, Complemento)
-        system_codes = ['SUELDO_BASE', 'CESTATICKET', 'COMPLEMENTO']
-        system_concepts_map = {c.code: c for c in PayrollConcept.objects.filter(code__in=system_codes)}
-
-        for cc in contract_concepts:
-            # Verificar configuración en DB
-            db_concept = system_concepts_map.get(cc['code'])
-            
-            # 1. Chequeo de visibilidad
-            if db_concept and not db_concept.show_on_payslip:
-                continue
-                
-            # 2. Override de Nombre (Personalización)
-            if db_concept:
-                cc['name'] = db_concept.name
-
-            if cc['kind'] == 'EARNING' and cc['amount_ves'] > 0:
-                # Determinamos tipo de recibo
-                tipo = 'salario'
-                is_integral = True
-                
-                if cc['code'] == 'CESTATICKET':
-                    tipo = 'cestaticket'
-                    is_integral = False
-                elif cc['code'] == 'COMPLEMENTO':
-                    tipo = 'complemento'
-                    is_integral = False
-
-                # LÓGICA ESPECIAL: Desglosar SUELDO_BASE si el usuario lo requiere
-                if cc['code'] == 'SUELDO_BASE':
-                    salary_lines = self._handle_salary_base(cc, eval_context, company)
-                    results_lines.extend(salary_lines)
-                    
-                    # --- ACTUALIZAR ACUMULADORES (Líneas Desglosadas) ---
-                    if db_concept and db_concept.incidences:
-                        for sl in salary_lines:
-                            for tag in db_concept.incidences:
-                                accumulators[tag] += float(sl['amount_ves'])
-                                eval_context[f'TOTAL_{tag}'] = accumulators[tag]
-
-                    integral_income += cc['amount_ves']
-
-                else:
-                    results_lines.append({
-                        'code': cc['code'],
-                        'name': cc['name'],
-                        'kind': cc['kind'],
-                        'amount_ves': cc['amount_ves'],
-                        'tipo_recibo': tipo,
-                        'trace': cc.get('trace', ''),
-                        'formula': cc.get('formula', ''),
-                        'variables': cc.get('variables', {})
-                    })
-                    if is_integral:
-                        integral_income += cc['amount_ves']
-                
-                total_income += cc['amount_ves']
-                
-                # --- ACTUALIZAR ACUMULADORES (Conceptos de Sistema No Desglosados) ---
-                if cc['code'] != 'SUELDO_BASE' and db_concept and db_concept.incidences:
-                    for tag in db_concept.incidences:
-                        accumulators[tag] += float(cc['amount_ves'])
-                        eval_context[f'TOTAL_{tag}'] = accumulators[tag]
-
-
-        # 2. Procesar conceptos dinámicos de ASIGNACIÓN
-        all_concepts = PayrollConcept.objects.filter(active=True).order_by('id')
+        # Factor de frecuencia
+        salary_factor = Decimal('1.0')
+        if company:
+            if company.payroll_journey == 'BIWEEKLY':
+                salary_factor = Decimal('0.5')
+            elif company.payroll_journey == 'WEEKLY':
+                salary_factor = Decimal('7') / Decimal('30')
         
-        # Excluir códigos procesados manualmente en el desglose de Sueldo Base
-        contract_codes = {cc['code'] for cc in contract_concepts}
-        contract_codes.update(['DIAS_DESCANSO', 'DIAS_DOMINGO', 'DIAS_FERIADO', 'DIAS_FERIADOS'])
+        rate = self._get_exchange_rate_value(self.contract.salary_currency)
+        
+        contract_data = {
+            'base_ves': (breakdown['base'] * salary_factor * rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP),
+            'complement_ves': (breakdown['complement'] * salary_factor * rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP),
+            'monthly_base': breakdown['base'],
+            'monthly_complement': breakdown['complement'],
+            'salary_factor': salary_factor,
+            'rate': rate
+        }
+
+        # --- 2. LOOP DE ASIGNACIONES (EARNINGS) ---
         overrides = {
             ec.concept.code: ec.override_value 
             for ec in self.contract.employee.concepts.filter(active=True)
         }
 
-        for concept in all_concepts.filter(kind='EARNING'):
-            if concept.code in contract_codes:
-                continue
-
-            # Prioridad: Novedad Manual > Valor Fijo Empleado
-            # Buscar por código exacto del concepto
+        for concept in all_concepts.filter(kind=PayrollConcept.ConceptKind.EARNING):
+            # A. Identificar Valor (Novedad > Override > Fijo/Fórmula)
             override_val = self.input_variables.get(concept.code)
-            
-            # Si no se encuentra, buscar por nombre de variable mapeada (alias reverso)
             if override_val is None:
-                # Buscar si alguna key de input_variables mapea a este concepto
-                for input_key, input_val in self.input_variables.items():
-                    mapped_var = self.NOVELTY_MAP.get(input_key.upper(), input_key.upper())
-                    # Si el código del concepto coincide con el input_key o con el mapped_var
-                    if concept.code.upper() == input_key.upper() or concept.code.upper() == mapped_var:
-                        override_val = input_val
+                for k, v in self.input_variables.items():
+                    if concept.code.upper() == k.upper():
+                        override_val = v
                         break
-            
-            # Si NO es novedad, pero tiene un valor fijo configurado para el empleado
             if override_val is None:
                 override_val = overrides.get(concept.code)
-            
-            # Si NO es novedad AND no debe mostrarse si es 0, omitir
-            if override_val is None and not concept.show_on_payslip:
-                continue
-                
-            res = self.calculate_concept(concept, override_value=override_val, context=eval_context)
-            amount = res['amount']
-            trace = res['trace']
-            
-            if amount > 0:
-                # Determinar tipo de recibo para dinámicos
-                tipo = 'salario'
-                if concept.code == 'CESTATICKET' or 'TICKET' in concept.code:
-                    tipo = 'cestaticket'
-                elif concept.code == 'COMPLEMENTO' or ('COMPLE' in concept.code and not concept.is_salary_incidence):
-                    tipo = 'complemento'
 
+            # B. Despachar Lógica por Comportamiento
+            amount = Decimal('0.00')
+            trace = ""
+            variables = {}
+            formula = concept.formula
+            tipo_recibo = 'salario'
+
+            if concept.behavior == PayrollConcept.ConceptBehavior.SALARY_BASE:
+                # Lógica de Sueldo Base (Desglose)
+                temp_cc = {
+                    'code': concept.code,
+                    'name': concept.name,
+                    'amount_ves': contract_data['base_ves']
+                }
+                salary_lines = self._handle_salary_base(temp_cc, eval_context, company)
+                for sl in salary_lines:
+                    sl['tipo_recibo'] = 'salario'
+                    results_lines.append(sl)
+                    # Acumular cada línea desglosada
+                    if concept.incidences:
+                        for tag in concept.incidences:
+                            accumulators[tag] += float(sl['amount_ves'])
+                            eval_context[f'TOTAL_{tag}'] = accumulators[tag]
+                continue # Ya agregamos las líneas, saltamos al siguiente concepto
+            
+            elif concept.behavior == PayrollConcept.ConceptBehavior.CESTATICKET:
+                # Lógica de Cestaticket
+                tipo_recibo = 'cestaticket'
+                # Reutilizamos la lógica de cálculo de ct que estaba en _get_contract_concepts
+                ct_base_amount = concept.value if concept.value > 0 else MONTO_CESTATICKET_USD
+                ct_currency = concept.currency or self.contract.salary_currency
+                
+                if self.contract.includes_cestaticket and company:
+                    ct_rate = self._get_exchange_rate_value(ct_currency)
+                    if company.cestaticket_journey == 'PERIODIC':
+                        amount = ct_base_amount * ct_rate * salary_factor
+                    else:
+                        payment_day = company.cestaticket_payment_day
+                        if self.period and self.period.start_date.day <= payment_day <= self.period.end_date.day:
+                            amount = ct_base_amount * ct_rate
+                        elif not self.period:
+                            amount = ct_base_amount * ct_rate
+                    amount = amount.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                    trace = f"{float(ct_base_amount):.2f} {ct_currency.code} * {float(ct_rate):.4f}"
+                    if salary_factor != 1 and company.cestaticket_journey == 'PERIODIC': 
+                        trace += f" * {float(salary_factor):.2f}"
+            
+            elif concept.behavior == PayrollConcept.ConceptBehavior.COMPLEMENT:
+                # Lógica de Complemento
+                tipo_recibo = 'complemento'
+                amount = contract_data['complement_ves']
+                trace = f"{float(contract_data['monthly_complement']):.2f} (Base) * {float(salary_factor):.2f} (Fac) * {float(rate):.2f} (Tasa)"
+
+            else:
+                # Lógica General (Fórmula o Fijo)
+                res = self.calculate_concept(concept, override_value=override_val, context=eval_context)
+                amount = res['amount']
+                trace = res['trace']
+                formula = res['formula']
+                variables = res['variables']
+                
+                # Determinar tipo recibo por convención si no es de sistema
+                if 'TICKET' in concept.code: tipo_recibo = 'cestaticket'
+                elif 'COMPLE' in concept.code and not concept.is_salary_incidence: tipo_recibo = 'complemento'
+
+            # C. Agregar Línea si corresponde
+            if amount > 0 or (concept.show_even_if_zero and concept.show_on_payslip):
                 line = {
                     'code': concept.code,
                     'name': concept.name,
                     'kind': concept.kind,
                     'amount_ves': amount,
-                    'tipo_recibo': tipo,
+                    'tipo_recibo': tipo_recibo,
                     'trace': trace,
-                    'formula': res['formula'],
-                    'variables': res['variables']
+                    'formula': formula,
+                    'variables': variables
                 }
-                
-                # Inyectar cantidad...
+                # Inyectar cantidad si hay novedad mapeada
                 var_name = self.NOVELTY_MAP.get(concept.code)
                 if var_name and eval_context.get(var_name):
                     line['quantity'] = eval_context[var_name]
@@ -953,94 +795,61 @@ class PayrollEngine:
                 
                 results_lines.append(line)
 
-                # --- ACTUALIZAR ACUMULADORES (Conceptos Dinámicos ASIGNACIÓN) ---
+                # D. Actualizar Acumuladores
                 if concept.incidences:
                     for tag in concept.incidences:
-                        accumulators[tag] += float(res['amount'])
+                        accumulators[tag] += float(amount)
                         eval_context[f'TOTAL_{tag}'] = accumulators[tag]
 
-                total_income += amount
-                if concept.is_salary_incidence:
-                    integral_income += amount
-
-
-        # 3. Inyectar deducciones de ley (USANDO integral_income)
-        law_concepts_config = {
-            c.code: c.show_on_payslip 
-            for c in PayrollConcept.objects.filter(code__in=['IVSS', 'PIE', 'FAOV', 'RPE'])
-        }
-
-        law_deductions = self._get_law_deductions(eval_context)
-        for ld in law_deductions:
-            is_visible = law_concepts_config.get(ld['code'], True)
-            if ld['amount_ves'] > 0 and is_visible:
-                ld['tipo_recibo'] = 'salario'
-                results_lines.append(ld)
-                total_deductions += ld['amount_ves']
-
-        # 3.1 Procesar Préstamos y Anticipos (Cuentas por Cobrar)
-        # Buscamos préstamos activos para este empleado
-        from .models.loans import Loan
-        active_loans = Loan.objects.filter(employee=self.contract.employee, status=Loan.LoanStatus.Active)
-        
-        for loan in active_loans:
-            if loan.balance <= 0 or not loan.installment_amount:
-                continue
-                
-            # Verificar frecuencia
-            # Si es 2ND_Q, solo cobramos si es la 2da quincena (día > 15) o fin de mes
-            if loan.frequency == Loan.Frequency.SECOND_FORTNIGHT:
-                if self.payment_date.day <= 15:
-                    continue
-
-            # Determinar monto a descontar: Min(Cuota, Saldo Restante)
-            deduction_amount = min(loan.installment_amount, loan.balance)
-            
-            # Conversión de Moneda si el préstamo es en USD
-            amount_ves = deduction_amount
-            trace_loan = f"Min({float(loan.installment_amount):.2f}, {float(loan.balance):.2f})"
-            if loan.currency.code != 'VES':
-                 rate = self._get_exchange_rate_value(loan.currency)
-                 amount_ves = (deduction_amount * rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-                 trace_loan += f" * {float(rate):.4f} (Tasa)"
-
-            if amount_ves > 0:
-                results_lines.append({
-                    'code': 'LOAN',
-                    'name': f"Préstamo: {loan.description}",
-                    'kind': 'DEDUCTION',
-                    'amount_ves': amount_ves,
-                    'loan_id': loan.id,
-                    'tipo_recibo': 'salario',
-                    'trace': trace_loan,
-                    'formula': 'MIN(CUOTA, SALDO) * TASA',
-                    'variables': {'CUOTA': float(loan.installment_amount), 'SALDO': float(loan.balance), 'TASA': float(rate if loan.currency.code != 'VES' else 1)}
-                })
-                total_deductions += amount_ves
-
-        # 4. Procesar conceptos dinámicos de DEDUCCIÓN
-        # Evitar duplicados con las deducciones de ley ya calculadas
-        law_codes = {ld['code'] for ld in law_deductions}
-        law_codes.update({'IVSS_VE', 'RPE_VE', 'FAOV_VE', 'PIE_VE', 'SSO', 'SPF', 'LPH'})
-        
-        for concept in all_concepts.filter(kind='DEDUCTION'):
-            if concept.code in contract_codes or concept.code in law_codes:
-                continue
-            
-            # Prioridad: Novedad Manual > Valor Fijo Empleado
+        # --- 3. LOOP DE DEDUCCIONES ---
+        for concept in all_concepts.filter(kind=PayrollConcept.ConceptKind.DEDUCTION):
+            # A. Valor
             override_val = self.input_variables.get(concept.code)
-            
             if override_val is None:
                 override_val = overrides.get(concept.code)
 
-            if override_val is None and not concept.show_on_payslip:
-                continue
+            amount = Decimal('0.00')
+            trace = ""
+            variables = {}
+            formula = concept.formula
+
+            if concept.behavior == PayrollConcept.ConceptBehavior.LAW_DEDUCTION:
+                # Lógica de Ley (Migrada a usar accumulators obligatoriamente)
+                # Map de códigos internos para LAW_CONFIG
+                internal_code = concept.code
+                if internal_code == 'RPE': internal_code = 'PIE' # Fix para compatibilidad con LAW_CONFIG
                 
-            res = self.calculate_concept(concept, override_value=override_val, context=eval_context)
-            amount = res['amount']
-            trace = res['trace']
+                sm = company.national_minimum_salary if company else FALLBACK_SALARIO_MINIMO
+                num_lunes = eval_context.get('LUNES', 4)
+                
+                # Construimos params mínimos para _handle_law_deduction
+                # Forzamos base_source='ACCUMULATOR'
+                law_params = {
+                    'rate': concept.value / 100 if concept.computation_method == PayrollConcept.ComputationMethod.DYNAMIC_FORMULA else concept.value,
+                    'base_source': 'ACCUMULATOR',
+                    'tag': concept.code + '_BASE',
+                    'is_weekly': concept.code in ['IVSS', 'RPE'],
+                    'tope_sm': 5 if concept.code == 'IVSS' else (10 if concept.code == 'RPE' else None),
+                    'name': concept.name
+                }
+                
+                # Intentar calcular
+                res = self._handle_law_deduction(concept.code, eval_context, sm, law_params, num_lunes)
+                if res:
+                    amount = res['amount_ves']
+                    trace = res['trace']
+                    formula = res['formula']
+                    variables = res['variables']
             
-            if amount > 0:
+            else:
+                # Deducción normal
+                res = self.calculate_concept(concept, override_value=override_val, context=eval_context)
+                amount = res['amount']
+                trace = res['trace']
+                formula = res['formula']
+                variables = res['variables']
+
+            if amount > 0 or (concept.show_even_if_zero and concept.show_on_payslip):
                 results_lines.append({
                     'code': concept.code,
                     'name': concept.name,
@@ -1048,23 +857,43 @@ class PayrollEngine:
                     'amount_ves': amount,
                     'tipo_recibo': 'salario',
                     'trace': trace,
-                    'formula': res['formula'],
-                    'variables': res['variables']
+                    'formula': formula,
+                    'variables': variables
                 })
-                
-                # --- ACTUALIZAR ACUMULADORES (Conceptos Dinámicos DEDUCCIÓN) ---
+                # Acumular deducciones
                 if concept.incidences:
                     for tag in concept.incidences:
-                        accumulators[tag] += float(res['amount'])
+                        accumulators[tag] += float(amount)
                         eval_context[f'TOTAL_{tag}'] = accumulators[tag]
 
-                total_deductions += amount
+        # --- 4. PRÉSTAMOS ---
+        active_loans = Loan.objects.filter(employee=self.contract.employee, status=Loan.LoanStatus.Active)
+        for loan in active_loans:
+            if loan.balance <= 0 or not loan.installment_amount: continue
+            if loan.frequency == Loan.Frequency.SECOND_FORTNIGHT and self.payment_date.day <= 15: continue
 
+            deduction_amount = min(loan.installment_amount, loan.balance)
+            amount_ves = deduction_amount
+            trace_loan = f"Min({float(loan.installment_amount):.2f}, {float(loan.balance):.2f})"
+            if loan.currency.code != 'VES':
+                 l_rate = self._get_exchange_rate_value(loan.currency)
+                 amount_ves = (deduction_amount * l_rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                 trace_loan += f" * {float(l_rate):.4f} (Tasa)"
 
-        # Recalcular totales reales basados en las líneas finales para consistencia absoluta
+            if amount_ves > 0:
+                results_lines.append({
+                    'code': 'LOAN',
+                    'name': f"Préstamo: {loan.description}",
+                    'kind': 'DEDUCTION',
+                    'amount_ves': amount_ves,
+                    'tipo_recibo': 'salario',
+                    'trace': trace_loan,
+                    'loan_id': loan.id
+                })
+
+        # --- 5. TOTALES FINALES ---
         total_income = sum(l['amount_ves'] for l in results_lines if l['kind'] == 'EARNING')
         total_deductions = sum(l['amount_ves'] for l in results_lines if l['kind'] == 'DEDUCTION')
-        
         net_pay_ves = total_income - total_deductions
         ref_rate = self._get_exchange_rate_value(self.contract.salary_currency)
         net_pay_usd = net_pay_ves / ref_rate if ref_rate > 0 else Decimal('0.00')
@@ -1072,7 +901,7 @@ class PayrollEngine:
         return {
             'employee': self.contract.employee.full_name,
             'national_id': self.contract.employee.national_id,
-            'position': self.contract.position,
+            'position': str(self.contract.job_position or self.contract.position),
             'contract_currency': self.contract.salary_currency.code,
             'payment_date': self.payment_date.strftime('%Y-%m-%d'),
             'exchange_rate_used': ref_rate,

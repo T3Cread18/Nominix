@@ -20,13 +20,15 @@ import { cn } from '../../utils/cn';
 
 /**
  * NovedadesGrid - Componente de edición masiva de incidencias.
- * Proporciona una interfaz tipo Excel para cargar variables de nómina.
+ * Proporciona una interfaz tipo Excel para cargar variables de nómina de forma DINÁMICA.
  */
 const NovedadesGrid = ({ initialPeriods, initialEmployees }) => {
     const [periods, setPeriods] = useState(initialPeriods || []);
     const [selectedPeriodId, setSelectedPeriodId] = useState('');
     const [employees, setEmployees] = useState(initialEmployees || []);
-    const [loading, setLoading] = useState(!initialPeriods || !initialEmployees);
+    const [noveltyConcepts, setNoveltyConcepts] = useState([]);
+    const [mappings, setMappings] = useState({});
+    const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [isDirty, setIsDirty] = useState(false);
 
@@ -34,77 +36,70 @@ const NovedadesGrid = ({ initialPeriods, initialEmployees }) => {
     const [data, setData] = useState([]);
 
     useEffect(() => {
-        if (initialEmployees && initialPeriods) {
-            setupGrid();
-        } else {
-            loadInitialData();
-        }
-    }, [initialEmployees, initialPeriods]);
+        loadInitialData();
+    }, []);
 
     const loadInitialData = async () => {
         setLoading(true);
         try {
-            const [periodsRes, employeesRes] = await Promise.all([
+            const [periodsRes, employeesRes, metadataRes] = await Promise.all([
                 axiosClient.get('/payroll-periods/'),
-                axiosClient.get('/employees/?is_active=true&page_size=1000')
+                axiosClient.get('/employees/?is_active=true&page_size=1000'),
+                axiosClient.get('/payroll-novelties/metadata/')
             ]);
+
             const periodsList = periodsRes.data.results || periodsRes.data;
             const employeesList = employeesRes.data.results || employeesRes.data;
+            const metadata = metadataRes.data;
 
             const openPeriods = periodsList.filter(p => p.status === 'OPEN');
             setPeriods(openPeriods);
             setEmployees(employeesList);
+            setNoveltyConcepts(metadata.concepts || []);
+            setMappings(metadata.mappings || {});
+
             if (openPeriods.length > 0) {
                 setSelectedPeriodId(openPeriods[0].id);
             }
         } catch (error) {
-            console.error("Error loading data:", error);
+            console.error("Error loading initial data:", error);
         } finally {
             setLoading(false);
         }
     };
 
     /**
-     * Inicializa el estado local basándose en las props.
-     */
-    const setupGrid = () => {
-        const openPeriods = initialPeriods.filter(p => p.status === 'OPEN');
-        setPeriods(openPeriods);
-        setEmployees(initialEmployees);
-
-        if (openPeriods.length > 0) {
-            setSelectedPeriodId(openPeriods[0].id);
-        }
-        setLoading(false);
-    };
-
-    /**
-     * Al cambiar el periodo o cargar empleados, busca las novedades existentes.
+     * Al cambiar el periodo o la metadata, busca las novedades existentes.
      */
     useEffect(() => {
-        if (selectedPeriodId && employees.length > 0) {
+        if (selectedPeriodId && employees.length > 0 && noveltyConcepts.length > 0) {
             fetchNovelties();
         }
-    }, [selectedPeriodId, employees]);
+    }, [selectedPeriodId, employees, noveltyConcepts]);
 
     const fetchNovelties = async () => {
-        setLoading(true); // Re-activar loading al cambiar periodo
+        setLoading(true);
         try {
             const response = await axiosClient.get(`/payroll-novelties/?period=${selectedPeriodId}`);
             const novs = response.data.results || response.data;
 
-            // Construir data para la tabla mapeando empleados con sus novedades
+            // Construir data para la tabla mapeando empleados con sus novedades dinámicas
             const tableData = employees.map(emp => {
                 const empNovs = novs.filter(n => n.employee === emp.id);
-                return {
+                const row = {
                     id: emp.id,
                     name: emp.full_name,
                     national_id: emp.national_id,
                     position: emp.position,
-                    H_EXTRA: parseFloat(empNovs.find(n => n.concept_code === 'H_EXTRA')?.amount || 0),
-                    B_NOCTURNO: parseFloat(empNovs.find(n => n.concept_code === 'B_NOCTURNO')?.amount || 0),
-                    FALTAS: parseFloat(empNovs.find(n => n.concept_code === 'FALTAS')?.amount || 0),
                 };
+
+                // Poblar dinámicamente cada concepto
+                noveltyConcepts.forEach(c => {
+                    const found = empNovs.find(n => n.concept_code === c.code);
+                    row[c.code] = parseFloat(found?.amount || 0);
+                });
+
+                return row;
             });
             setData(tableData);
             setIsDirty(false);
@@ -120,19 +115,25 @@ const NovedadesGrid = ({ initialPeriods, initialEmployees }) => {
      */
     const handleExportExcel = () => {
         if (data.length === 0) {
-            alert("No hay datos para exportar. Asegúrate de tener empleados activos.");
+            alert("No hay datos para exportar.");
             return;
         }
 
         const periodName = periods.find(p => p.id === parseInt(selectedPeriodId))?.name || 'period';
-        const exportData = data.map(row => ({
-            'Cédula': row.national_id,
-            'Nombre': row.name,
-            'Cargo': row.position,
-            'Horas Extra': row.H_EXTRA,
-            'Bono Nocturno (Horas)': row.B_NOCTURNO,
-            'Faltas (Días)': row.FALTAS,
-        }));
+        const exportData = data.map(row => {
+            const excelRow = {
+                'Cédula': row.national_id,
+                'Nombre': row.name,
+                'Cargo': row.position,
+            };
+
+            // Agregar columnas dinámicas con NOMBRES amigables
+            noveltyConcepts.forEach(c => {
+                excelRow[c.name] = row[c.code];
+            });
+
+            return excelRow;
+        });
 
         const ws = XLSX.utils.json_to_sheet(exportData);
         const wb = XLSX.utils.book_new();
@@ -151,21 +152,21 @@ const NovedadesGrid = ({ initialPeriods, initialEmployees }) => {
         reader.onload = (evt) => {
             const bstr = evt.target.result;
             const wb = XLSX.read(bstr, { type: 'binary' });
-            const wsname = wb.SheetNames[0];
-            const ws = wb.Sheets[wsname];
+            const ws = wb.Sheets[wb.SheetNames[0]];
             const importedData = XLSX.utils.sheet_to_json(ws);
 
-            // Hacer match por cédula (national_id)
             setData(currentData => {
                 return currentData.map(row => {
-                    const match = importedData.find(imp => imp['Cédula'] === row.national_id);
+                    const match = importedData.find(imp => String(imp['Cédula']) === String(row.national_id));
                     if (match) {
-                        return {
-                            ...row,
-                            H_EXTRA: parseFloat(match['Horas Extra'] || 0),
-                            B_NOCTURNO: parseFloat(match['Bono Nocturno (Horas)'] || match['Bono Nocturno'] || 0),
-                            FALTAS: parseFloat(match['Faltas (Días)'] || match['Faltas'] || 0),
-                        };
+                        const updatedRow = { ...row };
+                        noveltyConcepts.forEach(c => {
+                            // Buscar por nombre de concepto (el que se usó en el export)
+                            if (match[c.name] !== undefined) {
+                                updatedRow[c.code] = parseFloat(match[c.name] || 0);
+                            }
+                        });
+                        return updatedRow;
                     }
                     return row;
                 });
@@ -174,13 +175,9 @@ const NovedadesGrid = ({ initialPeriods, initialEmployees }) => {
             alert("Excel procesado. Revisa los datos y guarda los cambios.");
         };
         reader.readAsBinaryString(file);
-        // Reset input
         e.target.value = '';
     };
 
-    /**
-     * Actualiza el estado local cuando cambia un valor en la cuadrícula.
-     */
     const handleUpdateCell = (rowIndex, columnId, value) => {
         setData(old => old.map((row, index) => {
             if (index === rowIndex) {
@@ -194,27 +191,20 @@ const NovedadesGrid = ({ initialPeriods, initialEmployees }) => {
         setIsDirty(true);
     };
 
-    /**
-     * Envía todas las novedades modificadas al servidor en un solo lote.
-     */
     const handleSave = async () => {
-        if (!selectedPeriodId) {
-            alert("Selecciona un periodo válido antes de guardar.");
-            return;
-        }
+        if (!selectedPeriodId) return;
 
         setSaving(true);
         try {
             const payload = [];
             data.forEach(row => {
-                ['H_EXTRA', 'B_NOCTURNO', 'FALTAS'].forEach(code => {
-                    const amount = parseFloat(row[code]);
-                    // Solo enviamos si el monto es un número válido y mayor o igual a cero
+                noveltyConcepts.forEach(c => {
+                    const amount = parseFloat(row[c.code]);
                     if (!isNaN(amount) && amount >= 0) {
                         payload.push({
                             employee_id: parseInt(row.id),
                             period_id: parseInt(selectedPeriodId),
-                            concept_code: code,
+                            concept_code: c.code,
                             amount: amount
                         });
                     }
@@ -232,70 +222,52 @@ const NovedadesGrid = ({ initialPeriods, initialEmployees }) => {
             alert("Novedades sincronizadas exitosamente.");
         } catch (error) {
             console.error("Error al guardar:", error);
-            const errorMsg = error.response?.data?.error || "No se pudo guardar el lote de novedades.";
-            alert(`Error: ${errorMsg}`);
+            alert(`Error: ${error.response?.data?.error || "Error desconocido"}`);
         } finally {
             setSaving(false);
         }
     };
 
-    // Definición de columnas para TanStack Table
-    const columns = useMemo(() => [
-        {
-            header: 'Colaborador',
-            accessorKey: 'name',
-            cell: info => (
-                <div className="flex flex-col">
-                    <span className="font-bold text-gray-900 leading-tight">{info.getValue()}</span>
-                    <span className="text-[10px] text-gray-400 font-medium">{info.row.original.position}</span>
-                </div>
-            )
-        },
-        {
-            header: 'Cédula',
-            accessorKey: 'national_id',
-            cell: info => <span className="font-mono text-xs font-bold text-gray-400">{info.getValue()}</span>
-        },
-        {
-            header: 'Horas Extra',
-            accessorKey: 'H_EXTRA',
+    // Definición de columnas DINÁMICAS
+    const columns = useMemo(() => {
+        const baseCols = [
+            {
+                header: 'Colaborador',
+                accessorKey: 'name',
+                cell: info => (
+                    <div className="flex flex-col">
+                        <span className="font-bold text-gray-900 leading-tight">{info.getValue()}</span>
+                        <span className="text-[10px] text-gray-400 font-medium">{info.row.original.position}</span>
+                    </div>
+                )
+            },
+            {
+                header: 'Cédula',
+                accessorKey: 'national_id',
+                cell: info => <span className="font-mono text-xs font-bold text-gray-400">{info.getValue()}</span>
+            },
+        ];
+
+        // Columnas dinámicas de novedades
+        const dynamicCols = noveltyConcepts.map(c => ({
+            header: c.name,
+            accessorKey: c.code,
             cell: ({ getValue, row: { index }, column: { id } }) => (
                 <input
                     type="number"
                     value={getValue()}
                     onChange={e => handleUpdateCell(index, id, e.target.value)}
-                    className="w-full bg-transparent border-none focus:bg-white focus:ring-2 focus:ring-nominix-electric/20 text-right font-black text-gray-800 p-2 rounded-lg transition-all"
+                    className={cn(
+                        "w-full bg-transparent border-none focus:bg-white focus:ring-2 text-right font-black p-2 rounded-lg transition-all outline-none",
+                        c.kind === 'DEDUCTION' ? "text-red-500 focus:ring-red-100" : "text-nominix-electric focus:ring-nominix-electric/20"
+                    )}
                     placeholder="0"
                 />
             )
-        },
-        {
-            header: 'Horas Noct.',
-            accessorKey: 'B_NOCTURNO',
-            cell: ({ getValue, row: { index }, column: { id } }) => (
-                <input
-                    type="number"
-                    value={getValue()}
-                    onChange={e => handleUpdateCell(index, id, e.target.value)}
-                    className="w-full bg-transparent border-none focus:bg-white focus:ring-2 focus:ring-nominix-electric/20 text-right font-black text-gray-800 p-2 rounded-lg transition-all"
-                    placeholder="0"
-                />
-            )
-        },
-        {
-            header: 'Faltas (Días)',
-            accessorKey: 'FALTAS',
-            cell: ({ getValue, row: { index }, column: { id } }) => (
-                <input
-                    type="number"
-                    value={getValue()}
-                    onChange={e => handleUpdateCell(index, id, e.target.value)}
-                    className="w-full bg-slate-50 border border-transparent focus:border-red-200 focus:bg-white focus:ring-4 focus:ring-red-100 text-right font-black text-red-500 p-3 rounded-xl transition-all outline-none placeholder:text-red-200"
-                    placeholder="0"
-                />
-            )
-        }
-    ], [data]);
+        }));
+
+        return [...baseCols, ...dynamicCols];
+    }, [noveltyConcepts, data]);
 
     const table = useReactTable({
         data,
@@ -303,18 +275,17 @@ const NovedadesGrid = ({ initialPeriods, initialEmployees }) => {
         getCoreRowModel: getCoreRowModel(),
     });
 
-    if (loading) {
+    if (loading && data.length === 0) {
         return (
-            <div className="h-96 flex flex-col items-center justify-center bg-white rounded-3xl border border-gray-100 shadow-sm animate-pulse">
+            <div className="h-96 flex flex-col items-center justify-center bg-white rounded-3xl border border-gray-100 shadow-sm">
                 <Loader2 className="animate-spin text-nominix-electric mb-4" size={40} />
-                <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.3em]">Cargando Plantilla de Datos...</p>
+                <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.3em]">Cargando Plantilla Dinámica...</p>
             </div>
         );
     }
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
-            {/* Toolbar Superior */}
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
                 <div className="flex items-center gap-4">
                     <div className="p-4 bg-gray-900 text-white rounded-2xl shadow-xl">
@@ -322,12 +293,11 @@ const NovedadesGrid = ({ initialPeriods, initialEmployees }) => {
                     </div>
                     <div>
                         <h3 className="text-2xl font-black text-gray-900 tracking-tight">Carga Masiva de Novedades</h3>
-                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-[0.2em] mt-0.5">Sincronización por Lotes (Batch)</p>
+                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-[0.2em] mt-0.5">Sincronización Dinámica de Conceptos</p>
                     </div>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-4 w-full lg:w-auto">
-                    {/* Botones de Excel */}
                     <div className="flex gap-2 mr-2">
                         <button
                             onClick={handleExportExcel}
@@ -357,13 +327,9 @@ const NovedadesGrid = ({ initialPeriods, initialEmployees }) => {
                             onChange={e => setSelectedPeriodId(e.target.value)}
                             className="w-full pl-12 pr-10 py-3.5 bg-gray-50 border-2 border-transparent focus:border-nominix-electric rounded-2xl text-sm font-bold transition-all appearance-none cursor-pointer"
                         >
-                            {periods.length > 0 ? (
-                                periods.map(p => (
-                                    <option key={p.id} value={p.id}>{p.name} (Quincena Abierta)</option>
-                                ))
-                            ) : (
-                                <option value="">No hay periodos abiertos</option>
-                            )}
+                            {periods.map(p => (
+                                <option key={p.id} value={p.id}>{p.name} (Abierto)</option>
+                            ))}
                         </select>
                     </div>
 
@@ -383,7 +349,6 @@ const NovedadesGrid = ({ initialPeriods, initialEmployees }) => {
                 </div>
             </div>
 
-            {/* Grid Principal */}
             <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden relative">
                 {saving && (
                     <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] z-50 flex items-center justify-center">

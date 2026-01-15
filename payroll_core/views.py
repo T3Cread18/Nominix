@@ -395,6 +395,7 @@ class PayrollPeriodViewSet(viewsets.ModelViewSet):
                 if detail:
                     row = {
                         'name': detail.concept_name,
+                        'concept_name': detail.concept_name, # Alias para compatibilidad
                         'code': detail.concept_code,
                         'kind': detail.kind,
                         'quantity': getattr(detail, 'quantity', 0) or 0,
@@ -405,6 +406,7 @@ class PayrollPeriodViewSet(viewsets.ModelViewSet):
                 elif concept.show_even_if_zero:
                     row = {
                         'name': concept.name,
+                        'concept_name': concept.name, # Alias para compatibilidad
                         'code': concept.code,
                         'kind': concept.kind,
                         'quantity': 0,
@@ -417,8 +419,8 @@ class PayrollPeriodViewSet(viewsets.ModelViewSet):
                     used_codes.remove(concept.code) # Marcar como no usado realmente
                     continue
                 
-                row['earning_amount'] = row['amount_ves'] if row['kind'] == 'EARNING' else None
-                row['deduction_amount'] = row['amount_ves'] if row['kind'] == 'DEDUCTION' else None
+                row['earning_amount'] = row['amount_ves'] if row['kind'] == 'EARNING' else Decimal('0.00')
+                row['deduction_amount'] = row['amount_ves'] if row['kind'] == 'DEDUCTION' else Decimal('0.00')
                 payslip_rows.append(row)
             
             # Segundo, agregar detalles calculados que NO estaban en la configuración fija (Fallback)
@@ -426,14 +428,15 @@ class PayrollPeriodViewSet(viewsets.ModelViewSet):
                 if code not in used_codes:
                     row = {
                         'name': detail.concept_name,
+                        'concept_name': detail.concept_name,
                         'code': detail.concept_code,
                         'kind': detail.kind,
                         'quantity': getattr(detail, 'quantity', 0) or 0,
                         'unit': getattr(detail, 'unit', '') or '',
                         'amount_ves': detail.amount_ves,
                         'tipo_recibo': detail.tipo_recibo,
-                        'earning_amount': detail.amount_ves if detail.kind == 'EARNING' else None,
-                        'deduction_amount': detail.amount_ves if detail.kind == 'DEDUCTION' else None,
+                        'earning_amount': detail.amount_ves if detail.kind == 'EARNING' else Decimal('0.00'),
+                        'deduction_amount': detail.amount_ves if detail.kind == 'DEDUCTION' else Decimal('0.00'),
                     }
                     payslip_rows.append(row)
             
@@ -678,6 +681,38 @@ class PayrollNoveltyViewSet(viewsets.ModelViewSet):
     serializer_class = PayrollNoveltySerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['employee', 'period', 'concept_code']
+
+    @action(detail=False, methods=['get'], url_path='metadata')
+    def metadata(self, request):
+        """
+        GET /api/payroll-novelties/metadata/
+        Devuelve la lista de conceptos que pueden cargarse como novedades.
+        """
+        # Conceptos que son fórmulas dinámicas o préstamos suelen ser novedades
+        # También cualquier cosa que el usuario quiera marcar específicamente (is_system=False)
+        concepts = PayrollConcept.objects.filter(
+            active=True
+        ).exclude(
+            behavior__in=['SALARY_BASE', 'CESTATICKET', 'COMPLEMENT', 'LAW_DEDUCTION']
+        ).order_by('receipt_order')
+
+        # Si el usuario quiere ver los de sistema que son novedades (Faltas, etc)
+        # los incluimos explícitamente si cumplen con el criterio anterior.
+        
+        data = []
+        for c in concepts:
+            data.append({
+                'code': c.code,
+                'name': c.name,
+                'kind': c.kind,
+                'is_system': c.is_system,
+                'behavior': c.behavior
+            })
+            
+        return Response({
+            'concepts': data,
+            'mappings': PayrollEngine.NOVELTY_MAP if hasattr(PayrollEngine, 'NOVELTY_MAP') else {}
+        })
 
     @action(detail=False, methods=['post'], url_path='batch')
     def batch(self, request):
