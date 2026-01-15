@@ -18,7 +18,9 @@ import {
     Play,
     AlertCircle,
     ChevronRight,
-    BookOpen
+    BookOpen,
+    ClipboardList,
+    ShieldCheck
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 
@@ -34,6 +36,7 @@ const ConceptCatalog = () => {
     const [variables, setVariables] = useState({});
     const [validationResult, setValidationResult] = useState(null);
     const [isValidating, setIsValidating] = useState(false);
+    const [activeTab, setActiveTab] = useState('ALL'); // 'ALL', 'SYSTEM', 'CUSTOM'
 
     // Estado inicial del formulario
     const [newConcept, setNewConcept] = useState({
@@ -166,10 +169,21 @@ const ConceptCatalog = () => {
         }
     };
 
-    const filteredConcepts = concepts.filter(c =>
-        c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.code.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredConcepts = concepts.filter(c => {
+        const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            c.code.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesTab = activeTab === 'ALL' ||
+            (activeTab === 'SYSTEM' && c.is_system) ||
+            (activeTab === 'CUSTOM' && !c.is_system);
+        return matchesSearch && matchesTab;
+    });
+
+    const stats = {
+        total: concepts.length,
+        earnings: concepts.filter(c => c.kind === 'EARNING').length,
+        deductions: concepts.filter(c => c.kind === 'DEDUCTION').length,
+        system: concepts.filter(c => c.is_system).length
+    };
 
     return (
         <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden min-h-[700px] flex flex-col relative">
@@ -195,7 +209,11 @@ const ConceptCatalog = () => {
                                 <label className="text-[10px] font-black text-gray-400 uppercase">Código (Sugerido: BONO_X)</label>
                                 <input
                                     required
-                                    className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold text-sm outline-none focus:border-nominix-electric"
+                                    disabled={newConcept.is_system}
+                                    className={cn(
+                                        "w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold text-sm outline-none focus:border-nominix-electric",
+                                        newConcept.is_system && "opacity-50 cursor-not-allowed bg-gray-100"
+                                    )}
                                     value={newConcept.code}
                                     onChange={e => setNewConcept({ ...newConcept, code: e.target.value.toUpperCase() })}
                                 />
@@ -213,7 +231,11 @@ const ConceptCatalog = () => {
                             <div className="space-y-2">
                                 <label className="text-[10px] font-black text-gray-400 uppercase">Tipo</label>
                                 <select
-                                    className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold text-sm outline-none focus:border-nominix-electric"
+                                    disabled={newConcept.is_system}
+                                    className={cn(
+                                        "w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold text-sm outline-none focus:border-nominix-electric",
+                                        newConcept.is_system && "opacity-50 cursor-not-allowed bg-gray-100"
+                                    )}
                                     value={newConcept.kind}
                                     onChange={e => setNewConcept({ ...newConcept, kind: e.target.value })}
                                 >
@@ -225,7 +247,11 @@ const ConceptCatalog = () => {
                             <div className="space-y-2">
                                 <label className="text-[10px] font-black text-gray-400 uppercase">Método de Cálculo</label>
                                 <select
-                                    className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold text-sm outline-none focus:border-nominix-electric"
+                                    disabled={newConcept.is_system}
+                                    className={cn(
+                                        "w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold text-sm outline-none focus:border-nominix-electric",
+                                        newConcept.is_system && "opacity-50 cursor-not-allowed bg-gray-100"
+                                    )}
                                     value={newConcept.computation_method}
                                     onChange={e => setNewConcept({ ...newConcept, computation_method: e.target.value })}
                                 >
@@ -234,6 +260,16 @@ const ConceptCatalog = () => {
                                     <option value="DYNAMIC_FORMULA">Fórmula Dinámica (Python Safe)</option>
                                 </select>
                             </div>
+
+                            {newConcept.is_system && (
+                                <div className="col-span-2 p-4 bg-blue-50 rounded-2xl border border-blue-100 flex items-center gap-3">
+                                    <ShieldCheck className="text-blue-500" size={20} />
+                                    <div>
+                                        <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest leading-none">Concepto Protegido por Sistema</p>
+                                        <p className="text-[9px] text-blue-400 font-bold mt-1">Este concepto es esencial para el motor de nómina. Solo el nombre y visibilidad pueden ser ajustados.</p>
+                                    </div>
+                                </div>
+                            )}
 
                             {/* CONDICIONAL: Si es Fórmula Dinámica mostramos el editor avanzado */}
                             {newConcept.computation_method === 'DYNAMIC_FORMULA' ? (
@@ -433,15 +469,58 @@ const ConceptCatalog = () => {
                     </button>
                 </div>
 
-                <div className="relative max-w-xl group">
-                    <input
-                        type="text"
-                        placeholder="Buscar por código o nombre..."
-                        className="w-full pl-14 pr-6 py-5 bg-white border border-gray-200 rounded-[1.5rem] focus:border-nominix-electric focus:ring-4 focus:ring-nominix-electric/5 focus:outline-none font-bold text-sm transition-all"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                    <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-nominix-electric transition-colors" size={24} />
+                {/* Summary Bar */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                    {[
+                        { label: 'Total Reglas', value: stats.total, icon: ClipboardList, color: 'text-nominix-dark' },
+                        { label: 'Asignaciones', value: stats.earnings, icon: DollarSign, color: 'text-green-500' },
+                        { label: 'Deducciones', value: stats.deductions, icon: Percent, color: 'text-red-500' },
+                        { label: 'Protegidos', value: stats.system, icon: ShieldCheck, color: 'text-blue-500' }
+                    ].map((stat, i) => (
+                        <div key={i} className="bg-white p-4 rounded-2xl border border-gray-100 flex items-center gap-4 shadow-sm">
+                            <div className={cn("p-2 rounded-xl bg-gray-50", stat.color)}>
+                                <stat.icon size={16} />
+                            </div>
+                            <div>
+                                <p className="text-[9px] font-black text-gray-400 uppercase leading-none mb-1">{stat.label}</p>
+                                <p className="text-lg font-black text-nominix-dark leading-none">{stat.value}</p>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                <div className="flex flex-col md:flex-row gap-6 items-center justify-between">
+                    <div className="relative w-full max-w-xl group">
+                        <input
+                            type="text"
+                            placeholder="Buscar por código o nombre..."
+                            className="w-full pl-14 pr-6 py-5 bg-white border border-gray-200 rounded-[1.5rem] focus:border-nominix-electric focus:ring-4 focus:ring-nominix-electric/5 focus:outline-none font-bold text-sm transition-all"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                        <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-nominix-electric transition-colors" size={24} />
+                    </div>
+
+                    <div className="flex bg-gray-100 p-1 rounded-2xl gap-1 shrink-0">
+                        {[
+                            { id: 'ALL', label: 'Todos' },
+                            { id: 'SYSTEM', label: 'Estructurales' },
+                            { id: 'CUSTOM', label: 'Personalizados' }
+                        ].map(tab => (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id)}
+                                className={cn(
+                                    "px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                                    activeTab === tab.id
+                                        ? "bg-white text-nominix-dark shadow-sm"
+                                        : "text-gray-400 hover:text-gray-600"
+                                )}
+                            >
+                                {tab.label}
+                            </button>
+                        ))}
+                    </div>
                 </div>
             </div>
 
@@ -510,9 +589,14 @@ const ConceptCatalog = () => {
                         <div className="flex items-center justify-between border-t border-dashed pt-6 border-gray-100 mt-auto">
                             <div>
                                 <p className="text-[9px] font-black text-gray-300 uppercase tracking-tighter mb-1">
-                                    {concept.computation_method === 'DYNAMIC_FORMULA' ? 'Fórmula Definida' : 'Valor Defecto'}
+                                    {concept.is_system ? 'Lógica del Motor' : (concept.computation_method === 'DYNAMIC_FORMULA' ? 'Fórmula Definida' : 'Valor Defecto')}
                                 </p>
-                                {concept.computation_method === 'DYNAMIC_FORMULA' ? (
+                                {concept.is_system ? (
+                                    <div className="px-3 py-2 bg-blue-50 text-blue-600 rounded-xl border border-blue-100 flex items-center gap-2">
+                                        <ShieldCheck size={12} />
+                                        <span className="text-[10px] font-black uppercase">Algoritmo Protegido</span>
+                                    </div>
+                                ) : concept.computation_method === 'DYNAMIC_FORMULA' ? (
                                     <code className="text-[10px] bg-gray-900 text-green-400 p-2 rounded-lg block max-w-[180px] overflow-hidden text-ellipsis whitespace-nowrap">
                                         {concept.formula}
                                     </code>
@@ -533,7 +617,13 @@ const ConceptCatalog = () => {
                                 </button>
                                 <button
                                     onClick={() => handleDeleteConcept(concept.id)}
-                                    className="p-3 bg-red-50 text-red-400 rounded-2xl hover:bg-red-500 hover:text-white transition-all scale-90 hover:scale-100 shadow-lg shadow-red-500/10"
+                                    disabled={concept.is_system}
+                                    className={cn(
+                                        "p-3 rounded-2xl transition-all scale-90 hover:scale-100 shadow-lg",
+                                        concept.is_system
+                                            ? "bg-gray-50 text-gray-300 cursor-not-allowed"
+                                            : "bg-red-50 text-red-400 hover:bg-red-500 hover:text-white shadow-red-500/10"
+                                    )}
                                 >
                                     <Trash2 size={20} />
                                 </button>
