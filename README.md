@@ -1,428 +1,157 @@
-# 🇻🇪 Sistema RRHH Multi-Tenant para Venezuela
+# 🇻🇪 Nóminix Suite - Gestión de RRHH Multi-Tenant
 
-Sistema SaaS de gestión de Recursos Humanos y Nómina adaptado a la legislación laboral venezolana.
-Utiliza Django 5.x con arquitectura multi-tenant basada en esquemas de PostgreSQL.
+**Nóminix** es una plataforma SaaS (Software as a Service) de alto rendimiento diseñada para la gestión integral de Recursos Humanos y Nómina, optimizada específicamente para el marco legal y financiero de la República Bolivariana de Venezuela (LOTTT, IVSS, FAOV).
 
-## 📋 Tabla de Contenidos
-
-- [Características](#-características)
-- [Tecnologías](#-tecnologías)
-- [Estructura del Proyecto](#-estructura-del-proyecto)
-- [Instalación](#-instalación)
-- [Configuración](#-configuración)
-- [API REST](#-api-rest)
-- [Modelos](#-modelos)
-- [Servicios](#-servicios)
-- [Scripts Útiles](#-scripts-útiles)
-- [Comandos Django](#-comandos-django)
+![Banner](https://img.shields.io/badge/Status-Development-orange?style=for-the-badge)
+![Tech](https://img.shields.io/badge/Backend-Django_5.0-green?style=for-the-badge&logo=django)
+![Tech](https://img.shields.io/badge/Frontend-React_18-blue?style=for-the-badge&logo=react)
+![Architecture](https://img.shields.io/badge/Architecture-Multi--Tenant-blueviolet?style=for-the-badge)
 
 ---
 
-## ✨ Características
+## 🏗️ Arquitectura del Sistema
 
-### Multi-Tenancy
-- Aislamiento completo de datos por esquema PostgreSQL
-- Cada empresa/farmacia tiene su propia base de datos virtual
-- Gestión centralizada de tenants via API REST
+El sistema utiliza una arquitectura desacoplada con aislamiento total de datos:
 
-### Adaptado a Venezuela
-- **RIF**: Validación formato J-12345678-9
-- **Cédula**: Formato V-12345678 / E-12345678
-- **IVSS**: Código del Seguro Social
-- **FAOV**: Código Banavih (Fondo de Vivienda)
-- **Tasas de cambio**: Soporte BCV con 6 decimales
-- **Zona horaria**: America/Caracas
+### 🖥️ Backend (Python/Django)
+- **Multi-tenancy**: Implementado mediante esquemas de PostgreSQL (`django-tenants`). Cada cliente tiene su propio esquema, lo que garantiza seguridad y cumplimiento normativo.
+- **RESTful API**: Desarrollada con Django REST Framework, sirviendo como núcleo de lógica de negocio.
+- **Motor de Nómina**: Clase `PayrollEngine` que evalúa fórmulas dinámicas en Python seguro (`simple-eval`).
+- **Sincronización BCV**: Integración automatizada con las tasas del Banco Central de Venezuela.
 
-### API REST
-- CRUD completo de tenants
-- Gestión de dominios por tenant
-- Estadísticas del sistema
-- Autenticación y permisos
+### 🎨 Frontend (React/Vite)
+- **Modern UI**: Estética premium "Electric Dark" con Tailwind CSS.
+- **Feature-Based Structure**: Organización modular por funcionalidades (HR, Payroll, Loans, Tenants).
+- **Responsive Management**: Gestión de estados compleja para recibos, simulaciones y catálogos interactivos.
 
 ---
 
-## 🛠️ Tecnologías
+## ✨ Características Principales
 
-| Tecnología | Versión | Uso |
-|------------|---------|-----|
-| Python | 3.12+ | Lenguaje principal |
-| Django | 5.0 | Framework web |
-| Django REST Framework | 3.14 | API REST |
-| django-tenants | 3.6 | Multi-tenancy |
-| PostgreSQL | 12+ | Base de datos |
-| psycopg2/psycopg | 2.9/3.x | Driver PostgreSQL |
+### 💎 Core Business Logic
+- **Snapshotting de Nómina**: Al cerrar un periodo, el sistema guarda una "fotografía" inmutable de contratos, salarios y tasas de cambio para auditoría histórica.
+- **Catálogo de Conceptos Inteligente**: Gestión de asignaciones y deducciones con soporte para fórmulas personalizadas.
+- **Gestión de Préstamos**: Seguimiento automatizado de cuotas y saldos deudor de empleados.
+- **Contratos Multimoneda**: Soporte nativo para salarios pactados en divisas con liquidación en moneda local.
 
-> ⚠️ **Importante**: Python 3.14 tiene incompatibilidades con Django. Usar Python 3.12 o 3.13.
-
----
-
-## 📁 Estructura del Proyecto
-
-```
-c:\Desarrollo\RRHH\
-├── manage.py                 # Script de administración Django
-├── requirements.txt          # Dependencias del proyecto
-├── .env.example              # Plantilla de configuración
-├── .gitignore                # Archivos ignorados por Git
-│
-├── rrhh_saas/                # ⚙️ Configuración del proyecto
-│   ├── __init__.py
-│   ├── settings.py           # Configuración Django + django-tenants
-│   ├── urls.py               # URLs principales
-│   └── wsgi.py               # Punto de entrada WSGI
-│
-├── customers/                # 📦 APP COMPARTIDA (Schema Public)
-│   ├── models.py             # Client, Domain
-│   ├── serializers.py        # Serializers para API
-│   ├── views.py              # ViewSets de la API
-│   ├── urls.py               # Rutas de la API
-│   └── admin.py              # Interfaz de administración
-│
-├── payroll_core/             # 📦 APP TENANT (Schema por Empresa)
-│   ├── models.py             # Currency, ExchangeRate, Employee, LaborContract
-│   ├── services.py           # SalaryConverter, EmployeeService
-│   ├── admin.py              # Interfaz de administración
-│   └── urls.py               # Rutas de la API (pendiente)
-│
-├── scripts/                  # 🔧 Scripts de utilidad
-│   ├── create_tenants.py     # Crear tenants iniciales
-│   ├── delete_tenant.py      # Eliminar tenant
-│   └── check_schemas.py      # Verificar esquemas PostgreSQL
-│
-├── templates/                # Plantillas HTML
-└── static/                   # Archivos estáticos
-```
+### ⚖️ Adaptación Legal (Venezuela)
+- **Validaciones**: RIF (J-12345678-9) y Cédula (V/E).
+- **Leyes Sociales**: Automatización de IVSS (Seguro Social), FAOV (Vivienda), RPE (Paro Forzoso) e INCES.
+- **Cestaticket**: Cálculo automático ajustado a decretos vigentes.
 
 ---
 
-## 🚀 Instalación
+## 📁 Estructura del Código
 
-### 1. Prerrequisitos
-
-- Python 3.12 o 3.13 (NO usar 3.14)
-- PostgreSQL 12+
-- Git
-
-### 2. Clonar y Configurar
-
-```powershell
-# Clonar repositorio
-git clone <url-del-repo>
-cd RRHH
-
-# Crear entorno virtual con Python 3.12
-py -3.12 -m venv venv
-
-# Activar entorno (Windows PowerShell)
-.\venv\Scripts\activate
-
-# Instalar dependencias
-pip install -r requirements.txt
-```
-
-### 3. Configurar Base de Datos
-
-Crear la base de datos en PostgreSQL:
-```sql
-CREATE DATABASE rrhh_saas;
-```
-
-### 4. Configurar Variables de Entorno
-
-Editar `rrhh_saas/settings.py` líneas 113-122:
-```python
-DATABASES = {
-    'default': {
-        'ENGINE': 'django_tenants.postgresql_backend',
-        'NAME': 'rrhh_saas',
-        'USER': 'postgres',
-        'PASSWORD': 'TU_PASSWORD',
-        'HOST': 'localhost',
-        'PORT': '5432',
-    }
-}
-```
-
-### 5. Ejecutar Migraciones
-
-```powershell
-# IMPORTANTE: Configurar encoding en Windows
-$env:PGCLIENTENCODING='UTF8'
-
-# Crear migraciones
-python manage.py makemigrations customers payroll_core
-
-# Migrar esquema público
-python manage.py migrate_schemas --shared
-
-# Crear tenant público
-python create_tenants.py
-
-# Migrar esquemas de tenants
-python manage.py migrate_schemas --tenant
-
-# Crear superusuario
-python manage.py createsuperuser
-```
-
-### 6. Iniciar Servidor
-
-```powershell
-$env:PGCLIENTENCODING='UTF8'
-python manage.py runserver
-```
-
-Acceder a:
-- **Admin**: http://localhost:8000/admin/
-- **API**: http://localhost:8000/api/
-
----
-
-## ⚙️ Configuración
-
-### Variable de Entorno Windows
-
-**Siempre ejecutar antes de comandos Django:**
-```powershell
-$env:PGCLIENTENCODING='UTF8'
-```
-
-Esto evita el error `UnicodeDecodeError` con PostgreSQL en Windows.
-
-### Configuración de Tenants
-
-| Configuración | Valor |
-|---------------|-------|
-| `TENANT_MODEL` | `customers.Client` |
-| `TENANT_DOMAIN_MODEL` | `customers.Domain` |
-| `SHARED_APPS` | django_tenants, customers, auth, admin... |
-| `TENANT_APPS` | payroll_core, auth, admin... |
-
----
-
-## 📡 API REST
-
-### Endpoints de Tenants
-
-| Método | Endpoint | Descripción |
-|--------|----------|-------------|
-| `GET` | `/api/tenants/` | Listar todos los tenants |
-| `POST` | `/api/tenants/` | Crear nuevo tenant |
-| `GET` | `/api/tenants/{id}/` | Obtener detalle |
-| `PUT` | `/api/tenants/{id}/` | Actualizar tenant |
-| `DELETE` | `/api/tenants/{id}/` | Eliminar tenant y esquema |
-| `GET` | `/api/tenants/stats/` | Estadísticas del sistema |
-| `POST` | `/api/tenants/{id}/add_domain/` | Agregar dominio |
-| `DELETE` | `/api/tenants/{id}/remove_domain/` | Eliminar dominio |
-| `GET` | `/api/tenant-info/` | Info del tenant actual |
-
-### Crear Tenant (Ejemplo)
-
+### Backend Structure
 ```bash
-curl -X POST http://localhost:8000/api/tenants/ \
-  -H "Content-Type: application/json" \
-  -u admin:password \
-  -d '{
-    "name": "Farmacia Central",
-    "rif": "J-12345678-9",
-    "domain": "central.localhost",
-    "email": "admin@farmacia.com"
-  }'
+├── rrhh_saas/          # Configuración global y settings del proyecto
+├── customers/          # App compartida (Admin de Tenants, Dominios, Auth)
+├── payroll_core/       # App de negocio (Ejecutada en cada esquema de tenant)
+│   ├── engine.py       # El "Corazón": Motor de cálculo de nómina
+│   ├── formulas.py     # Definiciones de leyes laborales
+│   ├── models/         # Employee, contract, currency, payroll, loans
+│   └── services/       # Integración BCV, Inicialización, Snapshots
+├── scripts/            # Herramientas de administración y despliegue
 ```
 
-### Respuesta
-```json
-{
-  "message": "Tenant 'Farmacia Central' creado exitosamente",
-  "tenant": {
-    "id": 2,
-    "schema_name": "farmacia_central",
-    "name": "Farmacia Central",
-    "rif": "J-12345678-9",
-    "domains": [
-      {"id": 2, "domain": "central.localhost", "is_primary": true}
-    ]
-  }
-}
+### Frontend Structure (`nominix-web/`)
+```bash
+├── src/
+│   ├── api/            # Configuración de Axios y interceptores
+│   ├── features/       # Módulos funcionales (HR, Payroll, Auth...)
+│   │   ├── hr/         # Directorio de personal y expedientes
+│   │   ├── payroll/    # Tablero de control, Catálogo y Cierres
+│   │   └── loans/      # Gestión de préstamos
+│   ├── components/     # UI reusable (Buttons, Modals, Tables)
+│   └── store/          # Contextos de React para estado global
 ```
 
 ---
 
-## 📊 Modelos
+## 🚀 Instalación y Despliegue
 
-### Esquema Public
+### Requisitos Previos
+- Docker y Docker Compose
+- *Opcional*: Python 3.12+ / Node.js 20+
 
-#### Client (TenantMixin)
-```python
-- schema_name: str       # Nombre del esquema PostgreSQL
-- name: str              # Nombre de la empresa
-- rif: str               # RIF venezolano (J-12345678-9)
-- email: str             # Email de contacto
-- phone: str             # Teléfono
-- address: str           # Dirección
-- on_trial: bool         # En período de prueba
-- paid_until: date       # Fecha vencimiento suscripción
-- created_on: datetime   # Fecha de registro
+### Despliegue con Docker (Recomendado)
+```bash
+# 1. Clonar el repositorio
+git clone <url-repo>
+
+# 2. Configurar variables de entorno
+cp .env.example .env
+
+# 3. Levantar servicios
+docker-compose up --build
 ```
 
-#### Domain (DomainMixin)
-```python
-- domain: str            # Dominio/subdominio
-- tenant: ForeignKey     # Referencia al Client
-- is_primary: bool       # Dominio principal
-```
+### Inicialización del Sistema
+```bash
+# Crear el tenant principal (public)
+docker-compose exec backend python manage.py migrate_schemas --shared
 
-### Esquema Tenant
-
-#### Currency
-```python
-- code: str (PK)         # Código ISO (USD, VES)
-- name: str              # Nombre (Bolívar Digital)
-- symbol: str            # Símbolo ($, Bs.)
-- is_base_currency: bool # Moneda de reporte
-```
-
-#### ExchangeRate
-```python
-- currency: FK           # Moneda origen
-- rate: Decimal(18,6)    # Tasa con 6 decimales
-- date_valid: datetime   # Fecha/hora de validez
-- source: str            # BCV, MONITOR, PARALELO
-```
-
-#### Employee
-```python
-- first_name: str        # Nombres
-- last_name: str         # Apellidos
-- national_id: str       # Cédula (V-12345678)
-- rif: str               # RIF personal
-- ivss_code: str         # Código IVSS
-- faov_code: str         # Código FAOV/Banavih
-- hire_date: date        # Fecha de ingreso
-- is_active: bool        # Activo
-```
-
-#### LaborContract
-```python
-- employee: FK           # Empleado
-- salary_amount: Decimal # Monto del salario
-- salary_currency: FK    # Moneda (USD típicamente)
-- payment_frequency: str # WEEKLY, BIWEEKLY, MONTHLY
-- is_active: bool        # Contrato vigente
+# Inicializar conceptos de sistema para un tenant
+docker-compose exec backend python manage.py tenant_command create_system_concepts --schema=nombre_empresa
 ```
 
 ---
 
-## 🔧 Servicios
+## 📡 API Endpoints Clave
 
-### SalaryConverter
-
-Conversión de salarios entre monedas usando tasas del BCV:
-
-```python
-from payroll_core.services import SalaryConverter
-from decimal import Decimal
-from datetime import date
-
-# Convertir USD a VES
-amount_ves = SalaryConverter.convert_to_local(
-    amount=Decimal('500.00'),
-    currency_code='USD',
-    target_date=date.today(),
-    source='BCV'
-)
-print(f"Bs. {amount_ves:,.2f}")
-```
-
-### EmployeeService
-
-Operaciones comunes sobre empleados:
-
-```python
-from payroll_core.services import EmployeeService
-
-# Empleados activos
-employees = EmployeeService.get_active_employees()
-
-# Total de nómina
-total, count = EmployeeService.calculate_total_payroll(date.today(), 'BCV')
-```
+| Endpoint | Descripción |
+|----------|-------------|
+| `GET /api/tenant-info/` | Metadatos de la empresa actual (Logo, Nombre) |
+| `POST /api/payroll/validate-formula/` | Tester en tiempo real para fórmulas Python |
+| `GET /api/employees/{id}/simulate-payslip/` | Cálculo preventivo de recibo de pago |
+| `POST /api/payroll-periods/{id}/close/` | Cierre definitivo e inmutable de nómina |
 
 ---
 
-## 📜 Scripts Útiles
+## � Guía de Desarrollo
 
-### Verificar Esquemas
-```powershell
-$env:PGCLIENTENCODING='UTF8'
-python check_schemas.py
-```
+### Comandos de Utilidad (Backend)
+- **Sincronizar BCV**: `python manage.py tenant_command fetch_bcv_rates --schema=tu_empresa`
+- **Crear Superusuario**: `python manage.py tenant_command createsuperuser --schema=tu_empresa`
 
-### Crear Tenants Iniciales
-```powershell
-python create_tenants.py
-```
-
-### Eliminar Tenant
-```powershell
-python delete_tenant.py <schema_name>
-```
+### Estándares de Diseño
+Garantizar que todos los componentes nuevos sigan el **Design System** definido en `index.css`:
+- Colores base: `#000000` (Dark), `#CCFF00` (Electric Green).
+- Tipografía: Inter / Outfit.
 
 ---
 
-## 🎮 Comandos Django
+## 🧠 Auditoría Avanzada: Motor de Nómina (`PayrollEngine`)
 
-```powershell
-# Configurar encoding (SIEMPRE primero en Windows)
-$env:PGCLIENTENCODING='UTF8'
+El motor de Nóminix ha sido diseñado bajo principios de **Inmutabilidad**, **Transparencia** y **Seguridad**. A diferencia de sistemas contables tradicionales, Nóminix procesa la nómina como un flujo de estados evaluados en tiempo real.
 
-# Servidor de desarrollo
-python manage.py runserver
+### 🔑 Mecanismos de Cálculo
+El proceso se divide en cinco fases críticas ejecutadas de forma atómica:
 
-# Crear migraciones
-python manage.py makemigrations
+1.  **Contextualización (Build Context)**: Se genera un diccionario de variables (Snapshot de Datos Maestros) que incluye desde el salario hasta el conteo de lunes del mes según el calendario real de Venezuela.
+2.  **Partición Salarial (Contract Phase)**: Utiliza `SalarySplitter` para desglosar el "Total Package" en Salario Base, Cestaticket (Social) y Complemento, respetando la frecuencia (Quincenal/Mensual).
+3.  **Evaluación Dinámica (Dynamic Phase)**: Procesa reglas de negocio personalizadas. Prioriza: `Novedad Manual` > `Ajuste por Empleado` > `Valor Global`.
+4.  **Cálculo de Ley (Law Phase)**: Inyecta deducciones obligatorias (IVSS, FAOV, RPE) con lógica de topes (5 y 10 Salarios Mínimos) hardcodeada para evitar manipulaciones accidentales.
+5.  **Liquidación de Préstamos**: Descuenta automáticamente cuotas de préstamos activos, gestionando saldos y conversiones de divisas en el momento del cobro.
 
-# Migrar esquema público
-python manage.py migrate_schemas --shared
+### 🛡️ Seguridad y Robustez
+-   **Safe Evaluation**: Las fórmulas de usuario no se ejecutan como código Python crudo. Se filtran a través de `simple-eval`, permitiendo solo operadores matemáticos y funciones seguras (`min`, `max`, `round`).
+-   **Trazabilidad Total**: Cada línea calculada (`PayslipDetail`) almacena un `trace` (la fórmula expandida con valores reales) y un mapa de variables. Esto permite reconstruir el cálculo semanas después sin ambigüedades.
+-   **Aislamiento Monetario**: El motor opera internamente con `Decimal` de alta precisión (18,6 para tasas y 12,2 para montos), evitando errores de flotantes comunes en JavaScript.
 
-# Migrar esquemas de tenants
-python manage.py migrate_schemas --tenant
-
-# Migrar un tenant específico
-python manage.py migrate_schemas --schema=farmacia_central
-
-# Crear superusuario
-python manage.py createsuperuser
-
-# Shell de Django
-python manage.py shell
-
-# Verificar configuración
-python manage.py check
-```
+### 📊 Inventario de Variables (Resumen Auditado)
+| Variable | Origen | Descripción |
+| :--- | :--- | :--- |
+| `SALARIO_MENSUAL` | Contrato | Base de cálculo mensual en VES. |
+| `LUNES` | Calendario | Conteo real de lunes en el periodo (Base IVSS). |
+| `ANTIGUEDAD` | RRHH | Años de servicio para bonos de antigüedad. |
+| `DIAS_HABILES` | Calendario | Días lunes-viernes efectivos en el periodo. |
+| `NOVEDADES_*` | Incidencias | Variables inyectadas desde el panel de novedades (Ej: Horas Extra). |
 
 ---
 
-## 📝 Notas Importantes
+## 📄 Licencia y Créditos
 
-1. **Python 3.14**: NO compatible con Django 5.0. Usar 3.12 o 3.13.
-
-2. **Encoding Windows**: Siempre ejecutar `$env:PGCLIENTENCODING='UTF8'` antes de comandos.
-
-3. **Tenant Público**: El esquema `public` NO debe eliminarse.
-
-4. **Dominios Locales**: Para probar subdominios, agregar al archivo hosts:
-   ```
-   127.0.0.1 central.localhost
-   127.0.0.1 demo.localhost
-   ```
-
----
-
-## 📄 Licencia
-
-Proyecto privado - Todos los derechos reservados.
-
----
-
-Desarrollado para el mercado venezolano 🇻🇪
+© 2025 **Nóminix Suite**. Todos los derechos reservados.
+Desarrollado para la modernización de los procesos de capital humano en Venezuela. 🇻🇪
