@@ -127,7 +127,33 @@ class PayrollConcept(models.Model):
         verbose_name='Fórmula Python',
         help_text='Variables disponibles: SALARIO, DIAS, LUNES, TASA, ANTIGUEDAD. Ej: (SALARIO / 30) * DIAS'
     )
-    
+
+    class ConceptBehavior(models.TextChoices):
+        """Comportamiento del concepto (determina qué Handler usar)."""
+        SALARY_BASE = 'SALARY_BASE', 'Sueldo Base (Desglosable)'
+        CESTATICKET = 'CESTATICKET', 'Cestaticket'
+        COMPLEMENT = 'COMPLEMENT', 'Complemento Salarial'
+        LAW_DEDUCTION = 'LAW_DEDUCTION', 'Deducción de Ley (IVSS, FAOV, RPE)'
+        LOAN = 'LOAN', 'Préstamo / Anticipo'
+        DYNAMIC = 'DYNAMIC', 'Fórmula Dinámica'
+        FIXED = 'FIXED', 'Monto Fijo'
+
+    behavior: models.CharField = models.CharField(
+        max_length=20,
+        choices=ConceptBehavior.choices,
+        default=ConceptBehavior.DYNAMIC,
+        verbose_name='Comportamiento',
+        help_text='Define cómo el motor procesa este concepto'
+    )
+
+    system_params: models.JSONField = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name='Parámetros de Sistema',
+        help_text='Configuración del Handler (rate, base_source, cap_multiplier, etc.)'
+    )
+
+
     class Meta:
         verbose_name = 'Concepto de Nómina'
         verbose_name_plural = 'Conceptos de Nómina'

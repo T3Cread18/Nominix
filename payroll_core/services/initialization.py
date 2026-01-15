@@ -20,6 +20,7 @@ def create_system_concepts():
             'computation_method': PayrollConcept.ComputationMethod.DYNAMIC_FORMULA,
             'receipt_order': 10,
             'show_even_if_zero': True,
+            'is_system': True,
         },
         {
             'code': 'DIAS_DESCANSO',
@@ -28,6 +29,7 @@ def create_system_concepts():
             'computation_method': PayrollConcept.ComputationMethod.DYNAMIC_FORMULA,
             'receipt_order': 20,
             'show_even_if_zero': True,
+            'is_system': True,
         },
         {
             'code': 'DIAS_FERIADOS',
@@ -36,6 +38,7 @@ def create_system_concepts():
             'computation_method': PayrollConcept.ComputationMethod.DYNAMIC_FORMULA,
             'receipt_order': 30,
             'show_even_if_zero': True,
+            'is_system': True,
         },
         {
             'code': 'BONIFICACION',
@@ -43,6 +46,7 @@ def create_system_concepts():
             'kind': 'EARNING',
             'computation_method': PayrollConcept.ComputationMethod.DYNAMIC_FORMULA,
             'receipt_order': 40,
+            'is_system': True,
         },
         {
             'code': 'CESTATICKET',
@@ -51,6 +55,7 @@ def create_system_concepts():
             'computation_method': PayrollConcept.ComputationMethod.FIXED_AMOUNT,
             'receipt_order': 100,
             'is_salary_incidence': False,
+            'is_system': True,
         },
         {
             'code': 'COMPLEMENTO',
@@ -59,6 +64,7 @@ def create_system_concepts():
             'computation_method': PayrollConcept.ComputationMethod.FIXED_AMOUNT,
             'receipt_order': 110,
             'is_salary_incidence': False,
+            'is_system': True,
         },
         
         # DEDUCCIONES
@@ -69,6 +75,7 @@ def create_system_concepts():
             'computation_method': PayrollConcept.ComputationMethod.DYNAMIC_FORMULA,
             'receipt_order': 200,
             'show_even_if_zero': True,
+            'is_system': True,
         },
         {
             'code': 'RPE',
@@ -77,6 +84,7 @@ def create_system_concepts():
             'computation_method': PayrollConcept.ComputationMethod.DYNAMIC_FORMULA,
             'receipt_order': 210,
             'show_even_if_zero': True,
+            'is_system': True,
         },
         {
             'code': 'FAOV',
@@ -85,6 +93,7 @@ def create_system_concepts():
             'computation_method': PayrollConcept.ComputationMethod.DYNAMIC_FORMULA,
             'receipt_order': 220,
             'show_even_if_zero': True,
+            'is_system': True,
         },
         {
             'code': 'ISLR',
@@ -92,6 +101,7 @@ def create_system_concepts():
             'kind': 'DEDUCTION',
             'computation_method': PayrollConcept.ComputationMethod.FIXED_AMOUNT,
             'receipt_order': 230,
+            'is_system': True,
         },
         {
             'code': 'INCES',

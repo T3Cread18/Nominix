@@ -317,16 +317,18 @@
         <table class="receipt-table">
             <thead>
                 <tr>
-                    <th style="width: 40%;">Concepto</th>
+                    <th style="width: 12%;">Cód</th>
+                    <th style="width: 33%;">Concepto</th>
                     <th style="width: 15%; text-align: center;">Valor Auxiliar</th>
-                    <th style="width: 22.5%; text-align: right;">Asignación</th>
-                    <th style="width: 22.5%; text-align: right;">Deducción</th>
+                    <th style="width: 20%; text-align: right;">Asignación</th>
+                    <th style="width: 20%; text-align: right;">Deducción</th>
                 </tr>
             </thead>
             <tbody>
                 {% for row in payslip.processed_rows %}
                 {% if row.tipo_recibo == 'salario' %}
                 <tr>
+                    <td style="font-size: 9px; color: #555;">{{ row.code }}</td>
                     <td>{{ row.name }}</td>
                     <td style="text-align: center; font-family: monospace;">
                         {% if row.quantity %}{{ row.quantity }} {{ row.unit|default:"días" }}{% else %}0{% endif %}
@@ -343,7 +345,7 @@
                 {% endif %}
                 {% endfor %}
                 <tr>
-                    <td colspan="4" style="text-align: center; padding: 20px; color: #999;">
+                    <td colspan="5" style="text-align: center; padding: 20px; color: #999;">
                         No hay conceptos configurados para este recibo.
                     </td>
                 </tr>
@@ -373,7 +375,7 @@
     </div>
 
     {# ========== RECIBO 2: COMPLEMENTO ========== #}
-    {% with payslip.details.all as details %}
+    {% with payslip.lines.all as details %}
     {% for detail in details %}
     {% if detail.concept_code == 'COMPLEMENTO' and detail.amount_ves %}
     <div class="page-break">
@@ -427,7 +429,7 @@
     {% endwith %}
 
     {# ========== RECIBO 3: CESTATICKET ========== #}
-    {% with payslip.details.all as details %}
+    {% with payslip.lines.all as details %}
     {% for detail in details %}
     {% if detail.concept_code == 'CESTATICKET' and detail.amount_ves %}
     <div class="page-break">

@@ -5,9 +5,10 @@ import {
     Building2, MapPin, Globe, Save, Loader2,
     Upload, Camera, Mail, Phone, Hash, Store,
     Plus, Edit3, Trash2, X, CheckCircle2, XCircle,
-    DollarSign, Clock
+    DollarSign, Clock, Calculator, Percent
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
+// Asegúrate de que este componente exista en tu proyecto o coméntalo si aún no lo tienes
 import OrganizationManager from './OrganizationManager';
 import InputField from '../../components/ui/InputField';
 import SelectField from '../../components/ui/SelectField';
@@ -15,8 +16,12 @@ import ToggleField from '../../components/ui/ToggleField';
 
 const CompanySettings = () => {
     const [activeTab, setActiveTab] = useState('company');
+
+    // Estados de datos
     const [company, setCompany] = useState(null);
     const [branches, setBranches] = useState([]);
+    const [policies, setPolicies] = useState(null); // Nuevo estado para políticas
+
     const [loading, setLoading] = useState(true);
     const hasLoaded = useRef(false);
 
@@ -30,13 +35,19 @@ const CompanySettings = () => {
     const loadData = async () => {
         setLoading(true);
         try {
-            const [companyRes, branchesRes] = await Promise.all([
+            // Ahora cargamos 3 endpoints en paralelo
+            const [companyRes, branchesRes, policiesRes] = await Promise.all([
                 axiosClient.get('/company/config/'),
-                axiosClient.get('/branches/')
+                axiosClient.get('/branches/'),
+                axiosClient.get('/company/policies/') // Endpoint nuevo del backend
             ]);
+
             setCompany(companyRes.data);
             setBranches(branchesRes.data.results || branchesRes.data);
+            setPolicies(policiesRes.data);
+
         } catch (error) {
+            console.error(error);
             toast.error("Error cargando configuración");
         } finally {
             setLoading(false);
@@ -49,25 +60,34 @@ const CompanySettings = () => {
             <div className="mb-8">
                 <h1 className="text-3xl font-black text-nominix-dark tracking-tight">Configuración</h1>
                 <p className="text-gray-400 font-bold uppercase text-xs tracking-widest mt-2">
-                    Gestión de identidad corporativa y sucursales
+                    Gestión de identidad, sedes y reglas de negocio
                 </p>
             </div>
 
             {/* Tabs Navigation */}
-            <div className="flex items-center gap-6 border-b border-gray-100 mb-8 sticky top-0 bg-gray-100/95 backdrop-blur z-10 pt-2">
+            <div className="flex items-center gap-6 border-b border-gray-100 mb-8 sticky top-0 bg-gray-100/95 backdrop-blur z-10 pt-2 overflow-x-auto">
                 <button
                     onClick={() => setActiveTab('company')}
                     className={cn(
-                        "flex items-center gap-2 pb-4 text-xs font-black uppercase tracking-widest border-b-2 transition-all",
+                        "flex items-center gap-2 pb-4 text-xs font-black uppercase tracking-widest border-b-2 transition-all whitespace-nowrap",
                         activeTab === 'company' ? "border-nominix-electric text-nominix-electric" : "border-transparent text-gray-400 hover:text-gray-600"
                     )}
                 >
                     <Building2 size={16} /> Datos Empresa
                 </button>
                 <button
+                    onClick={() => setActiveTab('policies')}
+                    className={cn(
+                        "flex items-center gap-2 pb-4 text-xs font-black uppercase tracking-widest border-b-2 transition-all whitespace-nowrap",
+                        activeTab === 'policies' ? "border-nominix-electric text-nominix-electric" : "border-transparent text-gray-400 hover:text-gray-600"
+                    )}
+                >
+                    <Calculator size={16} /> Políticas y Factores
+                </button>
+                <button
                     onClick={() => setActiveTab('branches')}
                     className={cn(
-                        "flex items-center gap-2 pb-4 text-xs font-black uppercase tracking-widest border-b-2 transition-all",
+                        "flex items-center gap-2 pb-4 text-xs font-black uppercase tracking-widest border-b-2 transition-all whitespace-nowrap",
                         activeTab === 'branches' ? "border-nominix-electric text-nominix-electric" : "border-transparent text-gray-400 hover:text-gray-600"
                     )}
                 >
@@ -76,7 +96,7 @@ const CompanySettings = () => {
                 <button
                     onClick={() => setActiveTab('organization')}
                     className={cn(
-                        "flex items-center gap-2 pb-4 text-xs font-black uppercase tracking-widest border-b-2 transition-all",
+                        "flex items-center gap-2 pb-4 text-xs font-black uppercase tracking-widest border-b-2 transition-all whitespace-nowrap",
                         activeTab === 'organization' ? "border-nominix-electric text-nominix-electric" : "border-transparent text-gray-400 hover:text-gray-600"
                     )}
                 >
@@ -89,19 +109,32 @@ const CompanySettings = () => {
                 <div className="py-20 text-center"><Loader2 className="animate-spin mx-auto text-gray-400" /></div>
             ) : (
                 <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+
+                    {/* 1. DATOS EMPRESA */}
                     <div className={cn(activeTab !== 'company' && "hidden")}>
                         <CompanyForm
                             initialData={company}
-                            onRefresh={loadData}
                         />
                     </div>
+
+                    {/* 2. POLÍTICAS (NUEVO) */}
+                    <div className={cn(activeTab !== 'policies' && "hidden")}>
+                        <PayrollPoliciesForm
+                            initialData={policies}
+                        />
+                    </div>
+
+                    {/* 3. SEDES */}
                     <div className={cn(activeTab !== 'branches' && "hidden")}>
                         <BranchManager
                             initialBranches={branches}
                             onRefresh={loadData}
                         />
                     </div>
+
+                    {/* 4. ESTRUCTURA ORGANIZATIVA */}
                     <div className={cn(activeTab !== 'organization' && "hidden")}>
+                        {/* Asumo que este componente lo tienes definido en otro archivo */}
                         <OrganizationManager />
                     </div>
                 </div>
@@ -110,13 +143,130 @@ const CompanySettings = () => {
     );
 };
 
-// --- SUB-COMPONENTE 1: FORMULARIO DE EMPRESA ---
-const CompanyForm = ({ initialData, onRefresh }) => {
+// --- SUB-COMPONENTE: FORMULARIO DE POLÍTICAS (NUEVO) ---
+const PayrollPoliciesForm = ({ initialData }) => {
+    const [policy, setPolicy] = useState(initialData || {});
     const [saving, setSaving] = useState(false);
-    const [company, setCompany] = useState(initialData);
 
     useEffect(() => {
-        setCompany(initialData);
+        if (initialData) setPolicy(initialData);
+    }, [initialData]);
+
+    const handleChange = (e) => setPolicy({ ...policy, [e.target.name]: e.target.value });
+
+    const handleSave = async (e) => {
+        e.preventDefault();
+        setSaving(true);
+        try {
+            const res = await axiosClient.put('/company/policies/', policy);
+            setPolicy(res.data);
+            toast.success('Políticas actualizadas');
+        } catch (error) {
+            toast.error('Error al guardar políticas');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <form onSubmit={handleSave} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-1 space-y-6">
+                <div className="bg-white p-8 rounded-[2.5rem] shadow-xl shadow-slate-200/40 border border-slate-100">
+                    <h3 className="text-lg font-black text-nominix-dark mb-2">Factores Globales</h3>
+                    <p className="text-gray-500 text-sm leading-relaxed">
+                        Define los multiplicadores matemáticos que usará el motor de nómina para calcular conceptos variables.
+                    </p>
+                    <div className="mt-6 p-4 bg-blue-50 rounded-2xl border border-blue-100">
+                        <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest mb-2 flex items-center gap-2">
+                            <Percent size={12} /> Ejemplo de Cálculo
+                        </p>
+                        <p className="text-xs text-blue-800 font-medium">
+                            Si el salario diario es <strong>100 Bs</strong> y el factor de feriado es <strong>3.00</strong>:
+                            <br />
+                            <span className="block mt-2 font-mono text-xs bg-white/50 p-2 rounded">
+                                Pago = 100 * 3.00 = 300 Bs
+                            </span>
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div className="lg:col-span-2 space-y-8">
+                <div className="bg-white p-8 md:p-10 rounded-[2.5rem] shadow-xl shadow-slate-200/40 border border-slate-100">
+                    <h3 className="text-xs font-black uppercase text-gray-400 mb-6 flex items-center gap-2">
+                        <Calculator size={14} /> Factores de Días Especiales
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <InputField
+                            label="Factor Feriados / Domingos"
+                            name="holiday_payout_factor"
+                            type="number" step="0.01"
+                            value={policy.holiday_payout_factor}
+                            onChange={handleChange}
+                            placeholder="Ej: 3.00" // Valor común en LOTTT (1+1.5+Descanso)
+                        />
+                        <InputField
+                            label="Factor Descanso Trabajado"
+                            name="rest_day_payout_factor"
+                            type="number" step="0.01"
+                            value={policy.rest_day_payout_factor}
+                            onChange={handleChange}
+                            placeholder="Ej: 1.50"
+                        />
+                    </div>
+                </div>
+
+                <div className="bg-white p-8 md:p-10 rounded-[2.5rem] shadow-xl shadow-slate-200/40 border border-slate-100">
+                    <h3 className="text-xs font-black uppercase text-gray-400 mb-6 flex items-center gap-2">
+                        <Clock size={14} /> Recargos de Horas
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <InputField
+                            label="Recargo H.E. Diurna"
+                            name="overtime_day_factor"
+                            type="number" step="0.01"
+                            value={policy.overtime_day_factor}
+                            onChange={handleChange}
+                            placeholder="Ej: 1.50"
+                        />
+                        <InputField
+                            label="Recargo H.E. Nocturna"
+                            name="overtime_night_factor"
+                            type="number" step="0.01"
+                            value={policy.overtime_night_factor}
+                            onChange={handleChange}
+                            placeholder="Ej: 1.50" // LOTTT suele ser 1.5 base + 0.30 bono noc
+                        />
+                        <InputField
+                            label="Tasa Bono Nocturno"
+                            name="night_bonus_rate"
+                            type="number" step="0.01"
+                            value={policy.night_bonus_rate}
+                            onChange={handleChange}
+                            placeholder="Ej: 0.30" // 30%
+                        />
+                    </div>
+                </div>
+
+                <div className="flex justify-end">
+                    <button disabled={saving} className="px-8 py-4 bg-nominix-dark text-white rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-black transition-all flex items-center gap-2">
+                        {saving ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />} Guardar Políticas
+                    </button>
+                </div>
+            </div>
+        </form>
+    );
+}
+
+// --- SUB-COMPONENTE 1: FORMULARIO DE EMPRESA (Tuyo original, sin cambios lógicos) ---
+const CompanyForm = ({ initialData }) => {
+    // Nota: Recibimos initialData directamente. Como es una tab separada, podemos usar estado local
+    // O si prefieres que se actualice al volver a cargar, usa useEffect.
+    const [company, setCompany] = useState(initialData || {});
+    const [saving, setSaving] = useState(false);
+
+    useEffect(() => {
+        if (initialData) setCompany(initialData);
     }, [initialData]);
 
     const handleChange = (e) => setCompany({ ...company, [e.target.name]: e.target.value });
@@ -135,7 +285,7 @@ const CompanyForm = ({ initialData, onRefresh }) => {
         }
     };
 
-
+    if (!company.name && !company.rif) return null; // Evitar render sin datos
 
     return (
         <form onSubmit={handleSave} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -222,7 +372,7 @@ const CompanyForm = ({ initialData, onRefresh }) => {
                         </div>
                     </div>
 
-                    {/* Nueva Sección: Visibilidad en Recibos */}
+                    {/* Visibilidad en Recibos */}
                     <div className="mt-8 pt-8 border-t border-gray-50">
                         <h4 className="text-[10px] font-black uppercase text-gray-400 mb-4">Visibilidad en Recibos PDF</h4>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -314,7 +464,7 @@ const CompanyForm = ({ initialData, onRefresh }) => {
     );
 };
 
-// --- SUB-COMPONENTE 2: GESTOR DE SEDES ---
+// --- SUB-COMPONENTE 2: GESTOR DE SEDES (Tuyo original) ---
 const BranchManager = ({ initialBranches, onRefresh }) => {
     const [branches, setBranches] = useState(initialBranches);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -413,7 +563,7 @@ const BranchManager = ({ initialBranches, onRefresh }) => {
     );
 };
 
-// --- SUB-COMPONENTE 3: MODAL DE SEDE ---
+// --- SUB-COMPONENTE 3: MODAL DE SEDE (Tuyo original) ---
 const BranchFormModal = ({ branch, onClose, onSuccess }) => {
     const [formData, setFormData] = useState({
         name: '', code: '', rif: '', phone: '', address: '', is_active: true

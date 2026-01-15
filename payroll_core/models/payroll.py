@@ -133,7 +133,7 @@ class PayrollReceipt(models.Model):
     @property
     def total_income_salario(self) -> Decimal:
         """Suma de ingresos del recibo 1 (Salario)"""
-        return sum(d.amount_ves for d in self.details.all() if d.kind == 'EARNING' and d.tipo_recibo == 'salario')
+        return sum(d.amount_ves for d in self.lines.all() if d.kind == 'EARNING' and d.tipo_recibo == 'salario')
 
     @property
     def net_pay_salario(self) -> Decimal:
@@ -145,12 +145,12 @@ class PayrollReceipt(models.Model):
     @property
     def complemento_amount(self) -> Decimal:
         """Monto del recibo 2 (Complemento)"""
-        return sum(d.amount_ves for d in self.details.all() if d.tipo_recibo == 'complemento')
+        return sum(d.amount_ves for d in self.lines.all() if d.tipo_recibo == 'complemento')
 
     @property
     def cestaticket_amount(self) -> Decimal:
         """Monto del recibo 3 (Cestaticket)"""
-        return sum(d.amount_ves for d in self.details.all() if d.tipo_recibo == 'cestaticket')
+        return sum(d.amount_ves for d in self.lines.all() if d.tipo_recibo == 'cestaticket')
 
     class Meta:
         verbose_name = 'Recibo de Nómina'

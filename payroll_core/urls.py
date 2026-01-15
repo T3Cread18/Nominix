@@ -7,10 +7,13 @@ from .views import (
     LatestExchangeRateView,
     EmployeeViewSet, BranchViewSet, LaborContractViewSet,
     CurrencyViewSet, PayrollConceptViewSet, EmployeeConceptViewSet,
-    PayrollPeriodViewSet, PayslipReadOnlyViewSet, PayrollNoveltyViewSet,
+    PayrollPeriodViewSet, PayrollReceiptViewSet, PayrollNoveltyViewSet,
     CompanyConfigView, DepartmentViewSet, LoanViewSet, LoanPaymentViewSet,
-    PayrollVariablesView, ValidateFormulaView, JobPositionViewSet
+    PayrollVariablesView, ValidateFormulaView, JobPositionViewSet,
+    ConceptConfigMetadataView, PayrollPolicyView
 )
+
+
 
 app_name = 'payroll_core'
 
@@ -22,7 +25,8 @@ router.register(r'currencies', CurrencyViewSet, basename='currency')
 router.register(r'payroll-concepts', PayrollConceptViewSet, basename='payroll-concept')
 router.register(r'employee-concepts', EmployeeConceptViewSet, basename='employee-concept')
 router.register(r'payroll-periods', PayrollPeriodViewSet, basename='payroll-period')
-router.register(r'payslips', PayslipReadOnlyViewSet, basename='payslip')
+router.register(r'payslips', PayrollReceiptViewSet, basename='payslip')
+
 router.register(r'payroll-novelties', PayrollNoveltyViewSet, basename='payroll-novelty')
 router.register(r'departments', DepartmentViewSet, basename='department')
 router.register(r'job-positions', JobPositionViewSet, basename='job-position')
@@ -33,7 +37,10 @@ router.register(r'loan-payments', LoanPaymentViewSet, basename='loan-payment')
 urlpatterns = [
     path('', include(router.urls)),
     path('company/config/', CompanyConfigView.as_view(), name='company-config'),
+    path('company/policies/', PayrollPolicyView.as_view(), name='payroll-policy'),
+    path('concepts/config-metadata/', ConceptConfigMetadataView.as_view(), name='concept-config-metadata'),
     path('exchange-rates/latest/', LatestExchangeRateView.as_view(), name='latest-rate'),
     path('payroll/variables/', PayrollVariablesView.as_view(), name='payroll-variables'),
     path('payroll/validate-formula/', ValidateFormulaView.as_view(), name='validate-formula'),
 ]
+

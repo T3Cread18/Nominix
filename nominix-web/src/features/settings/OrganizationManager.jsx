@@ -196,7 +196,8 @@ const AddDepartmentButton = ({ onRefresh, branchId, disabled }) => {
 const JobPositionsList = ({ department }) => {
     const [positions, setPositions] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [isCreateOpen, setIsCreateOpen] = useState(false);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [editingPosition, setEditingPosition] = useState(null);
     const [currencies, setCurrencies] = useState([]);
 
     useEffect(() => {
@@ -232,7 +233,13 @@ const JobPositionsList = ({ department }) => {
                         <Briefcase size={10} /> Gestión de Cargos y Sueldos
                     </p>
                 </div>
-                <button onClick={() => setIsCreateOpen(true)} className="px-4 py-2 bg-nominix-dark text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all flex items-center gap-2">
+                <button
+                    onClick={() => {
+                        setEditingPosition(null);
+                        setIsModalOpen(true);
+                    }}
+                    className="px-4 py-2 bg-nominix-dark text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all flex items-center gap-2"
+                >
                     <Plus size={14} /> Nuevo Cargo
                 </button>
             </div>
@@ -249,8 +256,19 @@ const JobPositionsList = ({ department }) => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {positions.map(pos => (
                             <div key={pos.id} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all group relative">
-                                <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button className="p-1.5 bg-gray-100 text-gray-500 rounded-lg hover:bg-red-50 hover:text-red-500"><Trash2 size={12} /></button>
+                                <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
+                                    <button
+                                        onClick={() => {
+                                            setEditingPosition(pos);
+                                            setIsModalOpen(true);
+                                        }}
+                                        className="p-1.5 bg-gray-100 text-gray-500 rounded-lg hover:bg-nominix-electric hover:text-white transition-colors"
+                                    >
+                                        <Edit3 size={12} />
+                                    </button>
+                                    <button className="p-1.5 bg-gray-100 text-gray-500 rounded-lg hover:bg-red-50 hover:text-red-500 transition-colors">
+                                        <Trash2 size={12} />
+                                    </button>
                                 </div>
                                 <h5 className="font-bold text-nominix-dark">{pos.name}</h5>
                                 <p className="text-[10px] uppercase font-bold text-gray-400 mb-3">{pos.code}</p>
@@ -268,10 +286,14 @@ const JobPositionsList = ({ department }) => {
                 )}
             </div>
 
-            {isCreateOpen && (
+            {isModalOpen && (
                 <JobPositionModal
                     departmentId={department.id}
-                    onClose={() => setIsCreateOpen(false)}
+                    position={editingPosition}
+                    onClose={() => {
+                        setIsModalOpen(false);
+                        setEditingPosition(null);
+                    }}
                     onSuccess={loadPositions}
                     currencies={currencies}
                 />
@@ -280,25 +302,47 @@ const JobPositionsList = ({ department }) => {
     );
 };
 
-const JobPositionModal = ({ departmentId, onClose, onSuccess, currencies }) => {
+const JobPositionModal = ({ departmentId, position, onClose, onSuccess, currencies }) => {
     const [formData, setFormData] = useState({
-        name: '', code: '', default_total_salary: '', currency: 'USD'
+        name: '',
+        code: '',
+        default_total_salary: '',
+        currency: 'USD'
     });
     const [saving, setSaving] = useState(false);
+
+    useEffect(() => {
+        if (position) {
+            setFormData({
+                name: position.name,
+                code: position.code,
+                default_total_salary: position.default_total_salary,
+                currency: position.currency || 'USD'
+            });
+        }
+    }, [position]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setSaving(true);
         try {
-            await axiosClient.post('/job-positions/', {
-                ...formData,
-                department: departmentId
-            });
-            toast.success("Cargo creado");
+            if (position) {
+                await axiosClient.patch(`/job-positions/${position.id}/`, {
+                    ...formData,
+                    department: departmentId
+                });
+                toast.success("Cargo actualizado");
+            } else {
+                await axiosClient.post('/job-positions/', {
+                    ...formData,
+                    department: departmentId
+                });
+                toast.success("Cargo creado");
+            }
             onSuccess();
             onClose();
         } catch (error) {
-            toast.error("Error creando cargo. Verifique el código.");
+            toast.error(position ? "Error actualizando" : "Error creando cargo. Verifique el código.");
         } finally {
             setSaving(false);
         }
@@ -308,7 +352,7 @@ const JobPositionModal = ({ departmentId, onClose, onSuccess, currencies }) => {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-nominix-dark/40 backdrop-blur-sm animate-in fade-in">
             <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl p-6 animate-in zoom-in-95">
                 <div className="flex justify-between items-center mb-5">
-                    <h3 className="font-black text-nominix-dark">Nuevo Cargo</h3>
+                    <h3 className="font-black text-nominix-dark">{position ? 'Editar Cargo' : 'Nuevo Cargo'}</h3>
                     <button onClick={onClose}><X size={20} className="text-gray-400" /></button>
                 </div>
                 <form onSubmit={handleSubmit} className="space-y-4">
@@ -338,7 +382,7 @@ const JobPositionModal = ({ departmentId, onClose, onSuccess, currencies }) => {
                     </div>
 
                     <button disabled={saving} className="w-full py-3 bg-nominix-electric text-white rounded-xl font-black uppercase text-xs tracking-widest hover:opacity-90 mt-2">
-                        {saving ? 'Guardando...' : 'Crear Cargo'}
+                        {saving ? 'Guardando...' : position ? 'Guardar Cambios' : 'Crear Cargo'}
                     </button>
                 </form>
             </div>

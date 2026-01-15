@@ -18,16 +18,20 @@ from rest_framework.views import APIView
 from .models import (
     PayrollPeriod, PayrollReceipt, PayrollNovelty, Employee, 
     LaborContract, PayrollConcept, Company, Loan, Branch,
-    ExchangeRate, EmployeeConcept, Currency, Department, LoanPayment, JobPosition
+    ExchangeRate, EmployeeConcept, Currency, Department, LoanPayment, JobPosition,
+    PayrollPolicy
 )
 from .serializers import (
     PayrollPeriodSerializer, PayrollReceiptSerializer, PayrollNoveltySerializer,
     EmployeeSerializer, LaborContractSerializer, PayrollConceptSerializer,
     CompanySerializer, LoanSerializer, BranchSerializer,
     CurrencySerializer, EmployeeConceptSerializer, DepartmentSerializer, 
-    LoanPaymentSerializer, JobPositionSerializer
+    LoanPaymentSerializer, JobPositionSerializer, PayrollPolicySerializer,
+    ACCUMULATOR_LABELS, BEHAVIOR_REQUIRED_PARAMS
 )
 from .engine import PayrollEngine
+
+
 
 class CurrencyViewSet(viewsets.ModelViewSet):
     queryset = Currency.objects.all()
@@ -64,7 +68,89 @@ class EmployeeConceptViewSet(viewsets.ModelViewSet):
 class BranchViewSet(viewsets.ModelViewSet):
     queryset = Branch.objects.all()
     serializer_class = BranchSerializer
+
+
+class ConceptConfigMetadataView(APIView):
+    """
+    Devuelve la metadata necesaria para el constructor de conceptos en el frontend.
+    GET /api/concepts/config-metadata/
+    """
+    def get(self, request):
+        # Convertir behaviors del enum a lista de opciones para UI
+        behaviors = [
+            {'value': choice[0], 'label': choice[1]}
+            for choice in PayrollConcept.ConceptBehavior.choices
+        ]
+        
+        # Convertir kinds del enum a lista de opciones
+        kinds = [
+            {'value': choice[0], 'label': choice[1]}
+            for choice in PayrollConcept.ConceptKind.choices
+        ]
+        
+        # Convertir computation methods
+        computation_methods = [
+            {'value': choice[0], 'label': choice[1]}
+            for choice in PayrollConcept.ComputationMethod.choices
+        ]
+        
+        # Convertir accumulator labels a lista para checkboxes
+        accumulators = [
+            {'code': code, 'label': label}
+            for code, label in ACCUMULATOR_LABELS.items()
+        ]
+        
+        # Parámetros requeridos por behavior
+        behavior_params = BEHAVIOR_REQUIRED_PARAMS
+
+        return Response({
+            'behaviors': behaviors,
+            'kinds': kinds,
+            'computation_methods': computation_methods,
+            'accumulators': accumulators,
+            'behavior_required_params': behavior_params,
+        })
+
+
+class PayrollPolicyView(APIView):
+    """
+    Vista para leer/editar la política de nómina de la empresa.
+    GET/PUT /api/company/policies/
+    """
+    def get_policy(self, request):
+        """Obtiene o crea la política para la empresa actual."""
+        company = Company.objects.first()
+        if not company:
+            return None, Response(
+                {'error': 'No hay empresa configurada.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        policy, _ = PayrollPolicy.objects.get_or_create(company=company)
+        return policy, None
+    
+    def get(self, request):
+        policy, error_response = self.get_policy(request)
+        if error_response:
+            return error_response
+        
+        serializer = PayrollPolicySerializer(policy)
+        return Response(serializer.data)
+    
+    def put(self, request):
+        policy, error_response = self.get_policy(request)
+        if error_response:
+            return error_response
+        
+        serializer = PayrollPolicySerializer(policy, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
 class LatestExchangeRateView(APIView):
+
     """
     Devuelve la tasa de cambio más reciente para una moneda dada.
     Si no existe tasa para el día de hoy, intenta obtenerla del BCV.
@@ -271,17 +357,17 @@ class PayrollPeriodViewSet(viewsets.ModelViewSet):
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             return Response({"error": f"Falla inesperada en cierre: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
     @action(detail=True, methods=['get'], url_path='export-pdf')
-    def export_payslips_pdf(self, request, pk=None):
+    def export_pdf(self, request, pk=None):
         """
-        Genera un PDF masivo con todos los recibos del periodo.
-        Params: ?tipo=todos|salario|complemento|cestaticket
+        Genera el PDF masivo de recibos del periodo.
         """
         period = self.get_object()
         tipo_recibo = request.query_params.get('tipo', 'todos')
         
         # Obtener recibos asociados a este periodo
-        payslips_qs = period.payslips.select_related('employee', 'employee__department').prefetch_related('details').all()
+        payslips_qs = period.receipts.select_related('employee', 'employee__department').prefetch_related('lines').all()
         
         if not payslips_qs.exists():
             return Response({"error": "No hay recibos generados para este periodo."}, status=404)
@@ -297,7 +383,7 @@ class PayrollPeriodViewSet(viewsets.ModelViewSet):
         # 2. Pre-procesar cada payslip
         processed_payslips = []
         for payslip in payslips_qs:
-            actual_details = {d.concept_code: d for d in payslip.details.all()}
+            actual_details = {d.concept_code: d for d in payslip.lines.all()}
             used_codes = set()
             payslip_rows = []
             
@@ -480,12 +566,12 @@ class PayrollPeriodViewSet(viewsets.ModelViewSet):
         wb.save(response)
         return response
 
-class PayslipReadOnlyViewSet(viewsets.ReadOnlyModelViewSet):
+class PayrollReceiptViewSet(viewsets.ReadOnlyModelViewSet):
     """
     ViewSet solo lectura para consultar recibos históricos.
     """
-    queryset = Payslip.objects.all()
-    serializer_class = PayslipSerializer
+    queryset = PayrollReceipt.objects.all()
+    serializer_class = PayrollReceiptSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['period', 'employee', 'currency_code']
 
@@ -506,7 +592,7 @@ class PayslipReadOnlyViewSet(viewsets.ReadOnlyModelViewSet):
         ).order_by('receipt_order')
 
         # 2. Pre-procesar filas
-        actual_details = {d.concept_code: d for d in payslip.details.all()}
+        actual_details = {d.concept_code: d for d in payslip.lines.all()}
         used_codes = set()
         payslip_rows = []
         
@@ -581,6 +667,7 @@ class PayslipReadOnlyViewSet(viewsets.ReadOnlyModelViewSet):
         filename = f"recibo_{payslip.employee.national_id}_{payslip.period.id}.pdf"
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
         return response
+
 
 
 class PayrollNoveltyViewSet(viewsets.ModelViewSet):

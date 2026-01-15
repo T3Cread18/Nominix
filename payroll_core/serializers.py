@@ -2,8 +2,35 @@ from rest_framework import serializers
 from .models import (
     Employee, LaborContract, Branch, PayrollConcept, 
     EmployeeConcept, Currency, PayrollPeriod, PayrollReceipt, PayrollReceiptLine,
-    PayrollNovelty, Company, Department, Loan, LoanPayment, JobPosition, ExchangeRate
+    PayrollNovelty, Company, Department, Loan, LoanPayment, JobPosition, ExchangeRate,
+    PayrollPolicy
 )
+
+# ============================================================================
+# CONSTANTES PARA VALIDACIÓN Y UI (Concept Builder)
+# ============================================================================
+
+# Etiquetas de acumuladores disponibles para incidencias
+ACCUMULATOR_LABELS = {
+    'FAOV_BASE': 'Base FAOV (Ahorro Vivienda)',
+    'IVSS_BASE': 'Base IVSS (Seguro Social)',
+    'RPE_BASE': 'Base RPE (Paro Forzoso)',
+    'ISLR_BASE': 'Base ISLR (Impuesto)',
+    'PRESTACIONES_BASE': 'Base Prestaciones Sociales',
+}
+
+# Parámetros requeridos según behavior
+BEHAVIOR_REQUIRED_PARAMS = {
+    'LAW_DEDUCTION': ['rate', 'base_source'],
+    'SALARY_BASE': [],
+    'CESTATICKET': [],
+    'COMPLEMENT': [],
+    'LOAN': [],
+    'DYNAMIC': [],
+    'FIXED': [],
+}
+
+
 
 class PayrollNoveltySerializer(serializers.ModelSerializer):
     class Meta:
@@ -21,23 +48,65 @@ class CurrencySerializer(serializers.ModelSerializer):
         fields = ['code', 'name', 'symbol']
 
 class PayrollConceptSerializer(serializers.ModelSerializer):
+    """
+    Serializer para Conceptos de Nómina con validación de comportamiento y parámetros.
+    """
     currency_data = CurrencySerializer(source='currency', read_only=True)
+    behavior_display = serializers.CharField(source='get_behavior_display', read_only=True)
+    
     class Meta:
         model = PayrollConcept
         fields = [
             'id', 'code', 'name', 'kind', 'computation_method', 
             'value', 'currency', 'currency_data', 'is_salary_incidence', 
             'active', 'formula', 'show_on_payslip', 'appears_on_receipt',
-            'show_even_if_zero', 'receipt_order', 'is_system', 'incidences'
+            'show_even_if_zero', 'receipt_order', 'is_system', 
+            'incidences', 'behavior', 'behavior_display', 'system_params'
         ]
         read_only_fields = ['is_system']
 
+    def validate_incidences(self, value):
+        """Valida que las incidencias sean etiquetas conocidas."""
+        if not isinstance(value, list):
+            raise serializers.ValidationError("Incidences debe ser una lista.")
+        
+        for tag in value:
+            if tag not in ACCUMULATOR_LABELS:
+                raise serializers.ValidationError(
+                    f"Etiqueta de incidencia desconocida: '{tag}'. "
+                    f"Opciones válidas: {list(ACCUMULATOR_LABELS.keys())}"
+                )
+        return value
+
+    def validate_system_params(self, value):
+        """Valida que system_params sea un diccionario válido."""
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("system_params debe ser un objeto JSON.")
+        return value
+
     def validate(self, attrs):
-        if self.instance and self.instance.is_system:
-            raise serializers.ValidationError(
-                "Este es un concepto de sistema y no puede ser modificado."
-            )
+        # Bloquear modificación de conceptos de sistema
+        # if self.instance and self.instance.is_system:
+        #     raise serializers.ValidationError(
+        #         "Este es un concepto de sistema y no puede ser modificado."
+        #     )
+
+        
+        # Validar parámetros requeridos según behavior
+        behavior = attrs.get('behavior') or (self.instance.behavior if self.instance else None)
+        system_params = attrs.get('system_params', {})
+        
+        if behavior and behavior in BEHAVIOR_REQUIRED_PARAMS:
+            required = BEHAVIOR_REQUIRED_PARAMS[behavior]
+            for param in required:
+                if param not in system_params:
+                    raise serializers.ValidationError({
+                        'system_params': f"El comportamiento '{behavior}' requiere el parámetro '{param}'."
+                    })
+        
         return attrs
+
+
 
 class EmployeeConceptSerializer(serializers.ModelSerializer):
     concept_data = PayrollConceptSerializer(source='concept', read_only=True)
@@ -143,6 +212,24 @@ class CompanySerializer(serializers.ModelSerializer):
     class Meta:
         model = Company
         fields = '__all__'
+
+
+class PayrollPolicySerializer(serializers.ModelSerializer):
+    """
+    Serializer para Políticas de Nómina (factores de recargo).
+    """
+    company_name = serializers.CharField(source='company.name', read_only=True)
+    
+    class Meta:
+        model = PayrollPolicy
+        fields = [
+            'id', 'company', 'company_name',
+            'holiday_payout_factor', 'rest_day_payout_factor',
+            'overtime_day_factor', 'overtime_night_factor',
+            'night_bonus_rate', 'updated_at'
+        ]
+        read_only_fields = ['company', 'updated_at']
+
 
 class LoanPaymentSerializer(serializers.ModelSerializer):
     class Meta:

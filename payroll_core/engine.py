@@ -800,6 +800,9 @@ class PayrollEngine:
         integral_income = Decimal('0.00') # Base para deducciones de ley (Salario Integral)
         total_deductions = Decimal('0.00')
 
+        # Obtener compañía para pasar a los handlers
+        company = Company.objects.first()
+
         # 1. Inyectar conceptos del contrato (Asignaciones fijos)
         contract_concepts = self._get_contract_concepts()
         eval_context = self._build_eval_context()

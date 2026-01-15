@@ -20,10 +20,11 @@ const TenantWizard = ({ onClose, onCreated }) => {
         email: ''
     });
 
-    const handleCreate = async () => {
+    const handleCreate = async (data = null) => {
         setLoading(true);
+        const payload = data || form;
         try {
-            await axiosClient.post('/tenants/', form);
+            await axiosClient.post('/tenants/', payload);
             toast.success('Nueva infraestructura desplegada exitosamente');
             onCreated();
             onClose();
@@ -748,10 +749,28 @@ const TenantsAdmin = () => {
                                                 <code className="text-[11px] text-nominix-electric bg-nominix-electric/10 px-2 py-0.5 rounded inline-block w-fit font-mono">
                                                     {tenant.schema_name}
                                                 </code>
-                                                <div className="flex items-center gap-1.5 text-xs text-gray-400">
-                                                    <Globe size={12} />
-                                                    {tenant.domains?.find(d => d.is_primary)?.domain || 'Sin dominio'}
-                                                </div>
+                                                {(() => {
+                                                    const primaryDomain = tenant.domains?.find(d => d.is_primary)?.domain;
+                                                    if (!primaryDomain) return <span className="text-xs text-gray-500">Sin dominio</span>;
+
+                                                    const protocol = window.location.protocol;
+                                                    const port = window.location.port ? `:${window.location.port}` : '';
+                                                    const url = primaryDomain.includes('localhost')
+                                                        ? `${protocol}//${primaryDomain}${port}`
+                                                        : `${protocol}//${primaryDomain}`;
+
+                                                    return (
+                                                        <a
+                                                            href={url}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-nominix-electric hover:underline transition-colors mt-1"
+                                                        >
+                                                            <Globe size={12} />
+                                                            {primaryDomain}
+                                                        </a>
+                                                    );
+                                                })()}
                                             </div>
                                         </td>
                                         <td className="px-8 py-6">

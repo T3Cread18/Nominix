@@ -21,6 +21,9 @@ DEBUG: bool = os.environ.get('DEBUG', 'True').lower() in ('true', '1', 'yes')
 
 ALLOWED_HOSTS: List[str] = ['localhost', '127.0.0.1', '.localhost']
 
+# Dominio base para la creación automática de subdominios
+TENANT_BASE_DOMAIN: str = os.environ.get('TENANT_BASE_DOMAIN', 'localhost')
+
 # Orígenes confiables para CSRF (Necesario para el frontend desacoplado)
 CSRF_TRUSTED_ORIGINS: List[str] = [
     'http://localhost:3000',
