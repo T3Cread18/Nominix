@@ -269,10 +269,15 @@ class PayrollEngine:
         """
         Construye SOLO las VARIABLES (Datos).
         """
+        # 1. Determinar Salario Total y Sueldo Base
         contract_rate = self._get_exchange_rate_value(self.contract.salary_currency)
-        salary_ves = float(self.contract.salary_base * contract_rate)
+        total_salary_ves = float(self.contract.monthly_salary * contract_rate)
         
-        # Cálculo de Lunes y desglose de días por tipo
+        # Obtener desglose para tener el Sueldo Base real
+        breakdown = SalarySplitter.get_salary_breakdown(self.contract)
+        base_salary_ves = float(breakdown['base'] * contract_rate)
+        
+        # 2. Cálculo de Lunes y desglose de días por tipo
         mondays = 0
         workdays_count = 0  # L-V
         # Contador real del calendario para validación
@@ -355,9 +360,17 @@ class PayrollEngine:
             elif delta >= 6: days_in_period = 7
             else: days_in_period = delta
 
+        # 3. Contexto de Variables
         context = {
-            'SALARIO_MENSUAL': salary_ves,
-            'SALARIO_DIARIO': salary_ves / 30,
+            'SALARIO_MENSUAL': total_salary_ves,
+            'SALARIO_DIARIO': total_salary_ves / 30,
+            
+            # Nuevas variables desglosadas
+            'SALARIO_TOTAL_MENSUAL': total_salary_ves,
+            'SALARIO_TOTAL_DIARIO': total_salary_ves / 30,
+            'SUELDO_BASE_MENSUAL': base_salary_ves,
+            'SUELDO_BASE_DIARIO': base_salary_ves / 30,
+            
             'SALARIO_MINIMO': float(min_salary),
             'ANTIGUEDAD': self.contract.employee.seniority_years,
             'DIAS': days_in_period,
@@ -472,9 +485,18 @@ class PayrollEngine:
 
         elif concept.computation_method == PayrollConcept.ComputationMethod.PERCENTAGE_OF_BASIC:
             contract_rate = self._get_exchange_rate_value(self.contract.salary_currency)
-            salary_ves = self.contract.salary_amount * contract_rate
+            
+            # Determinar qué base usar según la configuración del concepto
+            if concept.calculation_base == PayrollConcept.CalculationBase.BASE:
+                breakdown = SalarySplitter.get_salary_breakdown(self.contract)
+                salary_ves = breakdown['base'] * contract_rate
+                base_name = "Sueldo Base"
+            else:
+                salary_ves = self.contract.monthly_salary * contract_rate
+                base_name = "Salario Total"
+
             amount = (salary_ves * base_val) / Decimal('100.00')
-            trace = f"({float(salary_ves):.2f} * {float(base_val):.2f}%) / 100"
+            trace = f"({float(salary_ves):.2f} [{base_name}] * {float(base_val):.2f}%) / 100"
 
         elif concept.computation_method == PayrollConcept.ComputationMethod.DYNAMIC_FORMULA:
             # Si hay un override_value (novedad), inyectarlo al contexto bajo el código del concepto
@@ -511,83 +533,27 @@ class PayrollEngine:
 
     def _handle_salary_base(self, cc, eval_context, company):
         """
-        Handler para desglosar el sueldo base en días trabajados, descansos y feriados.
-        Aplica los factores de la política de la empresa si existen.
+        Handler para el sueldo base. 
+        Asegura que el sueldo base se reporte por los días completos del periodo (15/30)
+        sin restar descansos o feriados, los cuales se calculan como conceptos aditivos.
         """
         lines = []
         total_days = eval_context.get('DIAS', 15)
-        amount_per_day = cc['amount_ves'] / Decimal(str(total_days))
         
-        # Obtener política de la empresa
-        policy = getattr(company, 'policy', None)
-        holiday_factor = Decimal(str(policy.holiday_payout_factor)) if policy else Decimal('1.50')
-        rest_factor = Decimal(str(policy.rest_day_payout_factor)) if policy else Decimal('1.50')
-
-        # Días registrados
-        sun_days = eval_context.get('DIAS_DOMINGO', 0)
-        hol_days = eval_context.get('DIAS_FERIADO', 0)
-        sat_days = eval_context.get('DIAS_SABADO', 0) 
-        
-        # 1. Días Trabajados (Remanente ordinario)
-        work_days = total_days - sun_days - hol_days - sat_days
-        if work_days > 0:
-            lines.append({
-                'code': 'SUELDO_BASE',
-                'name': cc['name'],
-                'kind': 'EARNING',
-                'amount_ves': (amount_per_day * Decimal(str(work_days))).quantize(Decimal('0.01')),
-                'quantity': work_days,
-                'unit': 'días',
-                'tipo_recibo': 'salario',
-                'trace': f"({float(cc['amount_ves']):.2f} / {total_days}) * {work_days} Días Ord.",
-                'formula': '(QUINCENA / DIAS_PERIOD) * DIAS_TRAB',
-                'variables': {'QUINCENA': float(cc['amount_ves']), 'DIAS_PERIOD': total_days, 'DIAS_TRAB': work_days}
-            })
-
-        # 2. Días Descanso (Sábados/Descansos) - Aplica Rest Factor
-        if sat_days > 0:
-            lines.append({
-                'code': 'DIAS_DESCANSO',
-                'name': 'Días Descanso Trabajados',
-                'kind': 'EARNING',
-                'amount_ves': (amount_per_day * rest_factor * Decimal(str(sat_days))).quantize(Decimal('0.01')),
-                'quantity': sat_days,
-                'unit': 'días',
-                'tipo_recibo': 'salario',
-                'trace': f"({float(cc['amount_ves']):.2f} / {total_days}) * {rest_factor} (Factor) * {sat_days} Días",
-                'formula': '(DIARIO * FACTOR_DESC) * DIAS',
-                'variables': {'DIARIO': float(amount_per_day), 'FACTOR_DESC': float(rest_factor), 'DIAS': sat_days}
-            })
-
-        # 3. Días Domingo - Aplica Rest Factor (Generalmente igual a descanso)
-        if sun_days > 0:
-            lines.append({
-                'code': 'DIAS_DOMINGO',
-                'name': 'Días de Descanso (Domingo)',
-                'kind': 'EARNING',
-                'amount_ves': (amount_per_day * rest_factor * Decimal(str(sun_days))).quantize(Decimal('0.01')),
-                'quantity': sun_days,
-                'unit': 'días',
-                'tipo_recibo': 'salario',
-                'trace': f"({float(cc['amount_ves']):.2f} / {total_days}) * {rest_factor} (Factor) * {sun_days} Días",
-                'formula': '(DIARIO * FACTOR_DESC) * DIAS',
-                'variables': {'DIARIO': float(amount_per_day), 'FACTOR_DESC': float(rest_factor), 'DIAS': sun_days}
-            })
-
-        # 4. Días Feriados - Aplica Holiday Factor
-        if hol_days > 0:
-            lines.append({
-                'code': 'DIAS_FERIADO',
-                'name': 'Días Feriados Trabajados',
-                'kind': 'EARNING',
-                'amount_ves': (amount_per_day * holiday_factor * Decimal(str(hol_days))).quantize(Decimal('0.01')),
-                'quantity': hol_days,
-                'unit': 'días',
-                'tipo_recibo': 'salario',
-                'trace': f"({float(cc['amount_ves']):.2f} / {total_days}) * {holiday_factor} (Factor) * {hol_days} Días",
-                'formula': '(DIARIO * FACTOR_FER) * DIAS',
-                'variables': {'DIARIO': float(amount_per_day), 'FACTOR_FER': float(holiday_factor), 'DIAS': hol_days}
-            })
+        # El Sueldo Base siempre representa la totalidad del periodo asignado (concept_data['base_ves'])
+        # No restamos nada para evitar modificar el monto principal.
+        lines.append({
+            'code': 'SUELDO_BASE',
+            'name': cc['name'],
+            'kind': 'EARNING',
+            'amount_ves': cc['amount_ves'],
+            'quantity': total_days,
+            'unit': 'días',
+            'tipo_recibo': 'salario',
+            'trace': f"{float(cc['amount_ves']):.2f} Bs. (Total {total_days} días)",
+            'formula': 'SALARIO_PERIOD',
+            'variables': {'SALARIO_PERIOD': float(cc['amount_ves']), 'DIAS': total_days}
+        })
             
         return lines
 

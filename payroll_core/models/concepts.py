@@ -138,6 +138,19 @@ class PayrollConcept(models.Model):
         DYNAMIC = 'DYNAMIC', 'Fórmula Dinámica'
         FIXED = 'FIXED', 'Monto Fijo'
 
+    class CalculationBase(models.TextChoices):
+        """Base de cálculo para el concepto (Total Paquete vs Sueldo Base)."""
+        TOTAL = 'TOTAL', 'Salario Total (Base + Complemento)'
+        BASE = 'BASE', 'Sueldo Base Únicamente'
+
+    calculation_base: models.CharField = models.CharField(
+        max_length=10,
+        choices=CalculationBase.choices,
+        default=CalculationBase.TOTAL,
+        verbose_name='Base de Cálculo',
+        help_text='Indica si el cálculo se basa en el total del contrato o solo en el sueldo base'
+    )
+
     behavior: models.CharField = models.CharField(
         max_length=20,
         choices=ConceptBehavior.choices,

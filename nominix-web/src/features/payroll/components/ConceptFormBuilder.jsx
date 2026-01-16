@@ -100,6 +100,7 @@ export default function ConceptFormBuilder({ initialData, onSave, onCancel }) {
             active: initialData?.active ?? true,
             appears_on_receipt: initialData?.appears_on_receipt ?? true,
             show_even_if_zero: initialData?.show_even_if_zero ?? false,
+            calculation_base: initialData?.calculation_base || 'TOTAL',
             receipt_order: initialData?.receipt_order || 0
         }
     });
@@ -215,6 +216,19 @@ export default function ConceptFormBuilder({ initialData, onSave, onCancel }) {
                             <option key={b.value} value={b.value}>{b.label}</option>
                         ))}
                     </select>
+                </div>
+
+                <div>
+                    <label className="block text-sm font-medium text-gray-700">Base de Cálculo</label>
+                    <select
+                        {...register('calculation_base')}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 sm:text-sm border p-2"
+                    >
+                        {configMetadata?.calculation_base_options?.map(opt => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                    </select>
+                    <p className="text-[10px] text-gray-400 mt-1 uppercase font-bold tracking-tight">Utilizado en porcentajes y horas extras</p>
                 </div>
 
                 {/* New Currency Field */}

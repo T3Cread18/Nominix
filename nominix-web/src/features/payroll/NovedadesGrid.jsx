@@ -88,7 +88,7 @@ const NovedadesGrid = ({ initialPeriods, initialEmployees }) => {
                 const empNovs = novs.filter(n => n.employee === emp.id);
                 const row = {
                     id: emp.id,
-                    name: emp.full_name,
+                    name: emp.first_name + ' ' + emp.last_name,
                     national_id: emp.national_id,
                     position: emp.position,
                 };

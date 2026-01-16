@@ -103,12 +103,19 @@ class ConceptConfigMetadataView(APIView):
         # Parámetros requeridos por behavior
         behavior_params = BEHAVIOR_REQUIRED_PARAMS
 
+        # Convertir calculation base methods
+        calculation_bases = [
+            {'value': choice[0], 'label': choice[1]}
+            for choice in PayrollConcept.CalculationBase.choices
+        ]
+
         return Response({
             'behaviors': behaviors,
             'kinds': kinds,
             'computation_methods': computation_methods,
             'accumulators': accumulators,
             'behavior_required_params': behavior_params,
+            'calculation_base_options': calculation_bases,
         })
 
 

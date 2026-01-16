@@ -232,6 +232,7 @@ def create_system_concepts():
                     **data,
                     'currency': ves,
                     'is_system': True,
+                    'calculation_base': data.get('calculation_base', PayrollConcept.CalculationBase.TOTAL),
                     'incidences': incidences,
                     'system_params': system_params,
                     'active': True
