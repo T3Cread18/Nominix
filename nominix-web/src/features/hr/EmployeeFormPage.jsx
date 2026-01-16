@@ -8,7 +8,7 @@ import {
     useUpdateEmployee,
     usePatchEmployee
 } from '../../hooks/useEmployees';
-import { useBranches } from '../../hooks/useOrganization';
+import { useBranches, useJobPositions } from '../../hooks/useOrganization';
 // Nuevo Hook
 import { useContracts } from '../../hooks/useLabor';
 
@@ -72,8 +72,9 @@ const EmployeeFormPage = () => {
     // --- LOCAL STATE ---
     const [selectedPhotoFile, setSelectedPhotoFile] = useState(null);
     const [photoPreview, setPhotoPreview] = useState(null);
-    // TODO: Migrar `availableJobPositions` a useJobPositions hook si es dinamico, pero depende del Dept seleccionado en form.
-    const [availableJobPositions, setAvailableJobPositions] = useState([]);
+    // Cargos dinámicos por departamento
+    const currentDept = watch('department');
+    const { data: availableJobPositions = [] } = useJobPositions(currentDept, { enabled: !!currentDept });
 
     const [confirmState, setConfirmState] = useState({ isOpen: false, title: '', message: '', action: null, isDangerous: false });
 
@@ -97,21 +98,6 @@ const EmployeeFormPage = () => {
         }
     }, [employee, reset]);
 
-    // 2. Fetch de Cargos dinamicamente cuando cambia el Departamento
-    const currentDept = watch('department');
-    useEffect(() => {
-        const fetchJobPositions = async () => {
-            if (currentDept) {
-                try {
-                    const res = await axiosClient.get(`/job-positions/?department=${currentDept}`);
-                    setAvailableJobPositions(res.data.results || res.data);
-                } catch (e) { console.error(e); }
-            } else {
-                setAvailableJobPositions([]);
-            }
-        };
-        fetchJobPositions();
-    }, [currentDept]);
 
     // --- HANDLERS ---
 

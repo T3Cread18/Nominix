@@ -23,7 +23,7 @@ const Navbar = () => {
         { path: '/personnel', icon: Users, label: 'Personal' },
         { path: '/payroll', icon: Calculator, label: 'Nómina' },
         { path: '/catalog', icon: ClipboardList, label: 'Conceptos' },
-        { path: '/novelties', icon: FileSpreadsheet, label: 'Novedades' },
+        //{ path: '/novelties', icon: FileSpreadsheet, label: 'Novedades' },
         { path: '/closures', icon: ShieldCheck, label: 'Cierres' },
         { path: '/config', icon: Settings, label: 'Config' },
     ];

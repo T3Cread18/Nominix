@@ -1,16 +1,47 @@
-# React + Vite
+# ⚡ Nóminix Web - Frontend Premium
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Este es el cliente web de **Nóminix**, construido con React 18, Vite y Tailwind CSS, diseñado para ofrecer una experiencia de gestión de RRHH fluida, rápida y estéticamente atractiva.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## 🚀 Tecnologías Principales
+- **React 18**: Basado en componentes funcionales y hooks.
+- **Vite**: Motor de compilación ultra rápido.
+- **TanStack Query (v5)**: Sincronización de estado servidor-cliente.
+- **Tailwind CSS**: Estilizado mediante utilidades y un Design System personalizado.
+- **Lucide React**: Set de iconos vectoriales.
+- **React Hook Form**: Gestión de formularios de alto rendimiento.
 
-## React Compiler
+---
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## 📂 Estructura del Proyecto
+- `src/components/ui/`: Biblioteca de componentes atómicos reutilizables.
+- `src/features/`: Módulos de negocio (Auth, HR, Payroll, Settings, Tenants).
+- `src/hooks/`: Capa de datos y lógica reutilizable.
+- `src/api/`: Configuración de Axios e interceptores.
 
-## Expanding the ESLint configuration
+---
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## 🛠️ Configuración de Desarrollo
+```bash
+# Instalación
+npm install
+
+# Servidor Local
+npm run dev
+
+# Construcción para Producción
+npm run build
+```
+
+---
+
+## 📖 Documentación Relacionada
+Para más detalles sobre los componentes y la lógica del sistema, consulte la carpeta `/docs` en la raíz del proyecto:
+- [Guía de Componentes UI](../docs/ui_components.md)
+- [Guía de Hooks de Datos](../docs/hooks.md)
+- [Documentación Técnica General](../docs/PROJECT_DOCUMENTATION.md)
+
+---
+
+© 2026 NÓMINIX - Hecho en Venezuela 🇻🇪

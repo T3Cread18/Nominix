@@ -22,7 +22,7 @@ import { cn } from '../../utils/cn';
  * Integra: Novedades, Simulación, Cierre de Periodos
  */
 const PayrollDashboard = () => {
-    const [activeTab, setActiveTab] = useState('novelties');
+    const [activeTab, setActiveTab] = useState('detail');
     const [periods, setPeriods] = useState([]);
     const [employees, setEmployees] = useState([]); // <--- Lista completa compartida
     const [selectedPeriod, setSelectedPeriod] = useState(null);
@@ -90,8 +90,8 @@ const PayrollDashboard = () => {
     };
 
     const tabs = [
-        { id: 'novelties', label: 'Novedades', icon: FileText, description: 'Carga masiva de incidencias' },
         { id: 'detail', label: 'Detalle de Nómina', icon: Calculator, description: 'Modificar y previsualizar recibos' },
+        { id: 'novelties', label: 'Novedades', icon: FileText, description: 'Carga masiva de incidencias' },
         { id: 'closure', label: 'Cierre', icon: Lock, description: 'Gestión de periodos' },
     ];
 
