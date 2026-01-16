@@ -1,7 +1,0 @@
---- Simulating for: Nally Valera ---
-[SUELDO_BASE] Sueldo Base: 2500.00 Bs.
-[CESTATICKET] Cestaticket: 12187.18 Bs.
-[COMPLEMENTO] Complemento Salarial: 61482.72 Bs.
-[IVSS] Seguro Social IVSS (4% - 4 Lun): 24.00 Bs.
-[PIE] Paro Forzoso RPE (0.5% - 4 Lun): 6.00 Bs.
-[FAOV] Bono Vivienda FAOV (1%): 761.70 Bs.

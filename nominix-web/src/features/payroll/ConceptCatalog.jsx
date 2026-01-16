@@ -98,44 +98,35 @@ const ConceptCatalog = () => {
 
             {/* Modal con Builder */}
             {isModalOpen && (
-                <div className="absolute inset-0 z-50 bg-nominix-dark/95 backdrop-blur-md flex items-center justify-center p-8 animate-in fade-in duration-300">
-                    <div className="bg-white w-full max-w-2xl rounded-[2.5rem] p-8 shadow-2xl animate-in zoom-in-95 duration-200 overflow-y-auto max-h-[90vh]">
-                        <div className="flex justify-between items-center mb-6 border-b border-gray-100 pb-4">
-                            <div>
-                                <h4 className="text-xl font-black text-nominix-dark uppercase tracking-widest">
-                                    {editingConcept ? 'Editar Concepto' : 'Nuevo Concepto'}
-                                </h4>
-                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-tighter mt-1">
-                                    Constructor de Reglas Salariales
-                                </p>
-                            </div>
-                            <button onClick={handleCloseModal} className="p-2 hover:bg-gray-100 rounded-xl transition-colors text-gray-300 hover:text-nominix-dark">
-                                <X size={24} />
-                            </button>
-                        </div>
-
-                        {/* Inyección del Componente Builder */}
+                <div className="fixed inset-0 z-[100] bg-nominix-dark/40 backdrop-blur-xl flex items-center justify-center p-4 md:p-12 animate-in fade-in duration-300">
+                    <div className="w-full max-w-6xl animate-in zoom-in-95 duration-200 overflow-y-auto max-h-[95vh] custom-scrollbar">
+                        {/* El ConceptFormBuilder ya trae su propio contenedor oscuro y cabecera */}
                         <ConceptFormBuilder
+                            key={editingConcept?.id || 'new'}
                             initialData={editingConcept}
                             onSave={handleSaveSuccess}
                             onCancel={handleCloseModal}
                         />
-
                     </div>
                 </div>
             )}
 
             <div className="p-10 border-b border-gray-50 bg-gray-50/30">
                 <div className="flex items-center justify-between mb-10">
-                    <div>
-                        <h3 className="text-3xl font-black text-nominix-dark">Configuración de Conceptos</h3>
-                        <p className="text-[11px] text-gray-400 font-black uppercase tracking-[0.3em] mt-2">DICCIONARIO MAESTRO DE REGLAS SALARIALES</p>
+                    <div className="flex items-center gap-6">
+                        <div className="w-16 h-16 bg-nominix-dark rounded-[1.5rem] flex items-center justify-center shadow-2xl">
+                            <ClipboardList className="text-white" size={32} />
+                        </div>
+                        <div>
+                            <h3 className="text-4xl font-black text-nominix-dark tracking-tighter uppercase italic">Catálogo <span className="text-nominix-electric not-italic">Global</span></h3>
+                            <p className="text-[11px] text-gray-400 font-black uppercase tracking-[0.4em] mt-1">Diccionario Maestro de Reglas Salariales</p>
+                        </div>
                     </div>
                     <button
                         onClick={handleOpenCreate}
-                        className="flex items-center gap-3 px-8 py-4 bg-nominix-dark text-white rounded-[1.2rem] text-[11px] font-black uppercase tracking-widest hover:bg-black transition-all shadow-2xl shadow-nominix-dark/10 active:scale-95"
+                        className="flex items-center gap-3 px-8 py-5 bg-nominix-dark text-white rounded-[1.2rem] text-[11px] font-black uppercase tracking-widest hover:bg-black transition-all shadow-2xl shadow-nominix-dark/10 active:scale-95"
                     >
-                        <Plus size={20} /> Crear Nuevo Concepto
+                        <Plus size={20} /> Nuevo Concepto
                     </button>
                 </div>
 

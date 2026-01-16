@@ -4,6 +4,101 @@ import { useForm, useWatch } from 'react-hook-form';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from '../../../api/axiosClient';
 import { toast } from 'sonner';
+import {
+    Settings2,
+    Calculator,
+    Layers,
+    Save,
+    X,
+    Hash,
+    FileText,
+    CheckCircle2,
+    AlertCircle,
+    Coins,
+    ChevronRight,
+    Code2,
+    Eye,
+    EyeOff,
+    Info,
+    ArrowUpDown,
+    Percent,
+    DollarSign,
+    Database,
+    Tag,
+    Calendar,
+    ShieldCheck,
+    Loader2
+} from 'lucide-react';
+
+// ============================================================================
+// COMPONENTES DE UI REUTILIZABLES (ESTILO PREMIUM)
+// ============================================================================
+
+const FormSection = ({ title, icon: Icon, children, description }) => (
+    <div className="bg-white/5 border border-white/10 rounded-[24px] p-6 backdrop-blur-xl space-y-4">
+        <div className="flex items-center gap-3 border-b border-white/5 pb-4">
+            <div className="w-10 h-10 rounded-xl bg-nominix-electric/10 flex items-center justify-center border border-nominix-electric/20">
+                <Icon className="text-nominix-electric" size={20} />
+            </div>
+            <div>
+                <h3 className="text-white font-bold tracking-tight">{title}</h3>
+                {description && <p className="text-gray-400 text-[10px] font-bold uppercase tracking-widest leading-tight">{description}</p>}
+            </div>
+        </div>
+        <div className="pt-2">
+            {children}
+        </div>
+    </div>
+);
+
+const CustomInput = React.forwardRef(({ label, icon: Icon, error, ...props }, ref) => (
+    <div className="space-y-1.5 w-full">
+        {label && <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{label}</label>}
+        <div className="relative group">
+            {Icon && <Icon className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${props.disabled ? 'text-gray-600' : 'text-gray-400 group-focus-within:text-nominix-electric'}`} size={16} />}
+            <input
+                {...props}
+                ref={ref}
+                className={`w-full bg-black/40 border ${error ? 'border-red-500/50' : 'border-white/5'} rounded-2xl py-3 ${Icon ? 'pl-11' : 'px-4'} pr-4 text-white text-sm outline-none focus:border-nominix-electric/50 focus:ring-4 focus:ring-nominix-electric/5 transition-all placeholder:text-gray-700 disabled:bg-white/5 disabled:cursor-not-allowed disabled:text-gray-500 disabled:border-white/5`}
+            />
+        </div>
+        {error && <span className="text-red-500 text-[10px] font-bold ml-1">{error}</span>}
+    </div>
+));
+CustomInput.displayName = 'CustomInput';
+
+const CustomSelect = React.forwardRef(({ label, icon: Icon, options = [], ...props }, ref) => (
+    <div className="space-y-1.5 w-full">
+        {label && <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{label}</label>}
+        <div className="relative group">
+            {Icon && <Icon className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-nominix-electric transition-colors pointer-events-none" size={16} />}
+            <select
+                {...props}
+                ref={ref}
+                className={`w-full bg-black/40 border border-white/5 rounded-2xl py-3 ${Icon ? 'pl-11' : 'px-4'} pr-10 text-white text-sm outline-none focus:border-nominix-electric/50 focus:ring-4 focus:ring-nominix-electric/5 transition-all appearance-none cursor-pointer`}
+            >
+                {options.map(opt => (
+                    <option key={opt.value} value={opt.value} className="bg-[#1A1A1E] text-white">
+                        {opt.label}
+                    </option>
+                ))}
+            </select>
+            <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 rotate-90 pointer-events-none" size={16} />
+        </div>
+    </div>
+));
+CustomSelect.displayName = 'CustomSelect';
+
+const Toggle = ({ label, checked, onChange, id }) => (
+    <div className="flex items-center gap-3 p-3 rounded-2xl bg-white/5 border border-white/5 hover:border-white/10 transition-all cursor-pointer group" onClick={() => onChange(!checked)}>
+        <div className={`w-10 h-6 rounded-full relative transition-all duration-300 ${checked ? 'bg-nominix-electric shadow-[0_0_10px_rgba(0,82,255,0.3)]' : 'bg-gray-800'}`}>
+            <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 ${checked ? 'left-5' : 'left-1 shadow-md'}`}></div>
+        </div>
+        <label htmlFor={id} className="text-xs font-bold text-gray-300 group-hover:text-white transition-colors cursor-pointer select-none">
+            {label}
+        </label>
+    </div>
+);
 
 // ============================================================================
 // CONFIGURACIÓN DE UI PARA CADA BEHAVIOR
@@ -11,11 +106,12 @@ import { toast } from 'sonner';
 const BEHAVIOR_CONFIG = {
     'LAW_DEDUCTION': {
         title: "Deducción de Ley",
-        description: "Configuración para deducciones como IVSS, FAOV, RPE.",
+        icon: ShieldCheck,
+        description: "Regulaciones de seguridad social (IVSS, FAOV, RPE)",
         fields: [
-            { name: 'rate', label: 'Tasa / Porcentaje (0.00 - 1.00)', type: 'number', step: '0.0001', required: true, help: "Ej: 0.04 para 4%" },
+            { name: 'rate', label: 'Tasa (0.00 - 1.00)', type: 'number', step: '0.0001', required: true, help: "Ej: 0.04 para 4%", icon: Percent },
             {
-                name: 'base_source', label: 'Fuente de Base', type: 'select', required: true,
+                name: 'base_source', label: 'Fuente de Base', type: 'select', required: true, icon: Database,
                 options: [
                     { value: 'ACCUMULATOR', label: 'Acumulador (Suma de Incidencias)' },
                     { value: 'TOTAL_EARNINGS', label: 'Total Asignaciones' },
@@ -23,52 +119,32 @@ const BEHAVIOR_CONFIG = {
                 ]
             },
             {
-                name: 'base_label', label: 'Etiqueta del Acumulador', type: 'text',
+                name: 'base_label', label: 'Etiqueta Acumulador', type: 'text', icon: Tag,
                 required: true,
-                help: "Tag interno usado para sumar incidencias (ej: FAOV_BASE)",
+                help: "Tag interno (ej: FAOV_BASE)",
                 showIf: (params) => params.base_source === 'ACCUMULATOR'
             },
-            { name: 'cap_multiplier', label: 'Tope (Salarios Mínimos)', type: 'number', step: '1', help: "Dejar en blanco si no tiene tope." },
-            { name: 'multiplier_var', label: 'Variable Multiplicadora', type: 'text', help: "Ej: 'LUNES' para multiplicar por lunes del mes." }
+            { name: 'cap_multiplier', label: 'Tope (S.M.)', type: 'number', step: '1', help: "Multiplicador salario mínimo", icon: ArrowUpDown },
+            { name: 'multiplier_var', label: 'Var. Semanal', type: 'text', help: "Ej: 'LUNES'", icon: Calendar }
         ]
     },
-    'SALARY_BASE': {
-        title: "Sueldo Base",
-        description: "Este concepto representa el pago del sueldo base. Generalmente no requiere parámetros adicionales.",
-        fields: []
-    },
-    'CESTATICKET': {
-        title: "Cestaticket",
-        description: "Beneficio de alimentación. El monto se toma de la configuración de la empresa o contrato.",
-        fields: []
-    },
-    'COMPLEMENT': {
-        title: "Complemento Salarial",
-        description: "Bonificaciones fijas recurrentes.",
-        fields: []
-    },
-    'LOAN': {
-        title: "Préstamo",
-        description: "Deducción por concepto de pago de préstamos.",
-        fields: []
-    },
-    'FIXED': {
-        title: "Monto Fijo Manual",
-        description: "Concepto de valor fijo asignado manualmente o por contrato.",
-        fields: []
-    },
     'DYNAMIC': {
-        title: "Fórmula Python",
-        description: "Cálculo avanzado mediante código Python.",
+        title: "Fórmula de Sistema",
+        icon: Code2,
+        description: "Ejecución de lógica avanzada personalizada",
         customRender: true
     }
 };
+
+// ============================================================================
+// COMPONENTE PRINCIPAL
+// ============================================================================
 
 export default function ConceptFormBuilder({ initialData, onSave, onCancel }) {
     const queryClient = useQueryClient();
     const isEditing = !!initialData;
 
-    // 1. Obtener Metadata del Backend y Monedas
+    // 1. Fetch Metadata
     const { data: configMetadata, isLoading: loadingMeta } = useQuery({
         queryKey: ['conceptConfigMetadata'],
         queryFn: async () => {
@@ -77,23 +153,25 @@ export default function ConceptFormBuilder({ initialData, onSave, onCancel }) {
         }
     });
 
-    const { data: currencies, isLoading: loadingCurrencies } = useQuery({
+    const { data: currencies } = useQuery({
         queryKey: ['currencies'],
         queryFn: async () => {
             const res = await axios.get('/currencies/');
-            return res.data; // Asumiendo que retorna lista o {results: []}
+            return res.data;
         }
     });
 
-    // 2. Configurar React Hook Form
+    // 2. Form Setup
     const { register, control, handleSubmit, setValue, watch, formState: { errors } } = useForm({
         defaultValues: {
             code: initialData?.code || '',
             name: initialData?.name || '',
             kind: initialData?.kind || 'EARNING',
             behavior: initialData?.behavior || 'DYNAMIC',
-            currency: initialData?.currency || '', // Required field
-            value: initialData?.value || 0,        // Required field
+            currency: initialData?.currency || 'VES',
+            computation_method: initialData?.computation_method || 'FIXED_AMOUNT',
+            is_salary_incidence: initialData?.is_salary_incidence ?? true,
+            value: initialData?.value || 0,
             incidences: initialData?.incidences || [],
             system_params: initialData?.system_params || {},
             formula: initialData?.formula || '',
@@ -105,281 +183,277 @@ export default function ConceptFormBuilder({ initialData, onSave, onCancel }) {
         }
     });
 
-    // Watchers
     const selectedBehavior = watch('behavior');
+    const selectedMethod = watch('computation_method');
     const currentParams = watch('system_params');
     const selectedKind = watch('kind');
 
-    // Mutation para guardar
+    // Sincronización automática de Behavior -> Method
+    useEffect(() => {
+        if (selectedBehavior === 'DYNAMIC') {
+            setValue('computation_method', 'DYNAMIC_FORMULA');
+        } else if (selectedBehavior === 'FIXED') {
+            setValue('computation_method', 'FIXED_AMOUNT');
+        } else if (selectedBehavior === 'LAW_DEDUCTION') {
+            setValue('computation_method', 'PERCENTAGE_OF_BASIC');
+        }
+    }, [selectedBehavior, setValue]);
+
+    // 3. Mutation
     const mutation = useMutation({
         mutationFn: (data) => {
-            // Asegurar que value y currency existan (defaults si están vacíos para evitar 400)
-            if (!data.value) data.value = 0;
-            if (!data.currency && currencies?.length > 0) data.currency = currencies[0].code;
-
             if (isEditing) {
                 return axios.put(`/payroll-concepts/${initialData.id}/`, data);
-            } else {
-                return axios.post('/payroll-concepts/', data);
             }
+            return axios.post('/payroll-concepts/', data);
         },
         onSuccess: () => {
-            toast.success(isEditing ? 'Concepto actualizado' : 'Concepto creado');
+            toast.success(isEditing ? 'Configuración actualizada' : 'Concepto creado exitosamente');
             queryClient.invalidateQueries(['payroll-concepts']);
             onSave && onSave();
         },
         onError: (err) => {
-            toast.error('Error guardando concepto: ' + (err.response?.data?.detail || JSON.stringify(err.response?.data) || 'Error desconocido'));
-            console.error(err.response?.data);
+            toast.error('Error: ' + (err.response?.data?.detail || 'No se pudo procesar la solicitud'));
         }
     });
 
-    // Submit Handler
     const onSubmit = (formData) => {
-        // Preparar Payload
         const payload = { ...formData };
-
-        // Limpiar system_params (enviar solo lo relevante para el behavior)
-        if (configMetadata?.behavior_required_params?.[payload.behavior]) {
-            const requiredParams = configMetadata.behavior_required_params[payload.behavior];
-            const cleanParams = {};
-
-            // Mover campos dinámicos
-            // Nota: En el form los params están dentro de system_params.key
-            // Si usamos inputs anidados tipo register('system_params.rate') ya vienen listos.
-
-            // Asegurarse de enviar tipos correctos (números)
-            if (payload.system_params) {
-                cleanParams.rate = payload.system_params.rate ? parseFloat(payload.system_params.rate) : null;
-                cleanParams.cap_multiplier = payload.system_params.cap_multiplier ? parseInt(payload.system_params.cap_multiplier) : null;
-                cleanParams.base_source = payload.system_params.base_source;
-                cleanParams.base_label = payload.system_params.base_label;
-                cleanParams.multiplier_var = payload.system_params.multiplier_var;
-
-                // Limpiar nulos/undefined
-                Object.keys(cleanParams).forEach(key => cleanParams[key] === undefined && delete cleanParams[key]);
-            }
-            payload.system_params = cleanParams;
-        } else {
-            // En DYNAMIC o FIXED, conservamos lo que sea necesario o limpiamos
-            if (payload.behavior !== 'DYNAMIC') {
-                payload.system_params = {};
-            }
+        if (payload.behavior !== 'LAW_DEDUCTION') {
+            // Limpieza básica si no es Ley
+            if (payload.behavior !== 'DYNAMIC') payload.formula = '';
         }
-
         mutation.mutate(payload);
     };
 
-    if (loadingMeta) return <div className="p-4">Cargando configuración...</div>;
-
-    const currentBehaviorConfig = BEHAVIOR_CONFIG[selectedBehavior] || {};
+    if (loadingMeta) return (
+        <div className="flex flex-col items-center justify-center p-12 space-y-4">
+            <Loader2 className="animate-spin text-nominix-electric" size={40} />
+            <p className="text-gray-500 font-bold uppercase tracking-widest text-[10px]">Cargando Motor de Conceptos...</p>
+        </div>
+    );
 
     return (
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 p-1">
+        <div className="bg-[#0f1115] rounded-[32px] p-6 md:p-10 border border-white/10 shadow-3xl overflow-hidden relative min-h-[600px]">
+            {/* Background Decorations */}
+            <div className="absolute top-0 right-0 w-96 h-96 bg-nominix-electric/5 blur-[120px] rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none" />
 
-            {/* 1. Datos Básicos */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label className="block text-sm font-medium text-gray-700">Código</label>
-                    <input
-                        {...register('code', { required: 'El código es requerido' })}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
-                        disabled={isEditing} // Código inmutable
-                    />
-                    {errors.code && <span className="text-red-500 text-xs">{errors.code.message}</span>}
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-gray-700">Nombre</label>
-                    <input
-                        {...register('name', { required: 'El nombre es requerido' })}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
-                    />
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-gray-700">Tipo</label>
-                    <select
-                        {...register('kind')}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 sm:text-sm border p-2"
-                    >
-                        {configMetadata?.kinds?.map(k => (
-                            <option key={k.value} value={k.value}>{k.label}</option>
-                        ))}
-                    </select>
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-gray-700">Comportamiento</label>
-                    <select
-                        {...register('behavior')}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 sm:text-sm border p-2"
-                    >
-                        {configMetadata?.behaviors?.map(b => (
-                            <option key={b.value} value={b.value}>{b.label}</option>
-                        ))}
-                    </select>
-                </div>
+            <form onSubmit={handleSubmit(onSubmit)} className="relative z-10 space-y-8 w-full mx-auto">
 
-                <div>
-                    <label className="block text-sm font-medium text-gray-700">Base de Cálculo</label>
-                    <select
-                        {...register('calculation_base')}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 sm:text-sm border p-2"
-                    >
-                        {configMetadata?.calculation_base_options?.map(opt => (
-                            <option key={opt.value} value={opt.value}>{opt.label}</option>
-                        ))}
-                    </select>
-                    <p className="text-[10px] text-gray-400 mt-1 uppercase font-bold tracking-tight">Utilizado en porcentajes y horas extras</p>
-                </div>
-
-                {/* New Currency Field */}
-                <div>
-                    <label className="block text-sm font-medium text-gray-700">Moneda Referencial</label>
-                    <select
-                        {...register('currency', { required: 'La moneda es requerida' })}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 sm:text-sm border p-2"
-                    >
-                        <option value="">-- Moneda --</option>
-                        {Array.isArray(currencies) ? currencies.map(c => (
-                            <option key={c.code} value={c.code}>{c.name} ({c.code})</option>
-                        )) : currencies?.results?.map(c => (
-                            <option key={c.code} value={c.code}>{c.name} ({c.code})</option>
-                        ))}
-                    </select>
-                    {errors.currency && <span className="text-red-500 text-xs">{errors.currency.message}</span>}
-                </div>
-
-                {/* Default Value Field (Hidden or Visible based on behavior?) -> Always visible as fallback but might be 0 */}
-                <div className={selectedBehavior !== 'FIXED' ? 'hidden' : ''}>
-                    <label className="block text-sm font-medium text-gray-700">Valor Fijo</label>
-                    <input
-                        type="number" step="0.0001"
-                        {...register('value')}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 sm:text-sm border p-2"
-                    />
-                    <p className="text-xs text-gray-400">Usado solo si Comportamiento es 'Monto Fijo'</p>
-                </div>
-            </div>
-
-            <div className="border-t border-gray-200 my-4"></div>
-
-            {/* 2. Configuración Específica del Comportamiento */}
-            <div className="bg-gray-50 p-4 rounded-md border border-gray-200">
-                <h3 className="text-md font-medium text-indigo-700 mb-1">{currentBehaviorConfig.title || 'Configuración'}</h3>
-                <p className="text-sm text-gray-500 mb-4">{currentBehaviorConfig.description}</p>
-
-                {/* Renderizado de campos dinámicos */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {currentBehaviorConfig.fields?.map((field) => {
-                        // Check showIf condition
-                        if (field.showIf && !field.showIf(currentParams || {})) return null;
-
-                        return (
-                            <div key={field.name}>
-                                <label className="block text-sm font-medium text-gray-700">
-                                    {field.label} {field.required && <span className="text-red-500">*</span>}
-                                </label>
-
-                                {field.type === 'select' ? (
-                                    <select
-                                        {...register(`system_params.${field.name}`, { required: field.required })}
-                                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 sm:text-sm border p-2"
-                                    >
-                                        <option value="">-- Seleccionar --</option>
-                                        {field.options?.map(opt => (
-                                            <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                        ))}
-                                    </select>
-                                ) : (
-                                    <input
-                                        type={field.type}
-                                        step={field.step}
-                                        {...register(`system_params.${field.name}`, { required: field.required })}
-                                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 sm:text-sm border p-2"
-                                    />
-                                )}
-                                {field.help && <p className="text-xs text-gray-400 mt-1">{field.help}</p>}
-                            </div>
-                        );
-                    })}
-
-                    {/* Editor de Fórmula (Solo para DYNAMIC) */}
-                    {currentBehaviorConfig.customRender && (
-                        <div className="col-span-2">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Código Python</label>
-                            <textarea
-                                {...register('formula')}
-                                rows={6}
-                                className="w-full font-mono text-sm p-3 border rounded-md bg-gray-900 text-green-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                placeholder="Ej: (SALARIO / 30) * DIAS"
-                            />
-                            <p className="text-xs text-gray-500 mt-2">
-                                Variables: SALARIO, DIAS, LUNES, TASA, ANTIGUEDAD.
-                            </p>
+                {/* CABECERA DINÁMICA */}
+                <div className="flex items-center justify-between border-b border-white/5 pb-8 mb-4">
+                    <div className="flex items-center gap-5">
+                        <div className="w-16 h-16 bg-gradient-to-br from-nominix-electric/20 to-nominix-electric/5 border border-nominix-electric/20 rounded-2xl flex items-center justify-center shadow-2xl">
+                            <Settings2 className="text-nominix-electric" size={32} />
                         </div>
-                    )}
-                </div>
-            </div>
+                        <div>
+                            <h2 className="text-3xl font-black text-white tracking-tighter uppercase italic">
+                                {isEditing ? 'Configurar' : 'Nuevo'} <span className="text-nominix-electric not-italic">Concepto</span>
+                            </h2>
+                            <p className="text-gray-500 text-[10px] font-bold uppercase tracking-[0.4em] mt-1">Lógica Salarial & Parametrización</p>
+                        </div>
+                    </div>
 
-            {/* 3. Incidencias (Solo si es EARNING? Opcional) */}
-            {selectedKind === 'EARNING' && (
-                <div className="mt-6">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Incidencias (Afecta a Bases)</label>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 bg-white p-3 border rounded-md max-h-40 overflow-y-auto">
-                        {configMetadata?.accumulators?.map(acc => (
-                            <div key={acc.code} className="flex items-start">
-                                <input
-                                    id={`inc-${acc.code}`}
-                                    type="checkbox"
-                                    value={acc.code}
-                                    {...register('incidences')}
-                                    className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 mt-1"
+                    <button
+                        type="button"
+                        onClick={onCancel}
+                        className="w-12 h-12 rounded-2xl bg-white/5 border border-white/5 flex items-center justify-center text-gray-500 hover:text-white hover:bg-white/10 transition-all hover:rotate-90 active:scale-95"
+                    >
+                        <X size={24} />
+                    </button>
+                </div>
+
+                <div className="grid grid-cols-1 xl:grid-cols-12 gap-10">
+
+                    {/* COLUMNA PRINCIPAL (IZQUIERDA) */}
+                    <div className="xl:col-span-8 space-y-8">
+                        <FormSection title="Identificación" icon={FileText} description="Atributos básicos del sistema">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                <CustomInput
+                                    label="Código Único"
+                                    icon={Hash}
+                                    {...register('code', { required: 'Requerido' })}
+                                    disabled={isEditing}
+                                    placeholder="EJ: SUELDO_BASE"
+                                    error={errors.code?.message}
                                 />
-                                <label htmlFor={`inc-${acc.code}`} className="ml-2 block text-sm text-gray-900 cursor-pointer">
-                                    {acc.label}
-                                </label>
+                                <CustomInput
+                                    label="Nombre Descriptivo"
+                                    icon={FileText}
+                                    {...register('name', { required: 'Requerido' })}
+                                    placeholder="Ej: Bonificación Especial"
+                                    error={errors.name?.message}
+                                />
+                                <CustomSelect
+                                    label="Tipo de Concepto"
+                                    icon={Layers}
+                                    {...register('kind')}
+                                    options={configMetadata?.kinds?.map(k => ({ value: k.value, label: k.label }))}
+                                />
+                                <CustomSelect
+                                    label="Comportamiento (Handler)"
+                                    icon={Settings2}
+                                    {...register('behavior')}
+                                    options={configMetadata?.behaviors?.map(b => ({ value: b.value, label: b.label }))}
+                                />
+                                <CustomSelect
+                                    label="Método de Cálculo"
+                                    icon={Calculator}
+                                    {...register('computation_method')}
+                                    options={configMetadata?.computation_methods?.map(m => ({ value: m.value, label: m.label }))}
+                                />
                             </div>
-                        ))}
+                        </FormSection>
+
+                        <FormSection title="Lógica de Cálculo" icon={Calculator} description="Reglas y parámetros matemáticos">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                                <CustomSelect
+                                    label="Base de Cálculo"
+                                    icon={ArrowUpDown}
+                                    {...register('calculation_base')}
+                                    options={configMetadata?.calculation_base_options || [
+                                        { value: 'TOTAL', label: 'Salario Total' },
+                                        { value: 'BASE', label: 'Sueldo Base' }
+                                    ]}
+                                />
+                                <CustomSelect
+                                    label="Moneda de Referencia"
+                                    icon={Coins}
+                                    {...register('currency')}
+                                    options={(Array.isArray(currencies) ? currencies : (currencies?.results || [])).map(c => ({
+                                        value: c.code,
+                                        label: `${c.name} (${c.code})`
+                                    }))}
+                                />
+                            </div>
+
+                            {selectedMethod !== 'DYNAMIC_FORMULA' && (
+                                <div className="mb-6 animate-in slide-in-from-top-2 duration-300">
+                                    <CustomInput
+                                        label={selectedMethod === 'PERCENTAGE_OF_BASIC' ? "Tasa / Porcentaje (Ej: 0.15 para 15%)" : "Monto Fijo"}
+                                        icon={selectedMethod === 'PERCENTAGE_OF_BASIC' ? Percent : DollarSign}
+                                        type="number"
+                                        step="0.0001"
+                                        {...register('value', { required: 'Requerido' })}
+                                        error={errors.value?.message}
+                                    />
+                                </div>
+                            )}
+
+                            {selectedMethod === 'DYNAMIC_FORMULA' ? (
+                                <div className="space-y-4 pt-2">
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Fórmula Python (simple_eval)</label>
+                                        <div className="px-2 py-1 bg-green-500/10 rounded-lg border border-green-500/20 text-[9px] font-bold text-green-500 flex items-center gap-1.5 uppercase">
+                                            <Code2 size={12} /> Sandbox Activo
+                                        </div>
+                                    </div>
+                                    <div className="relative group">
+                                        <textarea
+                                            {...register('formula')}
+                                            rows={8}
+                                            className="w-full font-mono text-sm p-5 bg-[#0d0d0f] border border-white/5 rounded-3xl text-green-400 outline-none focus:border-nominix-electric/50 transition-all shadow-inner"
+                                            placeholder="Ej: (SALARIO_DIARIO * 1.5) * HED"
+                                        />
+                                    </div>
+                                    <div className="bg-white/5 rounded-2xl p-4 border border-white/5">
+                                        <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                            <Info size={12} /> Variables Disponibles
+                                        </p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {['SALARIO_MENSUAL', 'SALARIO_DIARIO', 'DIAS', 'ANTIGUEDAD', 'LUNES', 'HED', 'HEN', 'BN'].map(v => (
+                                                <span key={v} className="px-2 py-1 bg-black/40 text-[10px] text-gray-400 rounded-md border border-white/5 font-mono group hover:border-nominix-electric/30 hover:text-white transition-all cursor-default">{v}</span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="p-10 border-2 border-dashed border-white/5 rounded-[32px] flex flex-col items-center justify-center text-center space-y-3">
+                                    <div className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center">
+                                        <Settings2 className="text-gray-600" size={20} />
+                                    </div>
+                                    <p className="text-gray-500 text-xs font-medium">Este comportamiento utiliza parámetros fijos de sistema.</p>
+                                </div>
+                            )}
+                        </FormSection>
+                    </div>
+
+                    {/* COLUMNA DERECHA: CONFIGURACIÓN ADICIONAL */}
+                    <div className="xl:col-span-4 space-y-8">
+                        <FormSection title="Visualización" icon={Eye} description="Presencia en el sistema">
+                            <div className="space-y-3">
+                                <Toggle label="Concepto Activo" checked={watch('active')} onChange={v => setValue('active', v)} id="t-active" />
+                                <Toggle label="Incidencia Salarial / Integración" checked={watch('is_salary_incidence')} onChange={v => setValue('is_salary_incidence', v)} id="t-incidence" />
+                                <Toggle label="Mostrar en Recibo" checked={watch('appears_on_receipt')} onChange={v => setValue('appears_on_receipt', v)} id="t-receipt" />
+                                <Toggle label="Mostrar aunque sea Cero" checked={watch('show_even_if_zero')} onChange={v => setValue('show_even_if_zero', v)} id="t-zero" />
+                                <div className="pt-2">
+                                    <CustomInput label="Orden en Recibo" type="number" icon={ArrowUpDown} {...register('receipt_order')} />
+                                </div>
+                            </div>
+                        </FormSection>
+
+                        {selectedKind === 'EARNING' && (
+                            <FormSection title="Incidencias" icon={Layers} description="Abono a acumuladores">
+                                <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar focus:outline-none">
+                                    {configMetadata?.accumulators?.map(acc => {
+                                        const isSelected = watch('incidences')?.includes(acc.code);
+                                        return (
+                                            <div
+                                                key={acc.code}
+                                                className={`flex items-start gap-3 p-3 rounded-2xl border transition-all cursor-pointer group select-none ${isSelected ? 'bg-nominix-electric/5 border-nominix-electric/30 shadow-lg' : 'bg-white/5 border-white/5 hover:border-white/10'}`}
+                                                onClick={() => {
+                                                    const current = watch('incidences') || [];
+                                                    if (current.includes(acc.code)) {
+                                                        setValue('incidences', current.filter(c => c !== acc.code));
+                                                    } else {
+                                                        setValue('incidences', [...current, acc.code]);
+                                                    }
+                                                }}
+                                            >
+                                                <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${isSelected ? 'bg-nominix-electric border-nominix-electric' : 'bg-black/30 border-white/10 group-hover:border-white/20'}`}>
+                                                    {isSelected && <CheckCircle2 className="text-white" size={12} />}
+                                                </div>
+                                                <div>
+                                                    <p className={`text-xs font-bold leading-tight ${isSelected ? 'text-white' : 'text-gray-400 group-hover:text-gray-300'}`}>{acc.label}</p>
+                                                    <p className="text-[9px] text-gray-500 uppercase mt-0.5 font-bold">{acc.code}</p>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </FormSection>
+                        )}
                     </div>
                 </div>
-            )}
 
-            {/* 4. Opciones de Visualización */}
-            <div className="flex gap-4 mt-4">
-                <div className="flex items-center">
-                    <input id="active" type="checkbox" {...register('active')} className="h-4 w-4 text-indigo-600 rounded border-gray-300" />
-                    <label htmlFor="active" className="ml-2 block text-sm text-gray-900">Activo</label>
+                {/* BARRA DE ACCIONES FLOTANTE O FIJA */}
+                <div className="sticky bottom-4 bg-[#121214]/80 backdrop-blur-3xl border border-white/10 p-4 rounded-[32px] flex items-center justify-between shadow-3xl z-50">
+                    <button
+                        type="button"
+                        onClick={onCancel}
+                        className="px-8 py-4 text-gray-400 hover:text-white font-bold text-xs uppercase tracking-widest transition-all"
+                    >
+                        Descartar
+                    </button>
+                    <button
+                        type="submit"
+                        disabled={mutation.isLoading}
+                        className="flex items-center gap-3 px-10 py-4 bg-nominix-electric hover:bg-nominix-electric/90 text-white font-black uppercase tracking-widest rounded-2xl shadow-lg shadow-nominix-electric/20 transition-all active:scale-95 disabled:opacity-50"
+                    >
+                        {mutation.isLoading ? (
+                            <>
+                                <Loader2 className="animate-spin" size={18} />
+                                <span>Procesando</span>
+                            </>
+                        ) : (
+                            <>
+                                <Save size={18} />
+                                <span>Guardar Configuración</span>
+                            </>
+                        )}
+                    </button>
                 </div>
-                <div className="flex items-center">
-                    <input id="appears_on_receipt" type="checkbox" {...register('appears_on_receipt')} className="h-4 w-4 text-indigo-600 rounded border-gray-300" />
-                    <label htmlFor="appears_on_receipt" className="ml-2 block text-sm text-gray-900">Visible en Recibo</label>
-                </div>
-
-                <div className="flex-grow"></div>
-
-                <div className="w-32">
-                    <label className="block text-xs text-gray-500">Orden</label>
-                    <input type="number" {...register('receipt_order')} className="w-full text-sm border rounded p-1" />
-                </div>
-            </div>
-
-            {/* Botones */}
-            <div className="flex justify-end gap-3 pt-4 border-t">
-                <button
-                    type="button"
-                    onClick={onCancel}
-                    className="px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-                >
-                    Cancelar
-                </button>
-                <button
-                    type="submit"
-                    disabled={mutation.isLoading}
-                    className="px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
-                >
-                    {mutation.isLoading ? 'Guardando...' : 'Guardar Concepto'}
-                </button>
-            </div>
-
-        </form>
+            </form>
+        </div>
     );
 }
