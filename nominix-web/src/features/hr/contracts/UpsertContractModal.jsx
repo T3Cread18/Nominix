@@ -38,14 +38,9 @@ const useSalarySimulation = (control, bcvRate, companyConfig, setValue) => {
                 if (splitMode === 'PERCENTAGE') {
                     const pct = parseFloat(companyConfig.split_percentage_base) || 30;
                     calculatedBaseBs = (totalSalary * currentRate * (pct / 100));
-                } else if (splitMode === 'FIXED_BASE') {
-                    const fixedBaseUsd = parseFloat(companyConfig.split_fixed_amount) || 0;
-                    calculatedBaseBs = fixedBaseUsd * currentRate;
-                } else if (splitMode === 'FIXED_BONUS') {
-                    const fixedBonusUsd = parseFloat(companyConfig.split_fixed_amount) || 0;
-                    const baseUsd = totalSalary - fixedBonusUsd;
-                    calculatedBaseBs = baseUsd > 0 ? (baseUsd * currentRate) : 130;
                 }
+                // Nota: Para FIXED_BASE y FIXED_BONUS, se calcula en handleJobPositionChange
+                // ya que depende del cargo seleccionado
 
                 setValue('base_salary_bs', calculatedBaseBs.toFixed(2), { shouldDirty: true });
             }
@@ -179,11 +174,11 @@ const SummaryCard = ({ label, amount, note, noteColor = "text-gray-400", highlig
     </div>
 );
 
-const ContractForm = ({ register, control, errors, watchedValues, jobPositions, branches, employeeData, handleJobPositionChange, formState, calculateBaseFromTotal }) => {
+const ContractForm = ({ register, control, errors, watchedValues, jobPositions, branches, employeeData, handleJobPositionChange, formState, calculateBaseFromTotal, handleSubmit, onSubmit }) => {
     const isJobSelected = !!watchedValues.job_position;
 
     return (
-        <form id="contract-form" className="flex-1 space-y-8 pr-2">
+        <form id="contract-form" className="flex-1 space-y-8 pr-2" onSubmit={handleSubmit(onSubmit)}>
 
             {/* 1. INFORMACIÓN GENERAL */}
             <section>
@@ -474,12 +469,17 @@ const UpsertContractModal = ({ isOpen, onClose, onSuccess, employeeId, employeeD
                     const pct = parseFloat(companyConfig.split_percentage_base) || 30;
                     calculatedBaseBs = (totalSalary * currentRate * (pct / 100));
                 } else if (splitMode === 'FIXED_BASE') {
-                    const fixedBaseUsd = parseFloat(companyConfig.split_fixed_amount) || 0;
-                    calculatedBaseBs = fixedBaseUsd * currentRate;
+                    // Leer monto fijo del cargo, no de la empresa
+                    const fixedAmt = parseFloat(job.split_fixed_amount) || 0;
+                    const fixedCurrency = job.split_fixed_currency_data?.code || job.split_fixed_currency || 'USD';
+                    // Solo convertir si está en USD
+                    calculatedBaseBs = fixedCurrency === 'USD' ? (fixedAmt * currentRate) : fixedAmt;
                 } else if (splitMode === 'FIXED_BONUS') {
-                    const fixedBonusUsd = parseFloat(companyConfig.split_fixed_amount) || 0;
-                    const baseUsd = totalSalary - fixedBonusUsd;
-                    calculatedBaseBs = baseUsd > 0 ? (baseUsd * currentRate) : 130;
+                    // Leer monto fijo del cargo
+                    const fixedAmt = parseFloat(job.split_fixed_amount) || 0;
+                    const fixedCurrency = job.split_fixed_currency_data?.code || job.split_fixed_currency || 'USD';
+                    const fixedBs = fixedCurrency === 'USD' ? (fixedAmt * currentRate) : fixedAmt;
+                    calculatedBaseBs = Math.max((totalSalary * currentRate) - fixedBs, 130);
                 }
             }
 
@@ -495,10 +495,17 @@ const UpsertContractModal = ({ isOpen, onClose, onSuccess, employeeId, employeeD
             return;
         }
 
+        // Data Cleaning & Sanitization
         const payload = {
             ...data,
             employee: employeeId,
-            department: data.department
+            department: data.department || null,
+            branch: data.branch || null,
+            job_position: data.job_position || null,
+            // Ensure numbers
+            salary_amount: parseFloat(data.salary_amount) || 0,
+            base_salary_bs: parseFloat(data.base_salary_bs) || 0,
+            islr_retention_percentage: parseFloat(data.islr_retention_percentage) || 0,
         };
 
         if (employeeData?.branch && !payload.branch) {
@@ -538,8 +545,12 @@ const UpsertContractModal = ({ isOpen, onClose, onSuccess, employeeId, employeeD
                     jobPositions={jobPositions}
                     branches={branches}
                     employeeData={employeeData}
+
                     handleJobPositionChange={handleJobPositionChange}
                     formState={formState}
+                    handleSubmit={handleSubmit}
+                    onSubmit={onSubmit}
+                    calculateBaseFromTotal={simulation.calculateBaseFromTotal}
                 />
 
                 <SalarySimulator

@@ -17,45 +17,45 @@ class SalarySplitter:
     """
 
     @staticmethod
-    def get_salary_breakdown(contract: LaborContract) -> Dict[str, Decimal]:
+    def get_salary_breakdown(contract: LaborContract, exchange_rate: Decimal = None) -> Dict[str, Decimal]:
         """
         Calcula el desglose del salario para un contrato dado.
 
         Args:
             contract: Instancia de LaborContract.
+            exchange_rate: Tasa de cambio USD->VES (opcional, para convertir montos fijos en VES)
 
         Returns:
             Dict con claves:
-                - 'base': Sueldo Base (Impacto Salarial)
-                - 'complement': Bono/Complemento (No Salarial)
-                - 'total': Total calculado
+                - 'base': Sueldo Base (Impacto Salarial) en USD
+                - 'complement': Bono/Complemento (No Salarial) en USD
+                - 'total': Total calculado en USD
         """
-        # 1. Obtener Sueldo Total Efectivo
+        # 1. Obtener Sueldo Total Efectivo (en USD)
         total_salary = SalarySplitter._get_effective_total_salary(contract)
         
         # 2. Obtener Configuración de la Empresa
         try:
-            # Asumimos que estamos en el contexto del tenant correcto
             company = Company.objects.first()
             if not company:
-                # Fallback seguro si no hay config
                 return {
                     'base': total_salary,
                     'complement': Decimal('0.00'),
                     'total': total_salary
                 }
         except Exception:
-            # Error defensivo
             return {
                 'base': total_salary,
                 'complement': Decimal('0.00'),
                 'total': total_salary
             }
 
-        # 3. Aplicar Estrategia
+        # 3. Obtener datos del cargo
+        job_position = contract.job_position
+        
+        # 4. Aplicar Estrategia
         base_salary = Decimal('0.00')
         complement = Decimal('0.00')
-        
         mode = company.salary_split_mode
         
         if mode == Company.SalarySplitMode.PERCENTAGE:
@@ -65,8 +65,14 @@ class SalarySplitter:
             complement = total_salary - base_salary
             
         elif mode == Company.SalarySplitMode.FIXED_BASE:
-            # Base fija, resto complemento
-            fixed_base = company.split_fixed_amount
+            # Base fija (viene del cargo), resto complemento
+            fixed_base = Decimal('0.00')
+            if job_position and job_position.split_fixed_amount:
+                fixed_base = job_position.split_fixed_amount
+                # Si está en VES, convertir a USD para comparar
+                if job_position.split_fixed_currency and job_position.split_fixed_currency.code == 'VES':
+                    if exchange_rate and exchange_rate > 0:
+                        fixed_base = fixed_base / exchange_rate
             
             if total_salary <= fixed_base:
                 base_salary = total_salary
@@ -76,8 +82,14 @@ class SalarySplitter:
                 complement = total_salary - base_salary
                 
         elif mode == Company.SalarySplitMode.FIXED_BONUS:
-            # Complemento fijo, resto base
-            fixed_bonus = company.split_fixed_amount
+            # Complemento fijo (viene del cargo), resto base
+            fixed_bonus = Decimal('0.00')
+            if job_position and job_position.split_fixed_amount:
+                fixed_bonus = job_position.split_fixed_amount
+                # Si está en VES, convertir a USD para comparar
+                if job_position.split_fixed_currency and job_position.split_fixed_currency.code == 'VES':
+                    if exchange_rate and exchange_rate > 0:
+                        fixed_bonus = fixed_bonus / exchange_rate
             
             if total_salary <= fixed_bonus:
                 complement = total_salary
@@ -97,6 +109,7 @@ class SalarySplitter:
             'complement': complement.quantize(Decimal('0.01')),
             'total': total_salary.quantize(Decimal('0.01'))
         }
+
 
     @staticmethod
     def _get_effective_total_salary(contract: LaborContract) -> Decimal:

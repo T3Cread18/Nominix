@@ -278,7 +278,7 @@ class PayrollEngine:
         total_salary_ves = float(self.contract.monthly_salary * contract_rate)
         
         # Obtener desglose para tener el Sueldo Base real
-        breakdown = SalarySplitter.get_salary_breakdown(self.contract)
+        breakdown = SalarySplitter.get_salary_breakdown(self.contract, contract_rate)
         base_salary_ves = float(breakdown['base'] * contract_rate)
         
         # 2. Cálculo de Lunes y desglose de días por tipo

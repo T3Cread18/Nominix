@@ -172,10 +172,11 @@ class DepartmentSerializer(serializers.ModelSerializer):
 class JobPositionSerializer(serializers.ModelSerializer):
     department_name = serializers.CharField(source='department.name', read_only=True)
     currency_data = CurrencySerializer(source='currency', read_only=True)
+    split_fixed_currency_data = CurrencySerializer(source='split_fixed_currency', read_only=True)
     
     class Meta:
         model = JobPosition
-        fields = ['id', 'name', 'code', 'department', 'department_name', 'default_total_salary', 'currency', 'currency_data']
+        fields = ['id', 'name', 'code', 'department', 'department_name', 'default_total_salary', 'currency', 'currency_data', 'split_fixed_amount', 'split_fixed_currency', 'split_fixed_currency_data']
 
 class LaborContractSerializer(serializers.ModelSerializer):
     currency_data = CurrencySerializer(source='salary_currency', read_only=True)
