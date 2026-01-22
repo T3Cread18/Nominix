@@ -8,8 +8,16 @@ def create_system_concepts():
     integrando la lógica detallada de Venezuela (LOTTT).
     """
     # Moneda principal (VES por defecto en Vzla)
-    ves, _ = Currency.objects.get_or_create(code='VES', defaults={'name': 'Bolívares', 'symbol': 'Bs.'})
-    
+    # Monedas principales (Se asume que ya están inicializadas en el esquema PUBLIC)
+    try:
+        ves = Currency.objects.get(code='VES')
+    except Currency.DoesNotExist:
+        ves = Currency.objects.create(code='VES', name='Bolívares', symbol='Bs.', is_base_currency=True)
+        
+    try:
+        usd = Currency.objects.get(code='USD')
+    except Currency.DoesNotExist:
+        usd = Currency.objects.create(code='USD', name='Dólares', symbol='$')
     system_concepts = [
         # === ASIGNACIONES ===
         {
@@ -151,6 +159,23 @@ def create_system_concepts():
             'appears_on_receipt': True,
             'show_even_if_zero': True,
         },
+{
+            'code': 'ISLR',
+            'name': 'Impuesto Sobre la Renta',
+            'kind': PayrollConcept.ConceptKind.DEDUCTION,
+            'computation_method': PayrollConcept.ComputationMethod.DYNAMIC_FORMULA, # Opcional, el behavior manda
+            'value': Decimal('0.00'),
+            'behavior': PayrollConcept.ConceptBehavior.LAW_DEDUCTION,
+            'system_params': {
+                'rate_source': 'CONTRACT',
+                'contract_field': 'islr_retention_percentage',
+                'base_source': 'ACCUMULATOR', 
+                'base_label': 'ISLR_BASE',
+                'cap_multiplier': None 
+            },
+            'receipt_order': 103,
+            'appears_on_receipt': True,
+        },
         {
             'code': 'RPE',
             'name': 'Régimen Prestacional de Empleo (Paro Forzoso)',
@@ -190,19 +215,11 @@ def create_system_concepts():
             'show_even_if_zero': True,
         },
         {
-            'code': 'ISLR',
-            'name': 'I.S.L.R.',
-            'kind': PayrollConcept.ConceptKind.DEDUCTION,
-            'computation_method': PayrollConcept.ComputationMethod.FIXED_AMOUNT,
-            'behavior': PayrollConcept.ConceptBehavior.DYNAMIC,
-            'receipt_order': 110,
-            'appears_on_receipt': True,
-        },
-        {
             'code': 'INCES',
             'name': 'INCES (0.5%)',
             'kind': PayrollConcept.ConceptKind.DEDUCTION,
             'computation_method': PayrollConcept.ComputationMethod.DYNAMIC_FORMULA,
+            'value': Decimal('0.50'),
             'behavior': PayrollConcept.ConceptBehavior.DYNAMIC,
             'receipt_order': 120,
             'appears_on_receipt': True,

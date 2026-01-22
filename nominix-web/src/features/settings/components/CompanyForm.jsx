@@ -96,20 +96,11 @@ const CompanyForm = () => {
                                 />
                             )}
 
-                            {(salarySplitMode === 'FIXED_BASE' || salarySplitMode === 'FIXED_BONUS') && (
-                                <InputField
-                                    label="Monto Fijo Referencia"
-                                    type="number"
-                                    step="0.01"
-                                    placeholder="0.00"
-                                    {...register('split_fixed_amount')}
-                                />
-                            )}
 
                             <div className="md:col-span-3 lg:col-span-3 text-[10px] text-gray-400 italic bg-gray-50 p-3 rounded-xl border border-dashed border-gray-200">
                                 {salarySplitMode === 'PERCENTAGE' && `El ${watch('split_percentage_base') || 0}% del Ingreso Total será Salario Base, el resto será Bono.`}
-                                {salarySplitMode === 'FIXED_BASE' && `El Salario Base será fijo (${watch('split_fixed_amount') || 0}), todo excedente será Bono.`}
-                                {salarySplitMode === 'FIXED_BONUS' && `El Bono será fijo (${watch('split_fixed_amount') || 0}), todo excedente será Salario Base.`}
+                                {salarySplitMode === 'FIXED_BASE' && `El Salario Base será fijo según el cargo del trabajador, todo excedente será Bono.`}
+                                {salarySplitMode === 'FIXED_BONUS' && `El Bono será fijo según el cargo del trabajador, todo excedente será Salario Base.`}
                             </div>
                         </div>
                     </Card.Section>

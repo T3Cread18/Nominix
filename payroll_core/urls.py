@@ -10,7 +10,9 @@ from .views import (
     PayrollPeriodViewSet, PayrollReceiptViewSet, PayrollNoveltyViewSet,
     CompanyConfigView, DepartmentViewSet, LoanViewSet, LoanPaymentViewSet,
     PayrollVariablesView, ValidateFormulaView, JobPositionViewSet,
-    ConceptConfigMetadataView, PayrollPolicyView
+    ConceptConfigMetadataView, PayrollPolicyView,
+    # Social Benefits
+    SocialBenefitsViewSet, InterestRateBCVViewSet, ExchangeRateViewSet
 )
 
 
@@ -33,14 +35,19 @@ router.register(r'job-positions', JobPositionViewSet, basename='job-position')
 # Loan Routes
 router.register(r'loans', LoanViewSet, basename='loan')
 router.register(r'loan-payments', LoanPaymentViewSet, basename='loan-payment')
+# Social Benefits Routes
+router.register(r'social-benefits', SocialBenefitsViewSet, basename='social-benefits')
+router.register(r'bcv-rates', InterestRateBCVViewSet, basename='bcv-rate')
+router.register(r'exchange-rates', ExchangeRateViewSet, basename='exchange-rate')
 
 urlpatterns = [
-    path('', include(router.urls)),
     path('company/config/', CompanyConfigView.as_view(), name='company-config'),
     path('company/policies/', PayrollPolicyView.as_view(), name='payroll-policy'),
     path('concepts/config-metadata/', ConceptConfigMetadataView.as_view(), name='concept-config-metadata'),
     path('exchange-rates/latest/', LatestExchangeRateView.as_view(), name='latest-rate'),
+    path('', include(router.urls)),
     path('payroll/variables/', PayrollVariablesView.as_view(), name='payroll-variables'),
     path('payroll/validate-formula/', ValidateFormulaView.as_view(), name='validate-formula'),
 ]
+
 

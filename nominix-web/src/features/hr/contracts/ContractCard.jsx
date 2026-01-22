@@ -1,5 +1,5 @@
 import React from 'react';
-import { Briefcase, Calendar, DollarSign, Clock, Building2, CheckCircle2, History, Pencil } from 'lucide-react';
+import { Briefcase, Calendar, DollarSign, Clock, Building2, CheckCircle2, History, Pencil, Percent } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 import Card from '../../../components/ui/Card';
 import Button from '../../../components/ui/Button';
@@ -107,6 +107,17 @@ const ContractCard = ({ contract, isActive, onEdit }) => {
                     </div>
                     <p className="font-bold">{frequencyMap[contract.payment_frequency] || contract.payment_frequency}</p>
                 </div>
+
+                {/* ISLR Retention (solo si > 0) */}
+                {parseFloat(contract.islr_retention_percentage) > 0 && (
+                    <div className="col-span-2 flex flex-col gap-1 p-3 rounded-2xl bg-white/5 border border-white/5">
+                        <div className="flex items-center gap-2 mb-1">
+                            <Percent size={16} className={isActive ? "text-yellow-400" : "text-slate-400"} />
+                            <span className="text-[10px] font-bold uppercase tracking-widest opacity-60">Retención ISLR</span>
+                        </div>
+                        <p className="font-bold">{contract.islr_retention_percentage}%</p>
+                    </div>
+                )}
             </div>
 
             {/* Footer: Sede y Dept (Snapshot) */}

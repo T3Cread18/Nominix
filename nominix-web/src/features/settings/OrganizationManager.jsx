@@ -67,12 +67,14 @@ const AddDepartmentButton = ({ onRefresh, branchId, disabled }) => {
 
 // --- SUB-COMPONENTES CARGOS (JOB POSITIONS) ---
 
-const JobPositionModal = ({ departmentId, position, onClose, onSuccess, currencies }) => {
+const JobPositionModal = ({ departmentId, position, onClose, onSuccess, currencies, salarySplitMode }) => {
     const [formData, setFormData] = useState({
         name: '',
         code: '',
         default_total_salary: '',
-        currency: 'USD'
+        currency: 'USD',
+        split_fixed_amount: '0.00',
+        split_fixed_currency: 'USD'
     });
     const [saving, setSaving] = useState(false);
 
@@ -82,7 +84,9 @@ const JobPositionModal = ({ departmentId, position, onClose, onSuccess, currenci
                 name: position.name,
                 code: position.code,
                 default_total_salary: position.default_total_salary,
-                currency: position.currency || 'USD'
+                currency: position.currency || 'USD',
+                split_fixed_amount: position.split_fixed_amount || '0.00',
+                split_fixed_currency: position.split_fixed_currency || 'USD'
             });
         }
     }, [position]);
@@ -146,6 +150,30 @@ const JobPositionModal = ({ departmentId, position, onClose, onSuccess, currenci
                         </div>
                     </div>
 
+                    {salarySplitMode !== 'PERCENTAGE' && (
+                        <div className="p-4 bg-nominix-electric/5 rounded-2xl border border-nominix-electric/10 space-y-3">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <label className="text-[9px] font-black uppercase text-nominix-electric pl-2 flex items-center gap-1">
+                                        <DollarSign size={10} /> Monto Fijo
+                                    </label>
+                                    <input className="w-full p-3 bg-white rounded-xl border border-nominix-electric/20 text-sm font-bold outline-none focus:border-nominix-electric" type="number" step="0.01"
+                                        value={formData.split_fixed_amount} onChange={e => setFormData({ ...formData, split_fixed_amount: e.target.value })} required placeholder="0.00" />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[9px] font-black uppercase text-nominix-electric pl-2">Moneda Fijo</label>
+                                    <select className="w-full p-3 bg-white rounded-xl border border-nominix-electric/20 text-sm font-bold outline-none focus:border-nominix-electric"
+                                        value={formData.split_fixed_currency} onChange={e => setFormData({ ...formData, split_fixed_currency: e.target.value })}>
+                                        {currencies.map(c => <option key={c.code} value={c.code}>{c.code}</option>)}
+                                    </select>
+                                </div>
+                            </div>
+                            <p className="text-[8px] text-gray-400 font-bold uppercase tracking-wider px-2">
+                                Se usa como Base Fija o Bono Fijo según la config. de empresa
+                            </p>
+                        </div>
+                    )}
+
                     <button disabled={saving} className="w-full py-3 bg-nominix-electric text-white rounded-xl font-black uppercase text-xs tracking-widest hover:opacity-90 mt-2">
                         {saving ? 'Guardando...' : position ? 'Guardar Cambios' : 'Crear Cargo'}
                     </button>
@@ -155,7 +183,7 @@ const JobPositionModal = ({ departmentId, position, onClose, onSuccess, currenci
     );
 };
 
-const JobPositionsList = ({ department }) => {
+const JobPositionsList = ({ department, salarySplitMode }) => {
     const [positions, setPositions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -237,10 +265,18 @@ const JobPositionsList = ({ department }) => {
 
                                 <div className="bg-green-50 px-3 py-2 rounded-xl inline-flex items-center gap-2 border border-green-100">
                                     <div className="bg-white p-1 rounded-full shadow-sm text-green-600"><DollarSign size={10} /></div>
-                                    <div>
+                                    <div className="flex-1">
                                         <p className="text-[9px] font-black uppercase text-green-600/70 leading-none">Sueldo Ref.</p>
                                         <p className="text-sm font-black text-green-700 leading-none mt-0.5">{pos.default_total_salary} {pos.currency}</p>
                                     </div>
+                                    {salarySplitMode !== 'PERCENTAGE' && (
+                                        <div className="border-l border-green-200 pl-2">
+                                            <p className="text-[9px] font-black uppercase text-nominix-electric/70 leading-none">Monto Fijo</p>
+                                            <p className="text-sm font-black text-nominix-electric leading-none mt-0.5">
+                                                {pos.split_fixed_amount} {pos.split_fixed_currency}
+                                            </p>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         ))}
@@ -258,6 +294,7 @@ const JobPositionsList = ({ department }) => {
                     }}
                     onSuccess={loadPositions}
                     currencies={currencies}
+                    salarySplitMode={salarySplitMode}
                 />
             )}
         </div>
@@ -273,10 +310,21 @@ const OrganizationManager = () => {
 
     const [branches, setBranches] = useState([]);
     const [selectedBranch, setSelectedBranch] = useState(null);
+    const [companyConfig, setCompanyConfig] = useState(null);
 
     useEffect(() => {
         loadBranches();
+        loadCompanyConfig();
     }, []);
+
+    const loadCompanyConfig = async () => {
+        try {
+            const res = await axiosClient.get('/company/config/');
+            setCompanyConfig(res.data);
+        } catch (e) {
+            console.error("Error cargando config de empresa", e);
+        }
+    };
 
     useEffect(() => {
         if (selectedBranch) {
@@ -379,7 +427,10 @@ const OrganizationManager = () => {
             {/* COLUMNA DERECHA: CARGOS (JOB POSITIONS) */}
             <div className="lg:col-span-2 bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden flex flex-col h-[600px]">
                 {selectedDept ? (
-                    <JobPositionsList department={selectedDept} />
+                    <JobPositionsList
+                        department={selectedDept}
+                        salarySplitMode={companyConfig?.salary_split_mode}
+                    />
                 ) : (
                     <div className="flex-1 flex flex-col items-center justify-center text-gray-300">
                         <Folder size={64} className="mb-4 opacity-20" />

@@ -3,7 +3,9 @@ from .models import (
     Employee, LaborContract, Branch, PayrollConcept, 
     EmployeeConcept, Currency, PayrollPeriod, PayrollReceipt, PayrollReceiptLine,
     PayrollNovelty, Company, Department, Loan, LoanPayment, JobPosition, ExchangeRate,
-    PayrollPolicy
+    PayrollPolicy,
+    # Social Benefits
+    SocialBenefitsLedger, SocialBenefitsSettlement, InterestRateBCV
 )
 
 # ============================================================================
@@ -46,7 +48,18 @@ class CurrencySerializer(serializers.ModelSerializer):
     class Meta:
         model = Currency
         fields = ['code', 'name', 'symbol']
-
+class ExchangeRateSerializer(serializers.ModelSerializer):
+    currency_data = CurrencySerializer(source='currency', read_only=True)
+    source_display = serializers.CharField(source='get_source_display', read_only=True)
+    
+    class Meta:
+        model = ExchangeRate
+        fields = [
+            'id', 'currency', 'currency_data', 'rate', 
+            'date_valid', 'source', 'source_display', 
+            'notes', 'created_at'
+        ]
+        read_only_fields = ['created_at']
 class PayrollConceptSerializer(serializers.ModelSerializer):
     """
     Serializer para Conceptos de Nómina con validación de comportamiento y parámetros.
@@ -86,17 +99,18 @@ class PayrollConceptSerializer(serializers.ModelSerializer):
         return value
 
     def validate(self, attrs):
-        # Bloquear modificación de conceptos de sistema
-        # if self.instance and self.instance.is_system:
-        #     raise serializers.ValidationError(
-        #         "Este es un concepto de sistema y no puede ser modificado."
-        #     )
+        # 1. Recuperar datos (Merge de lo que envían + lo que ya existe en DB)
+        instance = self.instance
+        behavior = attrs.get('behavior') or (instance.behavior if instance else None)
+        # Nota: system_params es un dict, usamos .get() o {}
+        system_params = attrs.get('system_params') 
+        if system_params is None and instance:
+            system_params = instance.system_params
+        if system_params is None:
+            system_params = {}
 
-        
-        # Validar parámetros requeridos según behavior
-        behavior = attrs.get('behavior') or (self.instance.behavior if self.instance else None)
-        system_params = attrs.get('system_params', {})
-        
+        # 2. Validación Genérica (Tu lógica actual)
+        # Verifica que existan las claves mínimas requeridas por el tipo de comportamiento
         if behavior and behavior in BEHAVIOR_REQUIRED_PARAMS:
             required = BEHAVIOR_REQUIRED_PARAMS[behavior]
             for param in required:
@@ -104,7 +118,42 @@ class PayrollConceptSerializer(serializers.ModelSerializer):
                     raise serializers.ValidationError({
                         'system_params': f"El comportamiento '{behavior}' requiere el parámetro '{param}'."
                     })
-        
+
+        # 3. Validación Condicional Avanzada (Lógica ISLR vs IVSS)
+        if behavior == 'LAW_DEDUCTION':
+            # Por defecto asumimos FIXED si no se especifica
+            rate_source = system_params.get('rate_source', 'FIXED') 
+
+            # CASO A: Tasa Fija (Ej: IVSS, FAOV)
+            if rate_source == 'FIXED':
+                if 'rate' not in system_params:
+                    raise serializers.ValidationError({
+                        "system_params": "Para deducciones de tasa fija (IVSS/FAOV), debe incluir el parámetro 'rate' (tasa)."
+                    })
+
+            # CASO B: Tasa desde Contrato (Ej: ISLR)
+            elif rate_source == 'CONTRACT':
+                if 'contract_field' not in system_params:
+                    raise serializers.ValidationError({
+                        "system_params": "Si la tasa viene del contrato (rate_source='CONTRACT'), debe especificar 'contract_field'."
+                    })
+                
+                # --- Validación de Seguridad (Opcional pero recomendada) ---
+                # Verifica que el nombre del campo realmente exista en el modelo LaborContract
+                # para evitar errores 500 en el motor de cálculo.
+                try:
+                    from ..models import LaborContract 
+                    field_name = system_params.get('contract_field')
+                    # Obtenemos la lista de campos válidos del modelo
+                    valid_fields = [f.name for f in LaborContract._meta.get_fields()]
+                    
+                    if field_name not in valid_fields:
+                         raise serializers.ValidationError({
+                            "system_params": f"El campo '{field_name}' no existe en el modelo LaborContract."
+                        })
+                except ImportError:
+                    pass # Si no puedes importar el modelo aquí, omite esta validación extra
+
         return attrs
 
 
@@ -138,8 +187,16 @@ class LaborContractSerializer(serializers.ModelSerializer):
             'base_salary_bs', 'includes_cestaticket', 
             'salary_currency', 'currency_data', 'payment_frequency', 'start_date', 
             'end_date', 'is_active', 'position', 'job_position', 'department', 'work_schedule',
-            'total_salary_override'
+            'total_salary_override', 'islr_retention_percentage'
         ]
+        extra_kwargs = {
+            'islr_retention_percentage': {
+                'required': False, 
+                'min_value': 0, 
+                'max_value': 100,
+                'help_text': 'Porcentaje de retención ISLR (0 a 100)'
+            }
+        }
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
@@ -251,3 +308,137 @@ class LoanSerializer(serializers.ModelSerializer):
             'status', 'start_date', 'payments', 'created_at'
         ]
         read_only_fields = ['balance', 'created_at', 'updated_at']
+
+
+# =============================================================================
+# SOCIAL BENEFITS SERIALIZERS (Prestaciones Sociales)
+# =============================================================================
+
+class InterestRateBCVSerializer(serializers.ModelSerializer):
+    """Serializer para tasas de interés del BCV."""
+    
+    class Meta:
+        model = InterestRateBCV
+        fields = ['id', 'year', 'month', 'rate', 'source_url', 'created_at', 'created_by']
+        read_only_fields = ['created_at']
+
+
+class SocialBenefitsLedgerSerializer(serializers.ModelSerializer):
+    """
+    Serializer para el Libro Mayor de Prestaciones Sociales.
+    
+    Incluye transaction_type_display para que el frontend muestre textos legibles.
+    """
+    # Campo de solo lectura para mostrar el texto legible del tipo de transacción
+    transaction_type_display = serializers.CharField(
+        source='get_transaction_type_display', 
+        read_only=True
+    )
+    
+    # Datos relacionados para visualización
+    employee_name = serializers.CharField(source='employee.full_name', read_only=True)
+    employee_national_id = serializers.CharField(source='employee.national_id', read_only=True)
+    
+    class Meta:
+        model = SocialBenefitsLedger
+        fields = [
+            'id', 
+            # Relaciones
+            'employee', 'employee_name', 'employee_national_id', 'contract',
+            # Clasificación
+            'transaction_type', 'transaction_type_display', 
+            'transaction_date', 'period_description',
+            # Snapshot de auditoría
+            'basis_days', 'daily_salary_used', 'interest_rate_used', 'previous_balance',
+            # Campos financieros
+            'amount', 'balance',
+            # Trazabilidad
+            'calculation_formula', 'calculation_trace',
+            # Auditoría
+            'reference', 'notes', 'created_at', 'created_by', 'ip_address',
+        ]
+        read_only_fields = [
+            'id', 'balance', 'created_at', 'transaction_type_display',
+            'employee_name', 'employee_national_id'
+        ]
+
+
+class SocialBenefitsSettlementSerializer(serializers.ModelSerializer):
+    """
+    Serializer para Liquidaciones de Prestaciones Sociales.
+    
+    Incluye chosen_method_display para mostrar el método elegido en texto legible.
+    """
+    # Campos de solo lectura para textos legibles
+    chosen_method_display = serializers.CharField(
+        source='get_chosen_method_display', 
+        read_only=True
+    )
+    status_display = serializers.CharField(
+        source='get_status_display',
+        read_only=True
+    )
+    
+    class Meta:
+        model = SocialBenefitsSettlement
+        fields = [
+            'id', 'contract',
+            # Snapshot del empleado
+            'employee_national_id', 'employee_full_name', 'hire_date', 'termination_date',
+            # Método Garantía
+            'total_garantia', 'total_dias_adicionales', 'total_intereses', 
+            'total_anticipos', 'net_garantia',
+            # Método Retroactivo
+            'years_of_service', 'retroactive_days', 'final_daily_salary', 'retroactive_amount',
+            # Resultado
+            'chosen_method', 'chosen_method_display', 'settlement_amount',
+            # Trazabilidad
+            'calculation_summary',
+            # Estado
+            'settlement_date', 'status', 'status_display',
+            # Auditoría
+            'created_at', 'created_by', 'approved_at', 'approved_by', 
+            'paid_at', 'paid_by', 'payment_reference',
+            'voided_at', 'voided_by', 'void_reason',
+            'notes',
+        ]
+        read_only_fields = [
+            'id', 'chosen_method_display', 'status_display', 
+            'created_at', 'approved_at', 'paid_at', 'voided_at'
+        ]
+
+
+class AdvanceRequestSerializer(serializers.Serializer):
+    """
+    Serializer para validar solicitudes de anticipo de prestaciones.
+    """
+    contract_id = serializers.IntegerField(
+        help_text='ID del contrato del empleado'
+    )
+    amount = serializers.DecimalField(
+        max_digits=14, 
+        decimal_places=2,
+        help_text='Monto del anticipo solicitado'
+    )
+    notes = serializers.CharField(
+        required=False, 
+        allow_blank=True,
+        help_text='Observaciones opcionales'
+    )
+
+
+class QuarterlyGuaranteeSerializer(serializers.Serializer):
+    """
+    Serializer para procesar abono de garantía trimestral.
+    """
+    contract_id = serializers.IntegerField(
+        help_text='ID del contrato del empleado'
+    )
+    period_description = serializers.CharField(
+        max_length=50,
+        help_text='Descripción del periodo (ej: Q1-2026)'
+    )
+    transaction_date = serializers.DateField(
+        required=False,
+        help_text='Fecha del abono (default: hoy)'
+    )

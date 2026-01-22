@@ -77,6 +77,10 @@ class PayrollEngine:
             currency=target_currency, 
             date_valid__lte=query_date 
         ).order_by('-date_valid').first()
+        if not rate_obj:
+            rate_obj = ExchangeRate.objects.filter(
+                currency=target_currency
+            ).order_by('date_valid').first()
 
         val = rate_obj.rate if rate_obj else Decimal('1.00')
         if self.contract.salary_currency == target_currency:
@@ -780,22 +784,40 @@ class PayrollEngine:
             formula = concept.formula
 
             if concept.behavior == PayrollConcept.ConceptBehavior.LAW_DEDUCTION:
-                # Lógica de Ley (Migrada a usar accumulators obligatoriamente)
-                # Map de códigos internos para LAW_CONFIG
-                internal_code = concept.code
-                if internal_code == 'RPE': internal_code = 'PIE' # Fix para compatibilidad con LAW_CONFIG
-                
+                # Lógica de Ley (Soporta system_params para configuración dinámica)
                 sm = company.national_minimum_salary if company else FALLBACK_SALARIO_MINIMO
                 num_lunes = eval_context.get('LUNES', 4)
                 
-                # Construimos params mínimos para _handle_law_deduction
-                # Forzamos base_source='ACCUMULATOR'
+                # Leer system_params del concepto (si existe)
+                system_params = concept.system_params or {}
+                rate_source = system_params.get('rate_source', 'CONCEPT')
+                
+                # Determinar la tasa de retención
+                if rate_source == 'CONTRACT':
+                    # Tasa desde el contrato del empleado (ej: ISLR)
+                    contract_field = system_params.get('contract_field', 'islr_retention_percentage')
+                    contract_rate_value = getattr(self.contract, contract_field, Decimal('0.00'))
+                    rate = Decimal(str(contract_rate_value)) / 100
+                else:
+                    # Tasa desde el valor del concepto (ej: IVSS, FAOV, RPE)
+                    rate = concept.value / 100 if concept.computation_method == PayrollConcept.ComputationMethod.DYNAMIC_FORMULA else concept.value
+                
+                # Determinar etiqueta de base (default: CODIGO_BASE)
+                tag = system_params.get('base_label', concept.code + '_BASE')
+                
+                # Determinar tope en salarios mínimos
+                cap_multiplier = system_params.get('cap_multiplier')
+                if cap_multiplier is None:
+                    # Fallback a lógica legacy para conceptos sin system_params
+                    cap_multiplier = 5 if concept.code == 'IVSS' else (10 if concept.code == 'RPE' else None)
+                
+                # Construir params para el handler
                 law_params = {
-                    'rate': concept.value / 100 if concept.computation_method == PayrollConcept.ComputationMethod.DYNAMIC_FORMULA else concept.value,
-                    'base_source': 'ACCUMULATOR',
-                    'tag': concept.code + '_BASE',
+                    'rate': rate,
+                    'base_source': system_params.get('base_source', 'ACCUMULATOR'),
+                    'tag': tag,
                     'is_weekly': concept.code in ['IVSS', 'RPE'],
-                    'tope_sm': 5 if concept.code == 'IVSS' else (10 if concept.code == 'RPE' else None),
+                    'tope_sm': cap_multiplier,
                     'name': concept.name
                 }
                 

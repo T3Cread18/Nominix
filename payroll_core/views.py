@@ -19,7 +19,9 @@ from .models import (
     PayrollPeriod, PayrollReceipt, PayrollNovelty, Employee, 
     LaborContract, PayrollConcept, Company, Loan, Branch,
     ExchangeRate, EmployeeConcept, Currency, Department, LoanPayment, JobPosition,
-    PayrollPolicy
+    PayrollPolicy,
+    # Social Benefits
+    SocialBenefitsLedger, SocialBenefitsSettlement, InterestRateBCV
 )
 from .serializers import (
     PayrollPeriodSerializer, PayrollReceiptSerializer, PayrollNoveltySerializer,
@@ -27,7 +29,10 @@ from .serializers import (
     CompanySerializer, LoanSerializer, BranchSerializer,
     CurrencySerializer, EmployeeConceptSerializer, DepartmentSerializer, 
     LoanPaymentSerializer, JobPositionSerializer, PayrollPolicySerializer,
-    ACCUMULATOR_LABELS, BEHAVIOR_REQUIRED_PARAMS
+    ACCUMULATOR_LABELS, BEHAVIOR_REQUIRED_PARAMS, ExchangeRateSerializer,
+    # Social Benefits Serializers
+    SocialBenefitsLedgerSerializer, SocialBenefitsSettlementSerializer,
+    InterestRateBCVSerializer, AdvanceRequestSerializer, QuarterlyGuaranteeSerializer
 )
 from .engine import PayrollEngine
 
@@ -155,7 +160,23 @@ class PayrollPolicyView(APIView):
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
+class ExchangeRateViewSet(viewsets.ModelViewSet):
+    queryset = ExchangeRate.objects.all().order_by('-date_valid')
+    serializer_class = ExchangeRateSerializer
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    filterset_fields = ['currency', 'source']
+    ordering_fields = ['date_valid', 'rate']
+    @action(detail=False, methods=['post'], url_path='sync-bcv')
+    def sync_bcv(self, request):
+        """Dispara la sincronización con el BCV."""
+        try:
+            results = BCVRateService.fetch_and_update_rates()
+            return Response(results)
+        except Exception as e:
+            return Response(
+                {'error': str(e)}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 class LatestExchangeRateView(APIView):
 
     """
@@ -811,3 +832,290 @@ class ValidateFormulaView(APIView):
         
         result = PayrollEngine.validate_formula(formula, context)
         return Response(result)
+
+
+# =============================================================================
+# SOCIAL BENEFITS VIEWSET (Prestaciones Sociales)
+# =============================================================================
+
+class SocialBenefitsViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet para gestión de Prestaciones Sociales.
+    
+    Endpoints:
+    - GET /api/social-benefits/ - Lista movimientos del ledger
+    - GET /api/social-benefits/{id}/ - Detalle de un movimiento
+    - POST /api/social-benefits/run-quarterly/ - Procesar garantía trimestral
+    - GET /api/social-benefits/simulate-settlement/?contract_id=X - Simular liquidación
+    - POST /api/social-benefits/request-advance/ - Solicitar anticipo
+    """
+    queryset = SocialBenefitsLedger.objects.all()
+    serializer_class = SocialBenefitsLedgerSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['employee', 'contract', 'transaction_type']
+
+    @action(detail=False, methods=['post'], url_path='run-quarterly')
+    def run_quarterly(self, request):
+        """
+        POST /api/social-benefits/run-quarterly/
+        
+        Procesa el abono de garantía trimestral (15 días de salario integral).
+        
+        Request Body:
+        {
+            "contract_id": 1,
+            "period_description": "Q1-2026",
+            "transaction_date": "2026-03-31" (opcional)
+        }
+        """
+        serializer = QuarterlyGuaranteeSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        data = serializer.validated_data
+        contract_id = data['contract_id']
+        period_description = data['period_description']
+        transaction_date = data.get('transaction_date') or timezone.now().date()
+        
+        try:
+            contract = LaborContract.objects.get(pk=contract_id)
+        except LaborContract.DoesNotExist:
+            return Response(
+                {'error': f'Contrato con ID {contract_id} no encontrado'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Importar el motor de prestaciones sociales
+        from .services.social_benefits_engine import process_quarterly_guarantee
+        
+        try:
+            # Obtener información del usuario para auditoría
+            created_by = getattr(request.user, 'username', 'API')
+            ip_address = self._get_client_ip(request)
+            
+            entry = process_quarterly_guarantee(
+                contract=contract,
+                transaction_date=transaction_date,
+                period_description=period_description,
+                created_by=created_by,
+                ip_address=ip_address,
+            )
+            
+            return Response(
+                SocialBenefitsLedgerSerializer(entry).data,
+                status=status.HTTP_201_CREATED
+            )
+        except Exception as e:
+            return Response(
+                {'error': f'Error procesando garantía trimestral: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=False, methods=['get'], url_path='simulate-settlement')
+    def simulate_settlement(self, request):
+        """
+        GET /api/social-benefits/simulate-settlement/?contract_id=X
+        
+        Simula la liquidación final comparando Garantía vs Retroactivo.
+        NO persiste datos, solo retorna el cálculo.
+        """
+        contract_id = request.query_params.get('contract_id')
+        termination_date_str = request.query_params.get('termination_date')
+        
+        if not contract_id:
+            return Response(
+                {'error': 'Se requiere contract_id como parámetro'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            contract = LaborContract.objects.get(pk=contract_id)
+        except LaborContract.DoesNotExist:
+            return Response(
+                {'error': f'Contrato con ID {contract_id} no encontrado'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Parsear fecha de terminación o usar hoy
+        if termination_date_str:
+            from datetime import datetime
+            try:
+                termination_date = datetime.strptime(termination_date_str, '%Y-%m-%d').date()
+            except ValueError:
+                return Response(
+                    {'error': 'Formato de fecha inválido. Use YYYY-MM-DD'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        else:
+            termination_date = timezone.now().date()
+        
+        # Importar y ejecutar el cálculo
+        from .services.social_benefits_engine import calculate_final_settlement
+        
+        try:
+            comparison = calculate_final_settlement(contract, termination_date)
+            
+            # Convertir Decimals a float para JSON
+            result = {k: float(v) if isinstance(v, Decimal) else v for k, v in comparison.items()}
+            
+            return Response(result)
+        except Exception as e:
+            return Response(
+                {'error': f'Error calculando liquidación: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=False, methods=['post'], url_path='request-advance')
+    def request_advance(self, request):
+        """
+        POST /api/social-benefits/request-advance/
+        
+        Solicita un anticipo de prestaciones sociales.
+        
+        Restricción de Negocio: El monto no puede exceder el 75% del saldo actual.
+        
+        Request Body:
+        {
+            "contract_id": 1,
+            "amount": 1000.00,
+            "notes": "Anticipo personal" (opcional)
+        }
+        """
+        serializer = AdvanceRequestSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        data = serializer.validated_data
+        contract_id = data['contract_id']
+        amount = data['amount']
+        notes = data.get('notes', '')
+        
+        try:
+            contract = LaborContract.objects.get(pk=contract_id)
+        except LaborContract.DoesNotExist:
+            return Response(
+                {'error': f'Contrato con ID {contract_id} no encontrado'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        employee = contract.employee
+        
+        # Importar helper para obtener saldo actual
+        from .services.social_benefits_engine import (
+            get_current_balance,
+            calculate_comprehensive_salary
+        )
+        
+        # 1. Obtener saldo actual
+        current_balance = get_current_balance(employee)
+        
+        # 2. Validar restricción de negocio: máximo 75% del saldo
+        max_allowed = current_balance * Decimal('0.75')
+        
+        if amount > max_allowed:
+            return Response(
+                {
+                    'error': f'El monto solicitado ({amount}) excede el 75% del saldo disponible.',
+                    'current_balance': float(current_balance),
+                    'max_allowed': float(max_allowed.quantize(Decimal('0.01'))),
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if amount <= Decimal('0'):
+            return Response(
+                {'error': 'El monto debe ser mayor a cero'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # 3. Calcular salario integral para el snapshot
+        salary_result = calculate_comprehensive_salary(contract, timezone.now().date())
+        daily_salary_used = salary_result['daily_salary_integral']
+        
+        # 4. Crear el registro de ANTICIPO (monto negativo)
+        created_by = getattr(request.user, 'username', 'API')
+        ip_address = self._get_client_ip(request)
+        
+        try:
+            anticipo_entry = SocialBenefitsLedger(
+                employee=employee,
+                contract=contract,
+                transaction_type=SocialBenefitsLedger.TransactionType.ANTICIPO,
+                transaction_date=timezone.now().date(),
+                period_description=f'Anticipo {timezone.now().strftime("%b %Y")}',
+                # Snapshot de auditoría
+                basis_days=Decimal('0'),  # No aplica para anticipos
+                daily_salary_used=daily_salary_used,
+                previous_balance=current_balance,
+                # Monto NEGATIVO (es un cargo, no un abono)
+                amount=-amount,
+                balance=current_balance - amount,
+                # Trazabilidad
+                calculation_formula='Anticipo de Prestaciones (-amount)',
+                calculation_trace=f'Saldo anterior: {current_balance}, Anticipo: -{amount}, Nuevo saldo: {current_balance - amount}',
+                # Auditoría
+                created_by=created_by,
+                ip_address=ip_address,
+                notes=notes,
+            )
+            anticipo_entry.save()
+            
+            return Response(
+                SocialBenefitsLedgerSerializer(anticipo_entry).data,
+                status=status.HTTP_201_CREATED
+            )
+        except Exception as e:
+            return Response(
+                {'error': f'Error creando anticipo: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=False, methods=['get'], url_path='balance')
+    def get_balance(self, request):
+        """
+        GET /api/social-benefits/balance/?employee_id=X
+        
+        Obtiene el saldo actual de prestaciones de un empleado.
+        """
+        employee_id = request.query_params.get('employee_id')
+        
+        if not employee_id:
+            return Response(
+                {'error': 'Se requiere employee_id como parámetro'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            employee = Employee.objects.get(pk=employee_id)
+        except Employee.DoesNotExist:
+            return Response(
+                {'error': f'Empleado con ID {employee_id} no encontrado'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        from .services.social_benefits_engine import get_current_balance
+        
+        balance = get_current_balance(employee)
+        
+        return Response({
+            'employee_id': employee.id,
+            'employee_name': employee.full_name,
+            'balance': float(balance),
+        })
+
+    def _get_client_ip(self, request):
+        """Extrae la IP del cliente del request."""
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            return x_forwarded_for.split(',')[0].strip()
+        return request.META.get('REMOTE_ADDR')
+
+
+class InterestRateBCVViewSet(viewsets.ModelViewSet):
+    """
+    CRUD para las tasas de interés del BCV.
+    """
+    queryset = InterestRateBCV.objects.all()
+    serializer_class = InterestRateBCVSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['year', 'month']

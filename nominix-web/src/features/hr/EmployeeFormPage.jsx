@@ -16,7 +16,7 @@ import axiosClient from '../../api/axiosClient';
 
 import {
     ArrowLeft, Save, Briefcase, Calculator,
-    User, UserX, UserCheck
+    User, UserX, UserCheck, Shield
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 
@@ -30,6 +30,7 @@ import ConfirmationModal from '../../components/ConfirmationModal';
 import EmployeeProfileForm from './components/EmployeeProfileForm';
 import LaborContractsManager from './contracts/LaborContractsManager';
 import EmployeeConcepts from './EmployeeConcepts';
+import ManageSocialBenefits from '../social-benefits/ManageSocialBenefits';
 
 const EmployeeFormPage = () => {
     const { id } = useParams();
@@ -81,6 +82,11 @@ const EmployeeFormPage = () => {
     // Helpers
     const activeContract = contracts.find(c => c.is_active);
     const activeJobPosition = activeContract?.job_position; // Objeto del contrato
+
+    // DEBUG
+    console.log('[EmployeeFormPage] isEditing:', isEditing);
+    console.log('[EmployeeFormPage] contracts:', contracts);
+    console.log('[EmployeeFormPage] ManageSocialBenefits imported:', !!ManageSocialBenefits);
 
     // --- EFECTOS ---
 
@@ -284,6 +290,7 @@ const EmployeeFormPage = () => {
                 <Tabs defaultValue="profile" className="w-full">
                     <TabsList className="mb-8">
                         <TabsTrigger value="profile" icon={User}>Datos Personales</TabsTrigger>
+                        {isEditing && <TabsTrigger value="benefits" icon={Shield}>Prestaciones</TabsTrigger>}
                         {isEditing && <TabsTrigger value="contract" icon={Briefcase}>Contrato & Laboral</TabsTrigger>}
                         {isEditing && <TabsTrigger value="payroll" icon={Calculator}>Conceptos</TabsTrigger>}
                     </TabsList>
@@ -313,6 +320,15 @@ const EmployeeFormPage = () => {
                                     <LaborContractsManager
                                         employeeId={id}
                                         employeeData={employee}
+                                    />
+                                </div>
+                            </TabsContent>
+                            <TabsContent value="benefits">
+                                <div className="bg-white p-8 rounded-[2rem] border border-gray-100">
+                                    <ManageSocialBenefits
+                                        employeeId={id}
+                                        employeeData={employee}
+                                        contracts={contracts}
                                     />
                                 </div>
                             </TabsContent>

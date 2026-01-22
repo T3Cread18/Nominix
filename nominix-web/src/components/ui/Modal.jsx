@@ -14,6 +14,8 @@ const modalSizes = {
     xl: "max-w-xl",
     "2xl": "max-w-2xl",
     "3xl": "max-w-3xl",
+    "4xl": "max-w-4xl",
+    "5xl": "max-w-5xl",
     full: "max-w-[90vw]",
 };
 
@@ -94,7 +96,7 @@ const Modal = ({
 
     const modalContent = (
         <div
-            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-nominix-dark/40 backdrop-blur-sm animate-in fade-in duration-200"
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-nominix-dark/70 backdrop-blur-md animate-in fade-in duration-200"
             onClick={handleOverlayClick}
             role="presentation"
         >
@@ -106,7 +108,7 @@ const Modal = ({
                 aria-describedby={description ? "modal-description" : undefined}
                 tabIndex={-1}
                 className={cn(
-                    "relative w-full bg-white rounded-[2.5rem] shadow-2xl",
+                    "relative w-full bg-white rounded-[2rem] shadow-2xl",
                     "animate-in zoom-in-95 slide-in-from-bottom-4 duration-300",
                     "focus:outline-none",
                     modalSizes[size],
@@ -137,10 +139,10 @@ const Modal = ({
                         {showCloseButton && (
                             <button
                                 onClick={onClose}
-                                className="p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors"
+                                className="p-3 hover:bg-gray-100 rounded-2xl transition-all text-gray-300 hover:text-nominix-dark"
                                 aria-label="Cerrar"
                             >
-                                <X size={20} />
+                                <X size={24} />
                             </button>
                         )}
                     </div>

@@ -174,7 +174,7 @@ USE_TZ: bool = True
 # ARCHIVOS ESTÁTICOS
 # =============================================================================
 
-STATIC_URL: str = 'static/'
+STATIC_URL: str = '/static/'
 STATIC_ROOT: Path = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS: List[Path] = [
     BASE_DIR / 'static',

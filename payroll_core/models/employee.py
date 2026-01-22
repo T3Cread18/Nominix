@@ -8,7 +8,7 @@ from decimal import Decimal
 
 from .base import tenant_upload_path
 from .organization import Branch, Department, JobPosition
-from .currency import Currency
+from customers.models import Currency
 
 
 class Employee(models.Model):
@@ -383,6 +383,14 @@ class LaborContract(models.Model):
     # INFORMACIÓN SALARIAL
     # ==========================================================================
     
+    islr_retention_percentage: models.DecimalField = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=0,
+        verbose_name='Porcentaje de Retención de ISLR',
+        help_text='Porcentaje de retención de ISLR'
+    )
+    
     salary_amount: models.DecimalField = models.DecimalField(
         max_digits=10,
         decimal_places=2,
@@ -497,23 +505,21 @@ class LaborContract(models.Model):
     def monthly_salary(self) -> Decimal:
         """
         Calcula el salario mensual personal (base + complementos fijos).
-        Prioridad: Override -> Cargo -> Cálculo Legacy
+        Prioridad: Override -> Sueldo del Contrato (Mensual) -> Cargo
         """
         # 1. Override manual (si existe)
         if self.total_salary_override is not None:
             return self.total_salary_override
             
-        # 2. Por defecto del cargo (si existe)
-        if self.job_position:
+        # 2. Monto pactado en contrato (se especifica siempre en mensualidad)
+        if self.salary_amount > 0:
+            return self.salary_amount
+
+        # 3. Por defecto del cargo (si existe)
+        if self.job_position and self.job_position.default_total_salary > 0:
             return self.job_position.default_total_salary
             
-        # 3. Fallback: Cálculo legacy basado en frecuencia
-        if self.payment_frequency == self.PaymentFrequency.WEEKLY:
-            return self.salary_amount * Decimal('4.33')  # Promedio semanas/mes
-        elif self.payment_frequency == self.PaymentFrequency.BIWEEKLY:
-            return self.salary_amount * Decimal('2')
-        else:  # MONTHLY
-            return self.salary_amount
+        return Decimal('0.00')
     
     def save(self, *args, **kwargs) -> None:
         """

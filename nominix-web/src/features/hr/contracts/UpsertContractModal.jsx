@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { useForm, Controller } from 'react-hook-form';
-import { Briefcase, Calendar, DollarSign, Building2, Calculator, Save, Info, Loader2 } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useForm, Controller, useWatch } from 'react-hook-form';
+import { Briefcase, Calendar, DollarSign, Building2, Calculator, Save, Info, Loader2, Percent } from 'lucide-react';
 import { toast } from 'sonner';
 
 // Hooks
@@ -12,16 +12,379 @@ import Modal from '../../../components/ui/Modal';
 import Button from '../../../components/ui/Button';
 import InputField from '../../../components/ui/InputField';
 import SelectField from '../../../components/ui/SelectField';
-import DepartmentSelector from '../../../components/DepartmentSelector'; // Legacy selector helper, keep for now
+import DepartmentSelector from '../../../components/DepartmentSelector';
+import { cn } from '../../../utils/cn';
+
+// --- CUSTOM HOOKS ---
+
+/**
+ * Hook to handle real-time salary simulation logic.
+ * Encapsulates all currency conversion, bonus calculations, and Salary Split Strategy.
+ */
+const useSalarySimulation = (control, bcvRate, companyConfig, setValue) => {
+    const salaryAmount = useWatch({ control, name: 'salary_amount' });
+    const baseSalaryBs = useWatch({ control, name: 'base_salary_bs' });
+
+    // Explicit helper to calculate Base Salary based on Strategy
+    // usage: call this when salary_amount input changes
+    const calculateBaseFromTotal = (totalValue) => {
+        if (companyConfig && totalValue && !isNaN(parseFloat(totalValue))) {
+            const totalSalary = parseFloat(totalValue);
+            const currentRate = bcvRate || 1;
+            const splitMode = companyConfig.salary_split_mode || 'PERCENTAGE';
+            let calculatedBaseBs = 130;
+
+            if (totalSalary > 0) {
+                if (splitMode === 'PERCENTAGE') {
+                    const pct = parseFloat(companyConfig.split_percentage_base) || 30;
+                    calculatedBaseBs = (totalSalary * currentRate * (pct / 100));
+                } else if (splitMode === 'FIXED_BASE') {
+                    const fixedBaseUsd = parseFloat(companyConfig.split_fixed_amount) || 0;
+                    calculatedBaseBs = fixedBaseUsd * currentRate;
+                } else if (splitMode === 'FIXED_BONUS') {
+                    const fixedBonusUsd = parseFloat(companyConfig.split_fixed_amount) || 0;
+                    const baseUsd = totalSalary - fixedBonusUsd;
+                    calculatedBaseBs = baseUsd > 0 ? (baseUsd * currentRate) : 130;
+                }
+
+                setValue('base_salary_bs', calculatedBaseBs.toFixed(2), { shouldDirty: true });
+            }
+        }
+    };
+
+    return {
+        ...useMemo(() => {
+            const totalPackageUsd = parseFloat(salaryAmount) || 0;
+            const baseBs = parseFloat(baseSalaryBs) || 0;
+            const currentRate = bcvRate || 1;
+            const MONTO_CESTATICKET_USD = 40.00;
+
+            const totalPackageBs = totalPackageUsd * currentRate;
+            const cestaTicketBs = MONTO_CESTATICKET_USD * currentRate;
+
+            let complementoBs = totalPackageBs - baseBs - cestaTicketBs;
+            if (complementoBs < 0) complementoBs = 0;
+
+            return {
+                totalPackageBs,
+                cestaTicketBs,
+                complementoBs,
+                baseBs,
+                isValid: totalPackageUsd > 0
+            };
+        }, [salaryAmount, baseSalaryBs, bcvRate]), calculateBaseFromTotal
+    };
+};
+
+
+
+
+// --- SUB-COMPONENTS ---
+
+const SalarySimulator = ({ simulation, bcvRate, isLoadingRate, isSubmitting }) => {
+    return (
+        <div className="w-full md:w-[320px] bg-slate-50/80 backdrop-blur-sm p-6 rounded-[2rem] border border-gray-100/50 flex flex-col h-full sticky top-0 shadow-sm">
+            <h4 className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-6 flex items-center gap-2">
+                <Calculator size={14} className="text-nominix-electric" />
+                Simulación en Tiempo Real
+            </h4>
+
+            {isLoadingRate ? (
+                <div className="flex-1 flex flex-col items-center justify-center text-gray-400 min-h-[200px]">
+                    <Loader2 className="animate-spin text-nominix-electric" size={32} />
+                    <p className="text-[10px] mt-4 font-bold uppercase tracking-widest">Sincronizando BCV...</p>
+                </div>
+            ) : (
+                <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-500">
+                    <SummaryCard
+                        label="Sueldo Base"
+                        amount={simulation.baseBs}
+                        note="Incide en Prestaciones / Utilidades"
+                        noteColor="text-green-600"
+                        icon={<Building2 size={12} className="text-green-600" />}
+                    />
+                    <SummaryCard
+                        label="Cestaticket (Ley)"
+                        amount={simulation.cestaTicketBs}
+                        note="Beneficio de Alimentación ($40 Ref)"
+                        icon={<Info size={12} className="text-gray-400" />}
+                    />
+                    <SummaryCard
+                        label="Complemento (Bono)"
+                        amount={simulation.complementoBs}
+                        note="No Salarial / Sin Incidencia"
+                        highlight
+                        icon={<DollarSign size={12} className="text-nominix-electric" />}
+                    />
+
+                    <div className="border-t border-gray-200/50 my-4"></div>
+
+                    {/* Footer Info */}
+                    <div className="p-4 bg-white rounded-2xl border border-gray-100 shadow-sm flex gap-3 items-center group hover:border-nominix-electric/20 transition-colors">
+                        <div className="p-2 bg-blue-50 rounded-xl text-blue-500 group-hover:bg-nominix-electric group-hover:text-white transition-colors">
+                            <Info size={16} />
+                        </div>
+                        <div>
+                            <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Tasa de Cambio</p>
+                            <p className="text-xs font-bold text-slate-700">BCV: <span className="font-mono">Bs. {bcvRate.toFixed(2)}</span></p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <div className="mt-auto pt-8 flex flex-col gap-3">
+                <Button
+                    type="submit"
+                    form="contract-form"
+                    variant="electric"
+                    className="w-full justify-center py-4 text-xs font-black tracking-widest uppercase rounded-2xl shadow-lg shadow-nominix-electric/20 text-white"
+                    isLoading={isSubmitting}
+                    icon={Save}
+                >
+                    Guardar Contrato
+                </Button>
+                <Button
+                    variant="ghost"
+                    onClick={() => document.getElementById('close-modal-btn')?.click()}
+                    className="w-full justify-center py-4 text-xs font-bold text-gray-400 hover:text-slate-700"
+                >
+                    Cancelar Operación
+                </Button>
+            </div>
+        </div>
+    );
+};
+
+const SummaryCard = ({ label, amount, note, noteColor = "text-gray-400", highlight = false, icon }) => (
+    <div className={cn(
+        "p-4 rounded-2xl border transition-all duration-300",
+        highlight
+            ? 'bg-gradient-to-br from-nominix-electric/5 to-transparent border-nominix-electric/20 shadow-lg shadow-nominix-electric/5'
+            : 'bg-white border-gray-100 hover:border-gray-200'
+    )}>
+        <div className="flex justify-between items-start mb-2">
+            <div className="flex items-center gap-2">
+                {icon && <div className={cn("p-1 rounded-lg", highlight ? "bg-white/50" : "bg-gray-50")}>{icon}</div>}
+                <span className={cn(
+                    "text-[10px] font-black uppercase tracking-widest",
+                    highlight ? 'text-nominix-electric' : 'text-slate-500'
+                )}>{label}</span>
+            </div>
+            <span className={cn(
+                "text-sm font-black font-mono tracking-tight",
+                highlight ? 'text-nominix-electric' : 'text-slate-800'
+            )}>Bs. {amount.toLocaleString('es-VE', { minimumFractionDigits: 2 })}</span>
+        </div>
+        <p className={cn("text-[9px] font-medium pl-1", noteColor)}>{note}</p>
+    </div>
+);
+
+const ContractForm = ({ register, control, errors, watchedValues, jobPositions, branches, employeeData, handleJobPositionChange, formState, calculateBaseFromTotal }) => {
+    const isJobSelected = !!watchedValues.job_position;
+
+    return (
+        <form id="contract-form" className="flex-1 space-y-8 pr-2">
+
+            {/* 1. INFORMACIÓN GENERAL */}
+            <section>
+                <SectionHeader icon={Calendar} title="Vigencia y Tipo" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <SelectField
+                        label="Tipo de Contrato"
+                        {...register('contract_type')}
+                        options={[
+                            { value: 'INDEFINITE', label: 'Tiempo Indeterminado' },
+                            { value: 'FIXED_TERM', label: 'Tiempo Determinado' },
+                            { value: 'PROJECT', label: 'Por Obra Determinada' }
+                        ]}
+                    />
+                    <div className="grid grid-cols-2 gap-4">
+                        <InputField
+                            label="Fecha Inicio"
+                            type="date"
+                            {...register('start_date', { required: 'Requerido' })}
+                            error={errors.start_date?.message}
+                        />
+                        {watchedValues.contract_type !== 'INDEFINITE' && (
+                            <div className="animate-in fade-in zoom-in-95">
+                                <InputField
+                                    label="Fecha Fin"
+                                    type="date"
+                                    {...register('end_date')}
+                                    className="bg-blue-50/30 border-blue-100"
+                                />
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </section>
+
+            {/* 2. ESQUEMA SALARIAL */}
+            <section className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm relative overflow-hidden group hover:shadow-md transition-all duration-500">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-nominix-electric/5 rounded-full -mr-10 -mt-10 group-hover:scale-110 transition-transform duration-700"></div>
+
+                <div className="flex justify-between items-center mb-6 relative z-10">
+                    <SectionHeader icon={DollarSign} title="Compensación" className="mb-0" />
+                    {isJobSelected && (
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-nominix-electric bg-nominix-electric/10 px-2 py-1 rounded-lg flex items-center gap-1">
+                            <Briefcase size={10} /> Definido por Cargo
+                        </span>
+                    )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 relative z-10">
+                    <InputField
+                        label="Total Paquete Mensual"
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                        icon={DollarSign}
+                        {...register('salary_amount', {
+                            required: 'Requerido',
+                            onChange: (e) => !isJobSelected && calculateBaseFromTotal(e.target.value)
+                        })}
+                        error={errors.salary_amount?.message}
+                        className={cn("text-lg font-black text-nominix-dark", isJobSelected && "bg-gray-50 text-gray-400 cursor-not-allowed")}
+                        disabled={isJobSelected}
+                    />
+                    <InputField
+                        label="Sueldo Base (Declarado)"
+                        type="number"
+                        step="0.01"
+                        placeholder="130.00"
+                        {...register('base_salary_bs', { required: 'Requerido' })}
+                        helperText="Monto en Bolívares para recibos de ley"
+                        className={cn(isJobSelected && "bg-gray-50 text-gray-400 cursor-not-allowed")}
+                        disabled={isJobSelected}
+                    />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mt-5 relative z-10">
+                    <SelectField
+                        label="Moneda Referencia"
+                        {...register('salary_currency')}
+                        options={[
+                            { value: 'USD', label: 'USD (Dólar)' },
+                            { value: 'VES', label: 'VES (Bolívar)' }
+                        ]}
+                        disabled={isJobSelected}
+                    />
+                    <SelectField
+                        label="Frecuencia de Pago"
+                        {...register('payment_frequency')}
+                        options={[
+                            { value: 'BIWEEKLY', label: 'Quincenal' },
+                            { value: 'WEEKLY', label: 'Semanal' },
+                            { value: 'MONTHLY', label: 'Mensual' }
+                        ]}
+                    />
+                    <InputField
+                        label="Retención ISLR (%)"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="100"
+                        placeholder="0.00"
+                        icon={Percent}
+                        {...register('islr_retention_percentage')}
+                        className="font-bold text-amber-600"
+                    />
+                </div>
+            </section>
+
+            {/* 3. UBICACIÓN ORGANIZACIONAL */}
+            <section>
+                <SectionHeader icon={Building2} title="Ubicación Organizacional" />
+                <div className="space-y-4">
+                    <SelectField
+                        label="Sede / Sucursal"
+                        {...register('branch')}
+                        disabled={!!employeeData?.branch}
+                        options={[
+                            { value: '', label: '-- Seleccionar Sede --' },
+                            ...branches.map(b => ({ value: b.id, label: b.name }))
+                        ]}
+                    />
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide ml-1">Departamento</label>
+                            <Controller
+                                name="department"
+                                control={control}
+                                render={({ field }) => (
+                                    <DepartmentSelector
+                                        branchId={watchedValues.branch}
+                                        value={field.value}
+                                        onChange={(val) => {
+                                            field.onChange(val);
+                                            // Reset dependents
+                                        }}
+                                        disabled={!!employeeData?.department || !watchedValues.branch}
+                                    />
+                                )}
+                            />
+                        </div>
+
+                        <div className="space-y-1">
+                            <Controller
+                                name="job_position"
+                                control={control}
+                                render={({ field }) => (
+                                    <SelectField
+                                        label="Cargo Estructurado"
+                                        icon={Briefcase}
+                                        {...field}
+                                        disabled={!watchedValues.department}
+                                        options={[
+                                            { value: '', label: watchedValues.department ? '-- Seleccionar Cargo --' : 'Seleccione Dpto.' },
+                                            ...jobPositions.map(pos => ({ value: pos.id, label: pos.name }))
+                                        ]}
+                                        onChange={(e) => {
+                                            field.onChange(e);
+                                            handleJobPositionChange(e);
+                                        }}
+                                    />
+                                )}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <InputField
+                            label="Cargo (Título en Recibo)"
+                            placeholder="Ej. Gerente General"
+                            {...register('position')}
+                        />
+                        <InputField
+                            label="Horario de Trabajo"
+                            placeholder="Lunes a Viernes..."
+                            {...register('work_schedule')}
+                        />
+                    </div>
+                </div>
+            </section>
+        </form>
+    );
+};
+
+const SectionHeader = ({ icon: Icon, title, className }) => (
+    <h4 className={cn("text-[10px] font-black uppercase text-gray-400 tracking-widest flex items-center gap-2 mb-4", className)}>
+        {Icon && <Icon size={14} className="text-nominix-electric opacity-60" />}
+        {title}
+    </h4>
+);
+
+// --- MAIN COMPONENT ---
 
 const UpsertContractModal = ({ isOpen, onClose, onSuccess, employeeId, employeeData, contractToEdit = null }) => {
-    // 1. Hooks de Datos Globales
+    // Hooks Globales
     const { data: companyConfig } = useCompanyConfig({ enabled: isOpen });
     const { data: branches = [] } = useBranches({ enabled: isOpen });
     const { data: bcvRate = 60.00, isLoading: isLoadingRate } = useExchangeRate({ enabled: isOpen });
 
-    // 2. React Hook Form
-    const { register, control, handleSubmit, watch, setValue, reset, formState: { errors } } = useForm({
+    // React Hook Form
+    const { register, control, handleSubmit, watch, setValue, reset, formState } = useForm({
         defaultValues: {
             contract_type: 'INDEFINITE',
             start_date: new Date().toISOString().split('T')[0],
@@ -35,29 +398,29 @@ const UpsertContractModal = ({ isOpen, onClose, onSuccess, employeeId, employeeD
             department: '',
             job_position: '',
             work_schedule: 'Lunes a Viernes 8:00 AM - 5:00 PM',
-            notes: ''
+            notes: '',
+            islr_retention_percentage: '0'
         }
     });
 
-    // Watchers para calculos
     const watchedValues = watch();
     const selectedDepartment = watchedValues.department;
 
-    // 3. Hooks dependientes (Cargos)
+    // Hooks Dependientes
     const { data: jobPositions = [] } = useJobPositions(
         typeof selectedDepartment === 'object' ? selectedDepartment.id : selectedDepartment,
         { enabled: !!selectedDepartment }
     );
 
-    // 4. Mutations
+    // Mutations
     const createContractMutation = useCreateContract();
     const updateContractMutation = useUpdateContract();
 
-    const isSubmitting = createContractMutation.isPending || updateContractMutation.isPending;
+    // Custom Logic Hook
+    const simulation = useSalarySimulation(control, bcvRate, companyConfig, setValue, !!watchedValues.job_position);
 
-    // --- EFECTOS ---
+    // --- EFFECTS & HANDLERS ---
 
-    // Inicializar Formulario al abrir
     useEffect(() => {
         if (isOpen) {
             if (contractToEdit) {
@@ -68,7 +431,8 @@ const UpsertContractModal = ({ isOpen, onClose, onSuccess, employeeId, employeeD
                     department: contractToEdit.department?.id || contractToEdit.department || '',
                     job_position: contractToEdit.job_position?.id || contractToEdit.job_position || '',
                     notes: contractToEdit.notes || '',
-                    base_salary_bs: contractToEdit.base_salary_bs || '130'
+                    base_salary_bs: contractToEdit.base_salary_bs || '130',
+                    islr_retention_percentage: contractToEdit.islr_retention_percentage || '0'
                 });
             } else {
                 reset({
@@ -84,25 +448,21 @@ const UpsertContractModal = ({ isOpen, onClose, onSuccess, employeeId, employeeD
                     department: employeeData?.department?.id || employeeData?.department || '',
                     job_position: '',
                     work_schedule: 'Lunes a Viernes 8:00 AM - 5:00 PM',
-                    notes: ''
+                    notes: '',
+                    islr_retention_percentage: '0'
                 });
             }
         }
     }, [isOpen, contractToEdit, employeeData, reset]);
 
-
-    // Manejo inteligente de cambio de cargo
-    const handleJobPositionChange = (e) => {
+    const handleJobPositionChange = useCallback((e) => {
         const val = e.target.value;
         const job = jobPositions.find(j => j.id == val);
 
         setValue('job_position', val);
 
         if (job) {
-            // Auto-fill nombre del cargo
             setValue('position', job.name);
-
-            // Auto-calculate base from job defaults
             const totalSalary = parseFloat(job.default_total_salary || 0);
             let calculatedBaseBs = 130;
 
@@ -127,30 +487,11 @@ const UpsertContractModal = ({ isOpen, onClose, onSuccess, employeeId, employeeD
             setValue('base_salary_bs', calculatedBaseBs.toFixed(2));
             setValue('salary_currency', job.currency?.code || job.currency || 'USD');
         }
-    };
+    }, [jobPositions, companyConfig, bcvRate, setValue]);
 
-
-    // --- CÁLCULO DE SIMULACIÓN ---
-    const simulation = useMemo(() => {
-        const totalPackageUsd = parseFloat(watchedValues.salary_amount) || 0;
-        const baseBs = parseFloat(watchedValues.base_salary_bs) || 0;
-        const currentRate = bcvRate || 1;
-        const MONTO_CESTATICKET_USD = 40.00;
-
-        const totalPackageBs = totalPackageUsd * currentRate;
-        const cestaTicketBs = MONTO_CESTATICKET_USD * currentRate;
-
-        let complementoBs = totalPackageBs - baseBs - cestaTicketBs;
-        if (complementoBs < 0) complementoBs = 0;
-
-        return { totalPackageBs, cestaTicketBs, complementoBs, baseBs };
-    }, [watchedValues.salary_amount, watchedValues.base_salary_bs, bcvRate]);
-
-
-    // --- SUBMIT ---
     const onSubmit = async (data) => {
         if (data.contract_type !== 'INDEFINITE' && !data.end_date) {
-            toast.error("La fecha de fin es obligatoria para este tipo de contrato");
+            toast.error("La fecha de fin es obligatoria para este contracto");
             return;
         }
 
@@ -160,20 +501,18 @@ const UpsertContractModal = ({ isOpen, onClose, onSuccess, employeeId, employeeD
             department: data.department
         };
 
-        // Si el empleado tiene branch legacy, usarla
         if (employeeData?.branch && !payload.branch) {
             payload.branch = employeeData.branch.id || employeeData.branch;
         }
-
         if (!payload.end_date) payload.end_date = null;
 
         try {
             if (contractToEdit) {
                 await updateContractMutation.mutateAsync({ id: contractToEdit.id, ...payload });
-                toast.success("Contrato actualizado");
+                toast.success("Contrato actualizado exitosamente");
             } else {
                 await createContractMutation.mutateAsync(payload);
-                toast.success("Contrato registrado");
+                toast.success("Contrato registrado exitosamente");
             }
             onSuccess?.();
             onClose();
@@ -187,236 +526,34 @@ const UpsertContractModal = ({ isOpen, onClose, onSuccess, employeeId, employeeD
         <Modal
             isOpen={isOpen}
             onClose={onClose}
-            title={contractToEdit ? 'Editar Contrato' : 'Nuevo Contrato'}
-            size="4xl"
+            title={contractToEdit ? 'Editar Contrato Laboral' : 'Nuevo Contrato Laboral'}
+            size="5xl"
         >
-            <div className="flex flex-col md:flex-row gap-6 p-1">
-                {/* COLUMNA IZQUIERDA: FORMULARIO */}
-                <form id="contract-form" onSubmit={handleSubmit(onSubmit)} className="flex-1 space-y-6">
+            <div className="flex flex-col lg:flex-row gap-8 p-2">
+                <ContractForm
+                    register={register}
+                    control={control}
+                    errors={formState.errors}
+                    watchedValues={watchedValues}
+                    jobPositions={jobPositions}
+                    branches={branches}
+                    employeeData={employeeData}
+                    handleJobPositionChange={handleJobPositionChange}
+                    formState={formState}
+                />
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Tipo de Contrato */}
-                        <SelectField
-                            label="Tipo de Contrato"
-                            {...register('contract_type')}
-                            options={[
-                                { value: 'INDEFINITE', label: 'Tiempo Indeterminado' },
-                                { value: 'FIXED_TERM', label: 'Tiempo Determinado' },
-                                { value: 'PROJECT', label: 'Por Obra Determinada' }
-                            ]}
-                        />
+                <SalarySimulator
+                    simulation={simulation}
+                    bcvRate={bcvRate}
+                    isLoadingRate={isLoadingRate}
+                    isSubmitting={createContractMutation.isPending || updateContractMutation.isPending}
+                />
 
-                        {/* Fechas */}
-                        <InputField
-                            label="Fecha Inicio"
-                            type="date"
-                            icon={Calendar}
-                            {...register('start_date', { required: 'Requerido' })}
-                            error={errors.start_date?.message}
-                        />
-
-                        {watchedValues.contract_type !== 'INDEFINITE' && (
-                            <div className="animate-in fade-in slide-in-from-top-2">
-                                <InputField
-                                    label="Fecha Fin"
-                                    type="date"
-                                    icon={Calendar}
-                                    {...register('end_date')}
-                                    className="bg-blue-50/50 border-blue-100"
-                                />
-                            </div>
-                        )}
-                    </div>
-
-                    {/* SECCIÓN SALARIAL */}
-                    <div className="border border-gray-100 rounded-2xl p-4 bg-gray-50/50 space-y-4">
-                        <h4 className="text-xs font-black uppercase text-nominix-electric tracking-widest flex items-center gap-2">
-                            <DollarSign size={14} /> Esquema Salarial
-                        </h4>
-
-                        <div className="grid grid-cols-2 gap-4">
-                            <InputField
-                                label="Total Paquete ($)"
-                                type="number"
-                                step="0.01"
-                                placeholder="0.00"
-                                icon={DollarSign}
-                                {...register('salary_amount', { required: 'Requerido' })}
-                                error={errors.salary_amount?.message}
-                                className="text-lg font-black"
-                            />
-
-                            <InputField
-                                label="Sueldo Base (Bs)"
-                                type="number"
-                                step="0.01"
-                                placeholder="130.00"
-                                {...register('base_salary_bs', { required: 'Requerido' })}
-                            />
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                            <SelectField
-                                label="Moneda Referencia"
-                                {...register('salary_currency')}
-                                options={[
-                                    { value: 'USD', label: 'USD (Dólar)' },
-                                    { value: 'VES', label: 'VES (Bolívar)' }
-                                ]}
-                            />
-                            <SelectField
-                                label="Frecuencia de Pago"
-                                {...register('payment_frequency')}
-                                options={[
-                                    { value: 'BIWEEKLY', label: 'Quincenal' },
-                                    { value: 'WEEKLY', label: 'Semanal' },
-                                    { value: 'MONTHLY', label: 'Mensual' }
-                                ]}
-                            />
-                        </div>
-                    </div>
-
-                    {/* ESTRUCTURA ORGANIZATIVA */}
-                    <div className="space-y-4 pt-2">
-                        <h4 className="text-xs font-black uppercase text-gray-400 tracking-widest flex items-center gap-2">
-                            <Building2 size={14} /> Ubicación
-                        </h4>
-
-                        {/* Sede */}
-                        <SelectField
-                            label="Sede / Sucursal"
-                            icon={Building2}
-                            {...register('branch')}
-                            disabled={!!employeeData?.branch} // Bloqueado si el empleado ya tiene sede
-                            options={[
-                                { value: '', label: '-- Seleccionar Sede --' },
-                                ...branches.map(b => ({ value: b.id, label: b.name }))
-                            ]}
-                            onChange={(e) => {
-                                setValue('branch', e.target.value);
-                                setValue('department', '');
-                                setValue('job_position', '');
-                                setValue('position', '');
-                            }}
-                        />
-
-                        {/* Departamento (Custom Component por ahora) */}
-                        <div className="space-y-1">
-                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide ml-1">Departamento</label>
-                            <Controller
-                                name="department"
-                                control={control}
-                                render={({ field }) => (
-                                    <DepartmentSelector
-                                        branchId={watchedValues.branch}
-                                        value={field.value}
-                                        onChange={(val) => {
-                                            field.onChange(val);
-                                            setValue('job_position', '');
-                                            setValue('position', '');
-                                        }}
-                                        disabled={!!employeeData?.department || !watchedValues.branch}
-                                    />
-                                )}
-                            />
-                        </div>
-
-                        {/* Cargo Estructurado */}
-                        <div className="space-y-1">
-                            <SelectField
-                                label="Cargo Estructurado"
-                                icon={Briefcase}
-                                {...register('job_position')}
-                                disabled={!watchedValues.department}
-                                options={[
-                                    { value: '', label: watchedValues.department ? '-- Seleccionar Cargo --' : 'Departamento Requerido' },
-                                    ...jobPositions.map(pos => ({ value: pos.id, label: pos.name }))
-                                ]}
-                                onChange={handleJobPositionChange}
-                            />
-                        </div>
-
-                        <InputField
-                            label="Cargo (Texto en Recibo)"
-                            placeholder="Ej. Gerente de Operaciones"
-                            {...register('position')}
-                        />
-
-                        <InputField
-                            label="Horario"
-                            placeholder="Lunes a Viernes..."
-                            {...register('work_schedule')}
-                        />
-                    </div>
-                </form>
-
-                {/* COLUMNA DERECHA: SIMULADOR */}
-                <div className="w-full md:w-[280px] bg-slate-50 p-6 rounded-2xl border border-gray-100 flex flex-col h-full sticky top-0">
-                    <h4 className="text-xs font-black uppercase text-gray-400 tracking-widest mb-6 flex items-center gap-2">
-                        <Calculator size={14} /> Simulación
-                    </h4>
-
-                    {isLoadingRate ? (
-                        <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
-                            <Loader2 className="animate-spin" size={24} />
-                            <p className="text-[10px] mt-2">Consultando Tasa...</p>
-                        </div>
-                    ) : (
-                        <div className="space-y-4 animate-in fade-in">
-                            <SummaryCard label="Sueldo Base" amount={simulation.baseBs} note="Incide Prestaciones" noteColor="text-green-600" />
-                            <SummaryCard label="Cestaticket" amount={simulation.cestaTicketBs} note="Valor de Ley ($40)" />
-                            <SummaryCard
-                                label="Complemento"
-                                amount={simulation.complementoBs}
-                                note="Bono No Salarial"
-                                highlight
-                            />
-
-                            <div className="border-t border-gray-200 my-2"></div>
-
-                            <div className="p-3 bg-blue-50/50 rounded-xl flex gap-2 items-start border border-blue-100/50">
-                                <Info size={14} className="text-blue-500 mt-0.5 flex-shrink-0" />
-                                <p className="text-[9px] text-blue-600 leading-relaxed">
-                                    Cálculo oficial BCV: <strong>Bs. {bcvRate.toFixed(2)}</strong>.
-                                </p>
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="mt-auto pt-6 flex flex-col gap-3">
-                        <Button
-                            type="submit"
-                            form="contract-form"
-                            variant="electric"
-                            className="w-full justify-center"
-                            isLoading={isSubmitting}
-                            icon={Save}
-                        >
-                            Guardar Contrato
-                        </Button>
-                        <Button
-                            variant="ghost"
-                            onClick={onClose}
-                            className="w-full justify-center"
-                        >
-                            Cancelar
-                        </Button>
-                    </div>
-                </div>
+                {/* Hidden button to close from simulator */}
+                <button id="close-modal-btn" className="hidden" onClick={onClose}></button>
             </div>
         </Modal>
     );
 };
-
-// Helper component local
-const SummaryCard = ({ label, amount, note, noteColor = "text-gray-400", highlight = false }) => (
-    <div className={`p-3 rounded-xl border shadow-sm ${highlight ? 'bg-nominix-electric/5 border-nominix-electric/30' : 'bg-white border-gray-100'}`}>
-        <div className="flex justify-between items-start mb-1">
-            <span className={`text-[9px] font-black uppercase ${highlight ? 'text-nominix-electric' : 'text-slate-500'}`}>{label}</span>
-            <span className={`text-xs font-bold ${highlight ? 'text-nominix-electric' : 'text-slate-800'}`}>Bs. {amount.toLocaleString()}</span>
-        </div>
-        <p className={`text-[8px] ${noteColor}`}>{note}</p>
-    </div>
-);
 
 export default UpsertContractModal;

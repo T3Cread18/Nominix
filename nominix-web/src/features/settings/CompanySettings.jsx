@@ -1,5 +1,5 @@
 import React, { Suspense } from 'react';
-import { Building2, Store, Hash, Calculator } from 'lucide-react';
+import { Building2, Store, Hash, Calculator, DollarSign, TrendingUp } from 'lucide-react';
 import Tabs, { TabsList, TabsTrigger, TabsContent } from '../../components/ui/Tabs';
 import Skeleton from '../../components/ui/Skeleton';
 import OrganizationManager from './OrganizationManager';
@@ -8,7 +8,7 @@ import OrganizationManager from './OrganizationManager';
 const CompanyForm = React.lazy(() => import('./components/CompanyForm'));
 const PayrollPoliciesForm = React.lazy(() => import('./components/PayrollPoliciesForm'));
 const BranchManager = React.lazy(() => import('./components/BranchManager'));
-
+const ExchangeRatesManager = React.lazy(() => import('./components/ExchangeRatesManager'));
 const CompanySettings = () => {
     return (
         <div className="max-w-7xl mx-auto pb-10">
@@ -27,6 +27,9 @@ const CompanySettings = () => {
                         <TabsTrigger value="organization" icon={Hash}>
                             Estructura Organizativa
                         </TabsTrigger>
+                        <TabsTrigger value="rates" icon={TrendingUp}>
+                            Tasas de Cambio
+                        </TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="company">
@@ -43,6 +46,9 @@ const CompanySettings = () => {
 
                     <TabsContent value="organization">
                         <OrganizationManager />
+                    </TabsContent>
+                    <TabsContent value="rates">
+                        <ExchangeRatesManager />
                     </TabsContent>
                 </Tabs>
             </Suspense>

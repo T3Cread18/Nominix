@@ -1,5 +1,5 @@
 """
-Fórmulas Legales para la Nómina Venezolana (LOTTT, IVSS, FAOV, RPE).
+Fórmulas Legales para la Nómina Venezolana (LOTTT, IVSS, FAOV, RPE, ISLR).
 
 Este módulo contiene la lógica pura de cálculo.
 Está diseñado para trabajar con los modelos: LaborContract, PayrollPeriod y PayrollNovelty.

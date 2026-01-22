@@ -6,7 +6,7 @@ from django.core.validators import MinValueValidator
 from decimal import Decimal
 
 from .employee import Employee
-from .currency import Currency
+from customers.models import Currency
 from .payroll import PayrollReceipt
 
 

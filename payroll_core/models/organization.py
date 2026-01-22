@@ -8,7 +8,7 @@ from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
 from decimal import Decimal
 
-from .currency import Currency
+from customers.models import Currency
 
 
 class Branch(models.Model):
@@ -186,6 +186,24 @@ class JobPosition(models.Model):
         help_text='Moneda del sueldo base (generalmente USD)'
     )
     
+    split_fixed_amount: models.DecimalField = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        validators=[MinValueValidator(Decimal('0.00'))],
+        verbose_name='Monto Fijo (Estrategia)',
+        help_text='Monto fijo para usar en estrategias FIXED_BASE o FIXED_BONUS'
+    )
+
+    split_fixed_currency: models.ForeignKey = models.ForeignKey(
+        Currency,
+        on_delete=models.PROTECT,
+        default='USD',
+        related_name='job_positions_fixed',
+        verbose_name='Moneda Monto Fijo',
+        help_text='Moneda del monto fijo para la estrategia (ej: USD)'
+    )
+    
     # ==========================================================================
     # ESTADO Y METADATA
     # ==========================================================================
@@ -286,15 +304,6 @@ class Company(models.Model):
         validators=[MinValueValidator(Decimal('0.00')), MaxValueValidator(Decimal('100.00'))],
         verbose_name="Porcentaje Base (%)",
         help_text="Para modo PERCENTAGE: porcentaje del total que es sueldo base (ej: 30.00)"
-    )
-    
-    split_fixed_amount = models.DecimalField(
-        max_digits=12,
-        decimal_places=2,
-        default=Decimal('0.00'),
-        validators=[MinValueValidator(Decimal('0.00'))],
-        verbose_name="Monto Fijo",
-        help_text="Para modos FIXED_BASE o FIXED_BONUS: monto fijo en la moneda del contrato"
     )
 
     # Configuración de Frecuencias y Pagos

@@ -5,6 +5,8 @@ const InputField = forwardRef(({
     label,
     className,
     icon: Icon,
+    error,
+    helperText,
     ...props
 }, ref) => (
     <div className={cn("space-y-1.5", className)}>
@@ -25,6 +27,12 @@ const InputField = forwardRef(({
             )}
             {...props}
         />
+        {helperText && !error && (
+            <p className="text-[10px] font-medium text-gray-400 pl-1">{helperText}</p>
+        )}
+        {error && (
+            <p className="text-[10px] font-bold text-red-500 pl-1 animate-in slide-in-from-left-1">{error}</p>
+        )}
     </div>
 ));
 

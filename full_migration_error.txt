@@ -1,0 +1,87 @@
+=== Starting migration
+Operations to perform:
+  Apply all migrations: admin, auth, contenttypes, customers, payroll_core, sessions
+Running migrations:
+  No migrations to apply.
+=== Starting migration
+Operations to perform:
+  Apply all migrations: admin, auth, contenttypes, customers, payroll_core, sessions
+Running migrations:
+  Applying payroll_core.0041_remove_exchangerate_currency_alter_loan_currency_and_more...
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.11/site-packages/django/db/backends/utils.py", line 103, in _execute
+    return self.cursor.execute(sql)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+psycopg2.errors.ForeignKeyViolation: insert or update on table "payroll_core_payrollconcept" violates foreign key constraint "payroll_core_payroll_currency_id_8adb768d_fk_customers"
+DETAIL:  Key (currency_id)=(VES) is not present in table "customers_currency".
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/app/run_migration.py", line 13, in <module>
+    call_command('migrate_schemas')
+  File "/usr/local/lib/python3.11/site-packages/django/core/management/__init__.py", line 194, in call_command
+    return command.execute(*args, **defaults)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/django/core/management/base.py", line 458, in execute
+    output = self.handle(*args, **options)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/django_tenants/management/commands/migrate_schemas.py", line 100, in handle
+    executor.run_migrations(tenants=tenants)
+  File "/usr/local/lib/python3.11/site-packages/django_tenants/migration_executors/standard.py", line 14, in run_migrations
+    run_migrations(self.args, self.options, self.codename, schema_name, idx=idx, count=len(tenants))
+  File "/usr/local/lib/python3.11/site-packages/django_tenants/migration_executors/base.py", line 59, in run_migrations
+    migrate_command_class(stdout=stdout, stderr=stderr).execute(*args, **options)
+  File "/usr/local/lib/python3.11/site-packages/django/core/management/base.py", line 458, in execute
+    output = self.handle(*args, **options)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/django/core/management/base.py", line 106, in wrapper
+    res = handle_func(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/django/core/management/commands/migrate.py", line 356, in handle
+    post_migrate_state = executor.migrate(
+                         ^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/django/db/migrations/executor.py", line 135, in migrate
+    state = self._migrate_all_forwards(
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/django/db/migrations/executor.py", line 167, in _migrate_all_forwards
+    state = self.apply_migration(
+            ^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/django/db/migrations/executor.py", line 252, in apply_migration
+    state = migration.apply(state, schema_editor)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/django/db/migrations/migration.py", line 132, in apply
+    operation.database_forwards(
+  File "/usr/local/lib/python3.11/site-packages/django/db/migrations/operations/fields.py", line 235, in database_forwards
+    schema_editor.alter_field(from_model, from_field, to_field)
+  File "/usr/local/lib/python3.11/site-packages/django/db/backends/base/schema.py", line 877, in alter_field
+    self._alter_field(
+  File "/usr/local/lib/python3.11/site-packages/django/db/backends/postgresql/schema.py", line 288, in _alter_field
+    super()._alter_field(
+  File "/usr/local/lib/python3.11/site-packages/django/db/backends/base/schema.py", line 1238, in _alter_field
+    self.execute(
+  File "/usr/local/lib/python3.11/site-packages/django/db/backends/postgresql/schema.py", line 48, in execute
+    return super().execute(sql, None)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/django/db/backends/base/schema.py", line 201, in execute
+    cursor.execute(sql, params)
+  File "/usr/local/lib/python3.11/site-packages/django/db/backends/utils.py", line 122, in execute
+    return super().execute(sql, params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/django/db/backends/utils.py", line 79, in execute
+    return self._execute_with_wrappers(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/django/db/backends/utils.py", line 92, in _execute_with_wrappers
+    return executor(sql, params, many, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/django/db/backends/utils.py", line 100, in _execute
+    with self.db.wrap_database_errors:
+  File "/usr/local/lib/python3.11/site-packages/django/db/utils.py", line 91, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "/usr/local/lib/python3.11/site-packages/django/db/backends/utils.py", line 103, in _execute
+    return self.cursor.execute(sql)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+django.db.utils.IntegrityError: insert or update on table "payroll_core_payrollconcept" violates foreign key constraint "payroll_core_payroll_currency_id_8adb768d_fk_customers"
+DETAIL:  Key (currency_id)=(VES) is not present in table "customers_currency".
+
