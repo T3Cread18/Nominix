@@ -161,6 +161,14 @@ export default function ConceptFormBuilder({ initialData, onSave, onCancel }) {
         }
     });
 
+    const { data: allConcepts } = useQuery({
+        queryKey: ['payrollConcepts'],
+        queryFn: async () => {
+            const res = await axios.get('/payroll-concepts/');
+            return res.data?.results || res.data || [];
+        }
+    });
+
     // 2. Form Setup
     const { register, control, handleSubmit, setValue, watch, formState: { errors } } = useForm({
         defaultValues: {
@@ -200,6 +208,13 @@ export default function ConceptFormBuilder({ initialData, onSave, onCancel }) {
     }, [selectedBehavior, setValue]);
 
     // 3. Mutation
+    const validationMutation = useMutation({
+        mutationFn: async (formula) => {
+            const res = await axios.post('/payroll/validate-formula/', { formula });
+            return res.data;
+        }
+    });
+
     const mutation = useMutation({
         mutationFn: (data) => {
             if (isEditing) {
@@ -217,8 +232,24 @@ export default function ConceptFormBuilder({ initialData, onSave, onCancel }) {
         }
     });
 
-    const onSubmit = (formData) => {
+    const onSubmit = async (formData) => {
         const payload = { ...formData };
+
+        if (payload.computation_method === 'DYNAMIC_FORMULA') {
+            const validationNotice = toast.loading('Validando integridad de fórmula...');
+            try {
+                const check = await validationMutation.mutateAsync(payload.formula);
+                if (!check.success) {
+                    toast.error(`Error en fórmula: ${check.error}`, { id: validationNotice });
+                    return;
+                }
+                toast.success('Fórmula validada correctamente', { id: validationNotice });
+            } catch (err) {
+                toast.error('Falla técnica en validación', { id: validationNotice });
+                return;
+            }
+        }
+
         if (payload.behavior !== 'LAW_DEDUCTION') {
             // Limpieza básica si no es Ley
             if (payload.behavior !== 'DYNAMIC') payload.formula = '';
@@ -344,8 +375,28 @@ export default function ConceptFormBuilder({ initialData, onSave, onCancel }) {
                                 <div className="space-y-4 pt-2">
                                     <div className="flex items-center justify-between">
                                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Fórmula Python (simple_eval)</label>
-                                        <div className="px-2 py-1 bg-green-500/10 rounded-lg border border-green-500/20 text-[9px] font-bold text-green-500 flex items-center gap-1.5 uppercase">
-                                            <Code2 size={12} /> Sandbox Activo
+                                        <div className="flex items-center gap-3">
+                                            <button
+                                                type="button"
+                                                onClick={async () => {
+                                                    const formula = watch('formula');
+                                                    if (!formula) return toast.info('Escriba una fórmula primero');
+                                                    const res = await validationMutation.mutateAsync(formula);
+                                                    if (res.success) {
+                                                        toast.success(`Validación exitosa: Result=${res.result}`);
+                                                    } else {
+                                                        toast.error(`Error: ${res.error}`);
+                                                    }
+                                                }}
+                                                disabled={validationMutation.isLoading}
+                                                className="px-3 py-1.5 bg-nominix-electric/10 hover:bg-nominix-electric/20 text-nominix-electric rounded-lg border border-nominix-electric/20 text-[9px] font-bold uppercase transition-all flex items-center gap-2"
+                                            >
+                                                {validationMutation.isLoading ? <Loader2 size={12} className="animate-spin" /> : <Calculator size={12} />}
+                                                Probar Fórmula
+                                            </button>
+                                            <div className="px-2 py-1 bg-green-500/10 rounded-lg border border-green-500/20 text-[9px] font-bold text-green-500 flex items-center gap-1.5 uppercase">
+                                                <Code2 size={12} /> Sandbox Activo
+                                            </div>
                                         </div>
                                     </div>
                                     <div className="relative group">
@@ -355,16 +406,83 @@ export default function ConceptFormBuilder({ initialData, onSave, onCancel }) {
                                             className="w-full font-mono text-sm p-5 bg-[#0d0d0f] border border-white/5 rounded-3xl text-green-400 outline-none focus:border-nominix-electric/50 transition-all shadow-inner"
                                             placeholder="Ej: (SALARIO_DIARIO * 1.5) * HED"
                                         />
+                                        {validationMutation.data && (
+                                            <div className={`absolute bottom-4 right-4 p-3 rounded-xl border backdrop-blur-md animate-in fade-in slide-in-from-right-2 ${validationMutation.data.success ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-red-500/10 border-red-500/20 text-red-400'}`}>
+                                                <p className="text-[10px] font-bold uppercase mb-1">{validationMutation.data.success ? '✓ Éxito' : '✕ Error'}</p>
+                                                <p className="text-[11px] font-mono leading-tight whitespace-pre-wrap max-w-[250px]">
+                                                    {validationMutation.data.success ? `Resultado: ${validationMutation.data.result}\nTraza: ${validationMutation.data.trace}` : validationMutation.data.error}
+                                                </p>
+                                            </div>
+                                        )}
                                     </div>
-                                    <div className="bg-white/5 rounded-2xl p-4 border border-white/5">
-                                        <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-2 flex items-center gap-2">
-                                            <Info size={12} /> Variables Disponibles
-                                        </p>
-                                        <div className="flex flex-wrap gap-2">
-                                            {['SALARIO_MENSUAL', 'SALARIO_DIARIO', 'DIAS', 'ANTIGUEDAD', 'LUNES', 'HED', 'HEN', 'BN'].map(v => (
-                                                <span key={v} className="px-2 py-1 bg-black/40 text-[10px] text-gray-400 rounded-md border border-white/5 font-mono group hover:border-nominix-electric/30 hover:text-white transition-all cursor-default">{v}</span>
-                                            ))}
+                                    <div className="bg-white/5 rounded-2xl p-4 border border-white/5 space-y-4">
+                                        <div>
+                                            <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                                <Info size={12} /> Variables Sistema
+                                            </p>
+                                            <div className="flex flex-wrap gap-2">
+                                                {['SALARIO_MENSUAL', 'SALARIO_DIARIO', 'DIAS', 'ANTIGUEDAD', 'LUNES', 'HED', 'HEN', 'BN'].map(v => (
+                                                    <span key={v} className="px-2 py-1 bg-black/40 text-[10px] text-gray-400 rounded-md border border-white/5 font-mono group hover:border-nominix-electric/30 hover:text-white transition-all cursor-default">{v}</span>
+                                                ))}
+                                            </div>
                                         </div>
+
+                                        {allConcepts?.length > 0 && (
+                                            <div>
+                                                <p className="text-[9px] font-black text-nominix-electric opacity-70 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                                    <Calculator size={12} /> Conceptos Existentes
+                                                </p>
+                                                <div className="flex flex-wrap gap-2 max-h-[120px] overflow-y-auto pr-2 custom-scrollbar">
+                                                    {allConcepts.filter(c => c.id !== initialData?.id).map(c => (
+                                                        <React.Fragment key={c.code}>
+                                                            <span
+                                                                onClick={() => {
+                                                                    const current = watch('formula') || '';
+                                                                    setValue('formula', current + (current ? ' + ' : '') + c.code);
+                                                                }}
+                                                                title={`${c.name} (Base: ${c.value})`}
+                                                                className="px-2 py-1 bg-nominix-electric/5 text-[10px] text-nominix-electric/70 rounded-md border border-nominix-electric/10 font-mono hover:bg-nominix-electric hover:text-white transition-all cursor-pointer"
+                                                            >
+                                                                {c.code}
+                                                            </span>
+                                                            <span
+                                                                onClick={() => {
+                                                                    const current = watch('formula') || '';
+                                                                    setValue('formula', current + (current ? ' + ' : '') + `${c.code}_CANT`);
+                                                                }}
+                                                                title={`${c.name} (Cant. ej: 1.0)`}
+                                                                className="px-2 py-1 bg-amber-500/5 text-[10px] text-amber-500/70 rounded-md border border-amber-500/10 font-mono hover:bg-amber-500 hover:text-white transition-all cursor-pointer"
+                                                            >
+                                                                {c.code}_CANT
+                                                            </span>
+                                                        </React.Fragment>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {configMetadata?.accumulators?.length > 0 && (
+                                            <div>
+                                                <p className="text-[9px] font-black text-purple-400 opacity-70 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                                    <Layers size={12} /> Acumuladores (TOTAL)
+                                                </p>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {configMetadata.accumulators.map(acc => (
+                                                        <span
+                                                            key={acc.code}
+                                                            onClick={() => {
+                                                                const current = watch('formula') || '';
+                                                                setValue('formula', current + (current ? ' + ' : '') + `TOTAL_${acc.code}`);
+                                                            }}
+                                                            title={acc.label}
+                                                            className="px-2 py-1 bg-purple-500/5 text-[10px] text-purple-400/70 rounded-md border border-purple-500/10 font-mono hover:bg-purple-500 hover:text-white transition-all cursor-pointer"
+                                                        >
+                                                            TOTAL_{acc.code}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             ) : (

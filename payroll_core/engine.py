@@ -100,6 +100,16 @@ class PayrollEngine:
                 'category': 'Salario',
                 'example': 5000.00
             },
+            'SUELDO_BASE': {
+                'description': 'Alias para SUELDO_BASE_MENSUAL (Sueldo tabular del contrato)',
+                'category': 'Salario',
+                'example': 3000.00
+            },
+            'COMPLEMENTO_MENSUAL': {
+                'description': 'Monto del complemento o bono no salarial mensual (VES)',
+                'category': 'Salario',
+                'example': 2000.00
+            },
             'SALARIO_DIARIO': {
                 'description': 'Salario mensual dividido entre 30 días',
                 'category': 'Salario',
@@ -165,6 +175,21 @@ class PayrollEngine:
                 'category': 'Novedades/Ausencias',
                 'example': 3
             },
+            'DIAS_DESCANSO': {
+                'description': 'Alias para DIAS_SABADO (Días de descanso semanal)',
+                'category': 'Novedades/Descansos',
+                'example': 2
+            },
+            'H_EXTRA_NOCTURNA': {
+                'description': 'Alias para NIGHT_HOURS (Horas extras nocturnas)',
+                'category': 'Novedades/Horas',
+                'example': 2.0
+            },
+            'BONO_NOCTURNO': {
+                'description': 'Alias para NIGHT_BONUS (Bono nocturno)',
+                'category': 'Novedades/Horas',
+                'example': 10.0
+            },
             'FALTAS': {
                 'description': 'Cantidad de faltas injustificadas reportadas',
                 'category': 'Novedades/Ausencias',
@@ -217,9 +242,27 @@ class PayrollEngine:
     def validate_formula(formula: str, custom_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         Prueba una fórmula de forma aislada para validación.
+        Carga automáticamente códigos de conceptos y acumuladores para evitar errores de definición.
         """
-        # Contexto base para que la validación no falle por variables faltantes
+        # 1. Contexto base de variables de sistema
         context = {k: v['example'] for k, v in PayrollEngine.get_variable_inventory().items()}
+        
+        # 2. Cargar códigos de conceptos existentes (usar su valor base como ejemplo realista)
+        try:
+            concept_codes = {c.code: float(c.value) for c in PayrollConcept.objects.filter(active=True)}
+            context.update(concept_codes)
+        except Exception:
+            pass # Fallback si no hay DB en este hilo
+
+        # 3. Cargar acumuladores definidos
+        from .serializers import ACCUMULATOR_LABELS
+        accumulators = {f"TOTAL_{code}": 1.0 for code in ACCUMULATOR_LABELS.keys()}
+        context.update(accumulators)
+
+        # 4. Cargar sufijos de cantidad (_CANT) para evitar NameError
+        quantities = {f"{c.code}_CANT": 1.0 for c in PayrollConcept.objects.filter(active=True)}
+        context.update(quantities)
+
         if custom_context:
             context.update(custom_context)
 
@@ -374,6 +417,8 @@ class PayrollEngine:
             'SALARIO_TOTAL_DIARIO': total_salary_ves / 30,
             'SUELDO_BASE_MENSUAL': base_salary_ves,
             'SUELDO_BASE_DIARIO': base_salary_ves / 30,
+            'COMPLEMENTO_MENSUAL': float(breakdown['complement'] * contract_rate),
+            'COMPLEMENTO_DIARIO': float(breakdown['complement'] * contract_rate) / 30,
             
             'SALARIO_MINIMO': float(min_salary),
             'ANTIGUEDAD': self.contract.employee.seniority_years,
@@ -396,6 +441,11 @@ class PayrollEngine:
             'H_EXTRA_DIURNA': 0.0,
             'H_EXTRA_NOCTURNA': 0.0,
             'BONO_NOCTURNO': 0.0,
+            'H_EXTRA': 0.0,
+            'B_NOCTURNO': 0.0,
+            'DIAS_DESCANSO': 0.0,
+            'FERIADOS_TRABAJADOS': 0.0,
+            'H_EXTRA_DIURNA': 0.0,
             
             # Polítitcas y Factores (de la base de datos)
             'FACTOR_HED': 1.50,
@@ -443,19 +493,8 @@ class PayrollEngine:
             # Map input key to internal variable name
             internal_key = self.NOVELTY_MAP.get(u_key, u_key)
 
-            # Validation based on internal mapped name
-            if internal_key == 'DIAS_SABADO':
-                if numeric_val > saturdays_calendar:
-                    print(f"⚠️ Alerta: Intentando ingresar {numeric_val} sábados, pero el calendario solo tiene {saturdays_calendar}. Ajustando al máximo.")
-                    numeric_val = float(saturdays_calendar)
-            elif internal_key == 'DIAS_DOMINGO':
-                if numeric_val > sundays_calendar:
-                    print(f"⚠️ Alerta: Intentando ingresar {numeric_val} domingos, pero el calendario solo tiene {sundays_calendar}. Ajustando al máximo.")
-                    numeric_val = float(sundays_calendar)
-            elif internal_key == 'DIAS_FERIADO':
-                if numeric_val > holidays_calendar:
-                    print(f"⚠️ Alerta: Intentando ingresar {numeric_val} feriados, pero el calendario solo tiene {holidays_calendar}. Ajustando al máximo.")
-                    numeric_val = float(holidays_calendar)
+            # Validation removed at user request: allow any number of days
+            pass
 
             context[internal_key] = numeric_val
             # Also keep it under original key if different
@@ -464,13 +503,21 @@ class PayrollEngine:
             
             # Legacy mapping for formulas
             if u_key in self.NOVELTY_MAP:
-                context[self.NOVELTY_MAP[u_key]] = numeric_val
+                mapped_key = self.NOVELTY_MAP[u_key]
+                context[mapped_key] = numeric_val
+                context[f"{mapped_key}_CANT"] = numeric_val
+
+            # Siempre inyectar el sufijo _CANT para el código original de la novedad
+            context[f"{u_key}_CANT"] = numeric_val
 
         return context
 
     def calculate_concept(self, concept: PayrollConcept, override_value=None, context=None) -> Dict[str, Any]:
         
-        base_val = override_value if override_value is not None else concept.value
+        if override_value is not None:
+            base_val = Decimal(str(override_value))
+        else:
+            base_val = concept.value
         amount = Decimal('0.00')
         trace = ""
         variables = {}
@@ -629,12 +676,21 @@ class PayrollEngine:
         company = Company.objects.first()
         eval_context = self._build_eval_context()
         
-        # --- 0. INICIALIZACIÓN DE ACUMULADORES DINÁMICOS ---
+        # --- 0. INICIALIZACIÓN DE VARIABLES Y ACUMULADORES ---
         accumulators = {}
         all_concepts = PayrollConcept.objects.filter(active=True).order_by('receipt_order', 'id')
         
-        # Pre-poblar acumuladores basados en el inventario de la tabla
+        # Pre-pobla códigos de conceptos, cantidades y acumuladores en el contexto
         for c in all_concepts:
+            # 1. Los códigos de concepto inician en 0.0 (si no vienen en la entrada como novedad)
+            if c.code not in eval_context:
+                eval_context[c.code] = 0.0
+                eval_context[f"{c.code}_CANT"] = 0.0
+            elif f"{c.code}_CANT" not in eval_context:
+                # Si el código vino como novedad, el valor numérico inicial es también su cantidad
+                eval_context[f"{c.code}_CANT"] = eval_context[c.code]
+            
+            # 2. Los acumuladores inician en 0.0
             if c.incidences:
                 for tag in c.incidences:
                     accumulators[tag] = 0.0
@@ -642,7 +698,8 @@ class PayrollEngine:
 
         # --- 1. PRE-CÁLCULO DE VALORES DE CONTRATO (SalarySplitter) ---
         # Obtenemos el desglose base/complemento para usarlos cuando el loop llegue a esos comportamientos
-        breakdown = SalarySplitter.get_salary_breakdown(self.contract)
+        rate = self._get_exchange_rate_value(self.contract.salary_currency)
+        breakdown = SalarySplitter.get_salary_breakdown(self.contract, exchange_rate=rate)
         
         # Factor de frecuencia
         salary_factor = Decimal('1.0')
@@ -652,8 +709,6 @@ class PayrollEngine:
             elif company.payroll_journey == 'WEEKLY':
                 salary_factor = Decimal('7') / Decimal('30')
         
-        rate = self._get_exchange_rate_value(self.contract.salary_currency)
-        
         contract_data = {
             'base_ves': (breakdown['base'] * salary_factor * rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP),
             'complement_ves': (breakdown['complement'] * salary_factor * rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP),
@@ -662,6 +717,10 @@ class PayrollEngine:
             'salary_factor': salary_factor,
             'rate': rate
         }
+        print(f"DEBUG ENGINE: Breakdown={breakdown}")
+        print(f"DEBUG ENGINE: Rate={rate}, Factor={salary_factor}")
+        print(f"DEBUG ENGINE: BaseVES={contract_data['base_ves']}, CompVES={contract_data['complement_ves']}")
+
 
         # --- 2. LOOP DE ASIGNACIONES (EARNINGS) ---
         overrides = {
@@ -695,14 +754,20 @@ class PayrollEngine:
                     'amount_ves': contract_data['base_ves']
                 }
                 salary_lines = self._handle_salary_base(temp_cc, eval_context, company)
+                total_base_ves = Decimal('0.00')
                 for sl in salary_lines:
                     sl['tipo_recibo'] = 'salario'
                     results_lines.append(sl)
+                    total_base_ves += Decimal(str(sl['amount_ves']))
                     # Acumular cada línea desglosada
                     if concept.incidences:
                         for tag in concept.incidences:
                             accumulators[tag] += float(sl['amount_ves'])
                             eval_context[f'TOTAL_{tag}'] = accumulators[tag]
+                
+                # Inyectar resultado total al contexto
+                eval_context[concept.code] = float(total_base_ves)
+                eval_context[f"{concept.code}_CANT"] = float(eval_context.get('DIAS', 15))
                 continue # Ya agregamos las líneas, saltamos al siguiente concepto
             
             elif concept.behavior == PayrollConcept.ConceptBehavior.CESTATICKET:
@@ -731,7 +796,7 @@ class PayrollEngine:
                 # Lógica de Complemento
                 tipo_recibo = 'complemento'
                 amount = contract_data['complement_ves']
-                trace = f"{float(contract_data['monthly_complement']):.2f} (Base) * {float(salary_factor):.2f} (Fac) * {float(rate):.2f} (Tasa)"
+                trace = f"{float(contract_data['monthly_complement']):.2f} (Complemento) * {float(salary_factor):.2f} (Fac) * {float(rate):.2f} (Tasa)"
 
             else:
                 # Lógica General (Fórmula o Fijo)
@@ -765,7 +830,9 @@ class PayrollEngine:
                 
                 results_lines.append(line)
 
-                # D. Actualizar Acumuladores
+                # D. Actualizar Acumuladores e inyectar al contexto para fórmulas subsecuentes
+                eval_context[concept.code] = float(amount)
+                
                 if concept.incidences:
                     for tag in concept.incidences:
                         accumulators[tag] += float(amount)
@@ -848,6 +915,20 @@ class PayrollEngine:
                     'formula': formula,
                     'variables': variables
                 })
+                
+                # Inyectar resultado al contexto
+                eval_context[concept.code] = float(amount)
+                
+                # Determinar cantidad para _CANT (Preferir novedad si existe, si no 1.0)
+                qty = 1.0
+                var_name = self.NOVELTY_MAP.get(concept.code)
+                if var_name and eval_context.get(f"{var_name}_CANT") is not None:
+                    qty = eval_context[f"{var_name}_CANT"]
+                elif eval_context.get(f"{concept.code}_CANT") is not None:
+                    qty = eval_context[f"{concept.code}_CANT"]
+                
+                eval_context[f"{concept.code}_CANT"] = float(qty)
+
                 # Acumular deducciones
                 if concept.incidences:
                     for tag in concept.incidences:

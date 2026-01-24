@@ -57,6 +57,7 @@ class SalarySplitter:
         base_salary = Decimal('0.00')
         complement = Decimal('0.00')
         mode = company.salary_split_mode
+        print(f"DEBUG SPLIT: Mode={mode}, Total={total_salary}")
         
         if mode == Company.SalarySplitMode.PERCENTAGE:
             # Calcular base como porcentaje del total
@@ -69,11 +70,23 @@ class SalarySplitter:
             fixed_base = Decimal('0.00')
             if job_position and job_position.split_fixed_amount:
                 fixed_base = job_position.split_fixed_amount
-                # Si está en VES, convertir a USD para comparar
-                if job_position.split_fixed_currency and job_position.split_fixed_currency.code == 'VES':
+                
+                # Obtener código de moneda de forma segura
+                curr_code = 'USD'
+                try:
+                    if job_position.split_fixed_currency:
+                        curr_code = job_position.split_fixed_currency.code
+                except Exception:
+                    pass
+                
+                print(f"DEBUG SPLIT: Fixed={fixed_base}, Currency={curr_code}, Rate={exchange_rate}")
+
+                # Si está en VES, convertir a USD para comparar con total_salary (que está en USD)
+                if curr_code == 'VES':
                     if exchange_rate and exchange_rate > 0:
                         fixed_base = fixed_base / exchange_rate
-            
+                        print(f"DEBUG SPLIT: Converted VES->USD fixed_base={fixed_base}")
+
             if total_salary <= fixed_base:
                 base_salary = total_salary
                 complement = Decimal('0.00')
@@ -86,8 +99,17 @@ class SalarySplitter:
             fixed_bonus = Decimal('0.00')
             if job_position and job_position.split_fixed_amount:
                 fixed_bonus = job_position.split_fixed_amount
-                # Si está en VES, convertir a USD para comparar
-                if job_position.split_fixed_currency and job_position.split_fixed_currency.code == 'VES':
+                
+                # Obtener código de moneda de forma segura
+                curr_code = 'USD'
+                try:
+                    if job_position.split_fixed_currency:
+                        curr_code = job_position.split_fixed_currency.code
+                except Exception:
+                    pass
+
+                # Si está en VES, convertir a USD
+                if curr_code == 'VES':
                     if exchange_rate and exchange_rate > 0:
                         fixed_bonus = fixed_bonus / exchange_rate
             
