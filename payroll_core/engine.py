@@ -512,32 +512,45 @@ class PayrollEngine:
 
         return context
 
-    def calculate_concept(self, concept: PayrollConcept, override_value=None, context=None) -> Dict[str, Any]:
+    def calculate_concept(self, concept: PayrollConcept, override_value=None, multiplier=None, context=None) -> Dict[str, Any]:
+        """
+        Calcula el monto de un concepto individual.
+        - override_value: Pone un nuevo valor base (ej: cambio de sueldo en contrato).
+        - multiplier: Multiplica el valor base (ej: cantidad en una novedad).
+        """
+        # 1. Determinar el Valor Base
+        # Si hay override_value (contrato), ese manda sobre el del catálogo.
+        base_val = Decimal(str(override_value)) if override_value is not None else concept.value
         
-        if override_value is not None:
-            base_val = Decimal(str(override_value))
-        else:
-            base_val = concept.value
+        # 2. Determinar el Multiplicador
+        # Si es monto fijo, el multiplicador es la cantidad (novedad). Default 1.0.
+        m = Decimal(str(multiplier)) if multiplier is not None else Decimal('1.0')
+        
         amount = Decimal('0.00')
         trace = ""
-        variables = {}
+        variables = {'BASE_VALUE': float(base_val), 'QTY': float(m)}
         formula = concept.formula
         
         if context is None:
             context = self._build_eval_context()
 
         if concept.computation_method == PayrollConcept.ComputationMethod.FIXED_AMOUNT:
+            # Tasa de cambio según la moneda del concepto
             rate = self._get_exchange_rate_value(concept.currency)
-            amount = base_val * rate
-            if rate != 1:
-                trace = f"{float(base_val):.2f} {concept.currency.code} * {float(rate):.4f}"
-            else:
-                trace = f"{float(base_val):.2f} Bs."
+            # Monto = Valor Base * Multiplicador * Tasa
+            amount = base_val * m * rate
+            
+            trace_parts = [f"{float(base_val):.2f}"]
+            if m != 1: trace_parts.append(f"Qty: {float(m):.2f}")
+            if rate != 1: trace_parts.append(f"Tasa ({concept.currency.code}): {float(rate):.4f}")
+            
+            trace = " * ".join(trace_parts)
+            if rate == 1 and m == 1: trace += " Bs."
 
         elif concept.computation_method == PayrollConcept.ComputationMethod.PERCENTAGE_OF_BASIC:
+            # Multiplicador no suele aplicar aquí, pero lo guardamos por integridad
             contract_rate = self._get_exchange_rate_value(self.contract.salary_currency)
             
-            # Determinar qué base usar según la configuración del concepto
             if concept.calculation_base == PayrollConcept.CalculationBase.BASE:
                 breakdown = SalarySplitter.get_salary_breakdown(self.contract)
                 salary_ves = breakdown['base'] * contract_rate
@@ -546,14 +559,17 @@ class PayrollEngine:
                 salary_ves = self.contract.monthly_salary * contract_rate
                 base_name = "Salario Total"
 
-            amount = (salary_ves * base_val) / Decimal('100.00')
-            trace = f"({float(salary_ves):.2f} [{base_name}] * {float(base_val):.2f}%) / 100"
+            amount = (salary_ves * base_val * m) / Decimal('100.00')
+            trace = f"({float(salary_ves):.2f} [{base_name}] * {float(base_val):.2f}%"
+            if m != 1: trace += f" * Qty: {m}"
+            trace += ") / 100"
 
         elif concept.computation_method == PayrollConcept.ComputationMethod.DYNAMIC_FORMULA:
-            # Si hay un override_value (novedad), inyectarlo al contexto bajo el código del concepto
-            # Esto permite que fórmulas como "BONO_X * 2" usen el valor de la novedad BONO_X
+            # Inyectar tanto el valor como la cantidad al contexto
             if override_value is not None:
                 context[concept.code] = float(override_value)
+            if multiplier is not None:
+                context[f"{concept.code}_CANT"] = float(multiplier)
             
             if concept.formula:
                 try:
@@ -569,16 +585,18 @@ class PayrollEngine:
                 except Exception as e:
                     print(f"Error evaluando fórmula [{concept.code}]: {concept.formula} -> {e}")
                     trace = f"Error: {str(e)}"
-            elif override_value is not None:
-                # Si no hay fórmula pero hay override, usar el valor directo
-                amount = Decimal(str(override_value)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-                trace = f"Valor manual: {float(override_value):.2f}"
+            elif override_value is not None or multiplier is not None:
+                # Fallback: si no hay fórmula pero hay datos, usar el valor/cantidad directo
+                val = override_value if override_value is not None else concept.value
+                amount = (Decimal(str(val)) * m).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                trace = f"Valor manual: {float(val):.2f} * {float(m):.2f}"
 
         return {
             'amount': amount,
             'trace': trace,
             'variables': variables,
-            'formula': concept.formula
+            'formula': concept.formula,
+            'quantity': float(m)
         }
 
 
@@ -730,14 +748,21 @@ class PayrollEngine:
 
         for concept in all_concepts.filter(kind=PayrollConcept.ConceptKind.EARNING):
             # A. Identificar Valor (Novedad > Override > Fijo/Fórmula)
-            override_val = self.input_variables.get(concept.code)
-            if override_val is None:
+            # 1. Novedad (Actúa como multiplicador si es Monto Fijo, o como valor si es Fórmula)
+            novelty_val = self.input_variables.get(concept.code)
+            if novelty_val is None:
                 for k, v in self.input_variables.items():
                     if concept.code.upper() == k.upper():
-                        override_val = v
+                        novelty_val = v
                         break
-            if override_val is None:
-                override_val = overrides.get(concept.code)
+            
+            # 2. Override del Contrato (Actúa como nuevo precio base)
+            contract_override_val = overrides.get(concept.code)
+
+            # --- FILTRADO DE CONCEPTOS GENÉRICOS ---
+            if concept.behavior in [PayrollConcept.ConceptBehavior.DYNAMIC, PayrollConcept.ConceptBehavior.FIXED]:
+                if novelty_val is None and contract_override_val is None:
+                    continue
 
             # B. Despachar Lógica por Comportamiento
             amount = Decimal('0.00')
@@ -800,7 +825,12 @@ class PayrollEngine:
 
             else:
                 # Lógica General (Fórmula o Fijo)
-                res = self.calculate_concept(concept, override_value=override_val, context=eval_context)
+                res = self.calculate_concept(
+                    concept, 
+                    override_value=contract_override_val, 
+                    multiplier=novelty_val,
+                    context=eval_context
+                )
                 amount = res['amount']
                 trace = res['trace']
                 formula = res['formula']
@@ -841,9 +871,13 @@ class PayrollEngine:
         # --- 3. LOOP DE DEDUCCIONES ---
         for concept in all_concepts.filter(kind=PayrollConcept.ConceptKind.DEDUCTION):
             # A. Valor
-            override_val = self.input_variables.get(concept.code)
-            if override_val is None:
-                override_val = overrides.get(concept.code)
+            novelty_val = self.input_variables.get(concept.code)
+            contract_override_val = overrides.get(concept.code)
+
+            # --- FILTRADO DE CONCEPTOS GENÉRICOS ---
+            if concept.behavior in [PayrollConcept.ConceptBehavior.DYNAMIC, PayrollConcept.ConceptBehavior.FIXED]:
+                if novelty_val is None and contract_override_val is None:
+                    continue
 
             amount = Decimal('0.00')
             trace = ""
@@ -851,6 +885,7 @@ class PayrollEngine:
             formula = concept.formula
 
             if concept.behavior == PayrollConcept.ConceptBehavior.LAW_DEDUCTION:
+                # ... (Lógica de Ley se mantiene igual)
                 # Lógica de Ley (Soporta system_params para configuración dinámica)
                 sm = company.national_minimum_salary if company else FALLBACK_SALARIO_MINIMO
                 num_lunes = eval_context.get('LUNES', 4)
@@ -898,7 +933,12 @@ class PayrollEngine:
             
             else:
                 # Deducción normal
-                res = self.calculate_concept(concept, override_value=override_val, context=eval_context)
+                res = self.calculate_concept(
+                    concept, 
+                    override_value=contract_override_val, 
+                    multiplier=novelty_val,
+                    context=eval_context
+                )
                 amount = res['amount']
                 trace = res['trace']
                 formula = res['formula']
