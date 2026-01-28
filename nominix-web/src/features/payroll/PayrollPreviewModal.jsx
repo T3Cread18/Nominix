@@ -97,7 +97,7 @@ const PayrollPreviewModal = ({ isOpen, onClose, data, companyConfig }) => {
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <div className="font-bold text-nominix-dark text-sm">{res.full_name}</div>
-                                                    <div className="text-[10px] text-gray-400 font-medium">V-{res.national_id}</div>
+                                                    <div className="text-[10px] text-gray-400 font-medium">{res.national_id}</div>
                                                 </td>
                                                 <td className="px-6 py-4 text-right">
                                                     <span className="text-sm font-medium text-gray-600">

@@ -1,12 +1,15 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import axiosClient from '../../api/axiosClient';
 import {
-    Calculator, User, Users, Calendar, TrendingUp, DollarSign,
+    Calculator, Users, // User y Search se movieron al selector
     Loader2, FileText, PlusCircle, Trash2, X, Save, AlertCircle,
-    Search, ChevronDown, Check
+    TrendingUp
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { cn } from '../../utils/cn';
+
+// IMPORTANTE: Asegúrate de que la ruta sea correcta
+import EmployeeSelector from './EmployeeSelector';
 
 const PayrollDetail = ({ period, allEmployees, initialConcepts }) => {
     const [loading, setLoading] = useState(false);
@@ -14,11 +17,8 @@ const PayrollDetail = ({ period, allEmployees, initialConcepts }) => {
     const [employees, setEmployees] = useState(allEmployees);
     const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
 
-    // --- NUEVO: ESTADOS PARA EL BUSCADOR ---
-    const [searchTerm, setSearchTerm] = useState('');
-    const [isSearchOpen, setIsSearchOpen] = useState(false);
-    const [filteredEmployees, setFilteredEmployees] = useState([]);
-    const searchRef = useRef(null);
+    // --- BORRADO: Ya no necesitas searchTerm, isSearchOpen, filteredEmployees, searchRef ---
+    // Todo eso ahora vive felizmente dentro de <EmployeeSelector />
 
     // Data State
     const [payslipData, setPayslipData] = useState(null);
@@ -35,7 +35,6 @@ const PayrollDetail = ({ period, allEmployees, initialConcepts }) => {
     useEffect(() => {
         if (allEmployees) {
             setEmployees(allEmployees);
-            setFilteredEmployees(allEmployees);
         } else {
             fetchEmployees();
         }
@@ -45,24 +44,14 @@ const PayrollDetail = ({ period, allEmployees, initialConcepts }) => {
         } else {
             loadConcepts();
         }
-
-        // Click outside para cerrar el buscador
-        const handleClickOutside = (event) => {
-            if (searchRef.current && !searchRef.current.contains(event.target)) {
-                setIsSearchOpen(false);
-            }
-        };
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [allEmployees, initialConcepts]);
 
     const fetchEmployees = async () => {
         setFetchingEmployees(true);
         try {
-            const res = await axiosClient.get('/employees/?is_active=true\u0026page_size=1000');
+            const res = await axiosClient.get('/employees/?is_active=true&page_size=1000');
             const list = res.data.results || res.data;
             setEmployees(list);
-            setFilteredEmployees(list);
         } catch (error) {
             console.error("Error fetching employees:", error);
         } finally {
@@ -78,21 +67,6 @@ const PayrollDetail = ({ period, allEmployees, initialConcepts }) => {
             console.error("Error loading concepts:", error);
         }
     };
-
-
-    // --- NUEVO: EFECTO DE FILTRADO ---
-    useEffect(() => {
-        if (!searchTerm && !isSearchOpen) return; // No filtrar si está cerrado o vacío inicialmente
-
-        const lowerTerm = searchTerm.toLowerCase();
-        const filtered = employees.filter(emp =>
-            emp.first_name.toLowerCase().includes(lowerTerm) ||
-            emp.last_name.toLowerCase().includes(lowerTerm) ||
-            emp.national_id.includes(lowerTerm)
-        );
-        setFilteredEmployees(filtered);
-    }, [searchTerm, employees]);
-
 
     // Main Fetcher (Novelties + Simulation)
     useEffect(() => {
@@ -150,11 +124,15 @@ const PayrollDetail = ({ period, allEmployees, initialConcepts }) => {
         }
     };
 
-    // --- NUEVO: MANEJADOR DE SELECCIÓN DE EMPLEADO ---
+    // --- NUEVO: Manejador simplificado para el componente Selector ---
     const handleSelectEmployee = (emp) => {
+        if (!emp) {
+            setSelectedEmployeeId('');
+            setPayslipData(null);
+            setNovelties([]);
+            return;
+        }
         setSelectedEmployeeId(emp.id);
-        setSearchTerm(`${emp.first_name} ${emp.last_name}`);
-        setIsSearchOpen(false);
     };
 
     const formatCurrency = (amount) => {
@@ -178,72 +156,24 @@ const PayrollDetail = ({ period, allEmployees, initialConcepts }) => {
     return (
         <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 min-h-screen">
 
-            {/* PANEL IZQUIERDO: Configuración (Fijo en desktop, arriba en mobile) */}
+            {/* PANEL IZQUIERDO: Configuración */}
             <div className="w-full lg:w-80 xl:w-[400px] flex-shrink-0 space-y-6">
 
-                {/* --- NUEVO: SELECTOR BUSCABLE --- */}
-                <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 relative z-20" ref={searchRef}>
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2 mb-3">
-                        <User size={12} /> Colaborador
-                    </label>
+                {/* --- AQUÍ ESTÁ EL NUEVO SELECTOR --- */}
+                {/* Reemplaza todo el bloque anterior de inputs y buscador manual */}
+                <EmployeeSelector
+                    employees={employees}
+                    onSelect={handleSelectEmployee}
+                    isLoading={fetchingEmployees}
+                />
+                {/* ----------------------------------- */}
 
-                    <div className="relative">
-                        {/* Input de Búsqueda */}
-                        <div
-                            className="flex items-center bg-slate-50 border border-gray-100/50 rounded-2xl focus-within:bg-white focus-within:border-nominix-electric focus-within:ring-4 focus-within:ring-nominix-electric/5 transition-all duration-300"
-                            onClick={() => setIsSearchOpen(true)}
-                        >
-                            <Search size={16} className="ml-4 text-gray-300" />
-                            <input
-                                type="text"
-                                className="w-full p-4 bg-transparent border-none focus:ring-0 font-bold text-sm text-nominix-dark placeholder:text-gray-300 outline-none"
-                                placeholder="Buscar por nombre o cédula..."
-                                value={searchTerm}
-                                onChange={(e) => {
-                                    setSearchTerm(e.target.value);
-                                    setIsSearchOpen(true);
-                                }}
-                                onFocus={() => setIsSearchOpen(true)}
-                            />
-                            <ChevronDown size={16} strokeWidth={3} className="mr-4 text-gray-400" />
-                        </div>
-
-                        {/* Dropdown de Resultados */}
-                        {isSearchOpen && (
-                            <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-100 max-h-60 overflow-y-auto custom-scrollbar z-50 animate-in fade-in slide-in-from-top-2">
-                                {filteredEmployees.length > 0 ? (
-                                    filteredEmployees.map(emp => (
-                                        <button
-                                            key={emp.id}
-                                            onClick={() => handleSelectEmployee(emp)}
-                                            className={cn(
-                                                "w-full text-left px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0",
-                                                selectedEmployeeId === emp.id ? "bg-blue-50/50" : ""
-                                            )}
-                                        >
-                                            <div>
-                                                <p className="text-sm font-bold text-slate-700">
-                                                    {emp.first_name} {emp.last_name}
-                                                </p>
-                                                <p className="text-[10px] text-gray-400 font-mono">
-                                                    {emp.national_id}
-                                                </p>
-                                            </div>
-                                            {selectedEmployeeId === emp.id && <Check size={14} className="text-nominix-electric" />}
-                                        </button>
-                                    ))
-                                ) : (
-                                    <div className="p-4 text-center text-gray-400 text-xs">
-                                        No se encontraron colaboradores
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                {/* Editor de Novedades */}
-                <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 h-fit relative z-10">
+                {/* Editor de Novedades (Mismo diseño original) */}
+                {/* Agregué transición de opacidad si no hay empleado seleccionado */}
+                <div className={cn(
+                    "bg-white p-6 rounded-3xl shadow-sm border border-gray-100 h-fit relative z-10 transition-all duration-300",
+                    !selectedEmployeeId && "opacity-60 pointer-events-none grayscale"
+                )}>
                     <div className="mb-6 space-y-4">
                         <div className="flex items-start justify-between">
                             <div>
@@ -312,7 +242,7 @@ const PayrollDetail = ({ period, allEmployees, initialConcepts }) => {
                 </div>
             </div>
 
-            {/* PANEL DERECHO: Recibo Simulado */}
+            {/* PANEL DERECHO: Recibo Simulado (Diseño Original Intacto) */}
             <div className="xl:flex-1">
                 {loading ? (
                     <div className="h-full min-h-[500px] flex items-center justify-center bg-white rounded-3xl">
@@ -499,7 +429,7 @@ const PayrollDetail = ({ period, allEmployees, initialConcepts }) => {
                 </div>
             )}
 
-            {/* MODAL AUDITORÍA DE CÁLCULO */}
+            {/* MODAL AUDITORÍA DE CÁLCULO (Diseño Original Intacto) */}
             {auditModal.isOpen && auditModal.line && (
                 <div className="fixed inset-0 bg-nominix-dark/80 backdrop-blur-md z-[200] flex items-center justify-center p-4">
                     <div className="bg-white rounded-[2rem] sm:rounded-[3rem] max-w-2xl w-full p-6 sm:p-10 shadow-2xl animate-in zoom-in-95 duration-300 border border-gray-100 overflow-y-auto max-h-[90vh]">
@@ -549,30 +479,60 @@ const PayrollDetail = ({ period, allEmployees, initialConcepts }) => {
                                 <div>
                                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 px-2">Valores Capturados del Colaborador</p>
                                     <div className="space-y-3 overflow-y-auto max-h-[250px] p-1 custom-scrollbar">
-                                        {Object.entries(auditModal.line.variables).map(([key, meta]) => (
-                                            <div key={key} className="p-4 bg-white border border-gray-100 rounded-2xl shadow-sm hover:border-nominix-electric/30 transition-all flex justify-between items-center group">
-                                                <div className="flex flex-col gap-1">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-[10px] font-black text-nominix-electric font-mono">{key}</span>
-                                                        {meta.category && (
-                                                            <span className="text-[8px] bg-gray-50 text-gray-400 px-1.5 py-0.5 rounded uppercase font-black tracking-tighter">
-                                                                {meta.category}
-                                                            </span>
-                                                        )}
+                                        {Object.entries(auditModal.line.variables).map(([key, meta]) => {
+                                            const renderValue = () => {
+                                                if (Array.isArray(meta)) {
+                                                    if (meta.length === 0) return <span className="text-gray-400">—</span>;
+                                                    return (
+                                                        <div className="text-xs space-y-1">
+                                                            {meta.map((item, idx) => (
+                                                                <div key={idx} className="flex justify-between gap-2 text-[10px]">
+                                                                    <span className="text-gray-500">{item.nombre || item.name || `#${idx + 1}`}</span>
+                                                                    <span className="font-mono font-bold">
+                                                                        {typeof item.monto === 'number'
+                                                                            ? item.monto.toLocaleString('es-VE', { minimumFractionDigits: 2 })
+                                                                            : (item.monto || item.amount || JSON.stringify(item))}
+                                                                    </span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    );
+                                                }
+                                                if (meta && typeof meta === 'object' && 'value' in meta) {
+                                                    const val = meta.value;
+                                                    if (typeof val === 'number') return val.toLocaleString('es-VE', { minimumFractionDigits: 2 });
+                                                    if (Array.isArray(val)) return val.length > 0 ? `${val.length} items` : '—';
+                                                    return String(val);
+                                                }
+                                                if (typeof meta === 'number') return meta.toLocaleString('es-VE', { minimumFractionDigits: 2 });
+                                                if (typeof meta === 'string') return meta;
+                                                if (typeof meta === 'object' && meta !== null) return <span className="text-[9px] text-gray-400 font-mono">{JSON.stringify(meta)}</span>;
+                                                return String(meta || '—');
+                                            };
+
+                                            return (
+                                                <div key={key} className="p-4 bg-white border border-gray-100 rounded-2xl shadow-sm hover:border-nominix-electric/30 transition-all flex justify-between items-center group">
+                                                    <div className="flex flex-col gap-1">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-[10px] font-black text-nominix-electric font-mono">{key}</span>
+                                                            {meta?.category && (
+                                                                <span className="text-[8px] bg-gray-50 text-gray-400 px-1.5 py-0.5 rounded uppercase font-black tracking-tighter">
+                                                                    {meta.category}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-[9px] text-gray-400 font-bold leading-tight max-w-[280px]">
+                                                            {meta?.description || 'Variable capturada durante el cálculo.'}
+                                                        </p>
                                                     </div>
-                                                    <p className="text-[9px] text-gray-400 font-bold leading-tight max-w-[280px]">
-                                                        {meta.description || 'Variable capturada durante el cálculo.'}
-                                                    </p>
+                                                    <div className="text-right">
+                                                        <span className="text-base font-black text-nominix-dark">
+                                                            {renderValue()}
+                                                        </span>
+                                                    </div>
                                                 </div>
-                                                <div className="text-right">
-                                                    <span className="text-base font-black text-nominix-dark">
-                                                        {typeof meta.value === 'number'
-                                                            ? meta.value.toLocaleString('es-VE', { minimumFractionDigits: 2 })
-                                                            : (meta.value || meta)}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 </div>
                             )}

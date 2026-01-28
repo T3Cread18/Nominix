@@ -75,7 +75,7 @@ class PayrollConceptSerializer(serializers.ModelSerializer):
             'active', 'formula', 'show_on_payslip', 'appears_on_receipt',
             'show_even_if_zero', 'receipt_order', 'is_system', 
             'incidences', 'behavior', 'behavior_display', 'system_params',
-            'calculation_base'
+            'calculation_base', 'deducts_from_base_salary', 'adds_to_complement'
         ]
         read_only_fields = ['is_system']
 

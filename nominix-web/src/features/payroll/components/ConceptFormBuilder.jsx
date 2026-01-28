@@ -187,7 +187,9 @@ export default function ConceptFormBuilder({ initialData, onSave, onCancel }) {
             appears_on_receipt: initialData?.appears_on_receipt ?? true,
             show_even_if_zero: initialData?.show_even_if_zero ?? false,
             calculation_base: initialData?.calculation_base || 'TOTAL',
-            receipt_order: initialData?.receipt_order || 0
+            receipt_order: initialData?.receipt_order || 0,
+            deducts_from_base_salary: initialData?.deducts_from_base_salary ?? false,
+            adds_to_complement: initialData?.adds_to_complement ?? false
         }
     });
 
@@ -251,8 +253,10 @@ export default function ConceptFormBuilder({ initialData, onSave, onCancel }) {
         }
 
         if (payload.behavior !== 'LAW_DEDUCTION') {
-            // Limpieza básica si no es Ley
-            if (payload.behavior !== 'DYNAMIC') payload.formula = '';
+            // Limpieza: Solo limpiar fórmula si NO es DYNAMIC ni FIXED (FIXED ahora puede tener fórmula de ajuste)
+            if (payload.behavior !== 'DYNAMIC' && payload.computation_method !== 'FIXED_AMOUNT') {
+                payload.formula = '';
+            }
         }
         mutation.mutate(payload);
     };
@@ -368,6 +372,71 @@ export default function ConceptFormBuilder({ initialData, onSave, onCancel }) {
                                         {...register('value', { required: 'Requerido' })}
                                         error={errors.value?.message}
                                     />
+                                </div>
+                            )}
+
+                            {/* NUEVO: Fórmula de Ajuste para FIXED_AMOUNT */}
+                            {selectedMethod === 'FIXED_AMOUNT' && (
+                                <div className="space-y-4 pt-4 border-t border-white/5 animate-in slide-in-from-top-2 duration-300">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <Code2 size={14} className="text-amber-400" />
+                                            <label className="text-[10px] font-black text-amber-400/80 uppercase tracking-widest">
+                                                Fórmula de Ajuste (Opcional)
+                                            </label>
+                                        </div>
+                                        <div className="px-2 py-1 bg-amber-500/10 rounded-lg border border-amber-500/20 text-[9px] font-bold text-amber-500 flex items-center gap-1.5 uppercase">
+                                            <Info size={10} /> Se suma al monto fijo
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={async () => {
+                                                const formula = watch('formula');
+                                                if (!formula) return toast.info('Escriba una fórmula primero');
+                                                const res = await validationMutation.mutateAsync(formula);
+                                                if (res.success) {
+                                                    toast.success(`Ajuste validado: ${res.result}`);
+                                                } else {
+                                                    toast.error(`Error: ${res.error}`);
+                                                }
+                                            }}
+                                            disabled={validationMutation.isLoading}
+                                            className="px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 rounded-lg border border-amber-500/20 text-[9px] font-bold uppercase transition-all flex items-center gap-2"
+                                        >
+                                            {validationMutation.isLoading ? <Loader2 size={12} className="animate-spin" /> : <Calculator size={12} />}
+                                            Probar
+                                        </button>
+                                    </div>
+                                    <div className="relative group">
+                                        <textarea
+                                            {...register('formula')}
+                                            rows={3}
+                                            className="w-full font-mono text-sm p-4 bg-[#0d0d0f] border border-amber-500/10 rounded-2xl text-amber-400 outline-none focus:border-amber-500/50 transition-all shadow-inner"
+                                            placeholder="Ej: PRIMA_ASISTENCIA - DESCUENTO_TARDANZA"
+                                        />
+                                    </div>
+                                    <div className="bg-amber-500/5 rounded-xl p-3 border border-amber-500/10 space-y-2">
+                                        <p className="text-[9px] font-black text-amber-400/60 uppercase tracking-widest flex items-center gap-2">
+                                            <Info size={10} /> Variables de Ajuste
+                                        </p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {['VALOR_BASE', 'CANTIDAD', 'MONTO_CALCULADO'].map(v => (
+                                                <span
+                                                    key={v}
+                                                    onClick={() => {
+                                                        const current = watch('formula') || '';
+                                                        setValue('formula', current + (current ? ' + ' : '') + v);
+                                                    }}
+                                                    className="px-2 py-1 bg-black/40 text-[10px] text-amber-400 rounded-md border border-amber-500/20 font-mono hover:bg-amber-500 hover:text-white transition-all cursor-pointer"
+                                                >
+                                                    {v}
+                                                </span>
+                                            ))}
+                                        </div>
+                                        <p className="text-[9px] text-gray-500 mt-2 leading-tight">
+                                            También puedes usar cualquier concepto calculado previamente (según <code className="text-amber-400">receipt_order</code>)
+                                        </p>
+                                    </div>
                                 </div>
                             )}
 
@@ -504,6 +573,22 @@ export default function ConceptFormBuilder({ initialData, onSave, onCancel }) {
                                 <Toggle label="Incidencia Salarial / Integración" checked={watch('is_salary_incidence')} onChange={v => setValue('is_salary_incidence', v)} id="t-incidence" />
                                 <Toggle label="Mostrar en Recibo" checked={watch('appears_on_receipt')} onChange={v => setValue('appears_on_receipt', v)} id="t-receipt" />
                                 <Toggle label="Mostrar aunque sea Cero" checked={watch('show_even_if_zero')} onChange={v => setValue('show_even_if_zero', v)} id="t-zero" />
+                                {(selectedBehavior === 'DYNAMIC' || selectedBehavior === 'FIXED') && (
+                                    <Toggle
+                                        label="Resta Días del Sueldo Base"
+                                        checked={watch('deducts_from_base_salary')}
+                                        onChange={v => setValue('deducts_from_base_salary', v)}
+                                        id="t-deducts"
+                                    />
+                                )}
+                                {(selectedBehavior === 'DYNAMIC' || selectedBehavior === 'FIXED') && (
+                                    <Toggle
+                                        label="Suma al Complemento/Bono"
+                                        checked={watch('adds_to_complement')}
+                                        onChange={v => setValue('adds_to_complement', v)}
+                                        id="t-adds-complement"
+                                    />
+                                )}
                                 <div className="pt-2">
                                     <CustomInput label="Orden en Recibo" type="number" icon={ArrowUpDown} {...register('receipt_order')} />
                                 </div>

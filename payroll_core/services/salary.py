@@ -81,11 +81,38 @@ class SalarySplitter:
                 
                 print(f"DEBUG SPLIT: Fixed={fixed_base}, Currency={curr_code}, Rate={exchange_rate}")
 
-                # Si está en VES, convertir a USD para comparar con total_salary (que está en USD)
+                # Si está en VES, convertir a USD SOLO para la comparación lógica
                 if curr_code == 'VES':
                     if exchange_rate and exchange_rate > 0:
-                        fixed_base = fixed_base / exchange_rate
-                        print(f"DEBUG SPLIT: Converted VES->USD fixed_base={fixed_base}")
+                        fixed_base_usd = fixed_base / exchange_rate
+                        
+                        # * PROTECCIÓN DE PRECISIÓN *
+                        # Si el Cargo (JobPosition) define la base en VES, protegemos ese valor
+                        # independientemente de si el contrato es USD o VES.
+                        result = {
+                            'base': fixed_base_usd.quantize(Decimal('0.01')),
+                            'complement': (total_salary - fixed_base_usd).quantize(Decimal('0.01')),
+                            'total': total_salary.quantize(Decimal('0.01')),
+                            'base_ves_protected': fixed_base # Valor exacto del cargo
+                        }
+
+                        # Obtener código de moneda del contrato de forma segura
+                        contract_curr_code = 'USD'
+                        try:
+                            if hasattr(contract.salary_currency, 'code'):
+                                contract_curr_code = contract.salary_currency.code
+                            else:
+                                contract_curr_code = str(contract.salary_currency)
+                        except Exception:
+                            pass
+
+                        # Si el contrato TAMBIÉN está en VES, protegemos el total
+                        if contract_curr_code == 'VES':
+                            result['total_ves_protected'] = contract.monthly_salary
+
+                        return result
+                        
+                        fixed_base = fixed_base_usd
 
             if total_salary <= fixed_base:
                 base_salary = total_salary

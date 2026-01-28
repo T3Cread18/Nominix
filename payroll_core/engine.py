@@ -100,18 +100,38 @@ class PayrollEngine:
                 'category': 'Salario',
                 'example': 5000.00
             },
-            'SUELDO_BASE': {
-                'description': 'Alias para SUELDO_BASE_MENSUAL (Sueldo tabular del contrato)',
+            'SUELDO_BASE_MENSUAL': {
+                'description': 'Sueldo base mensual pactado en el contrato (Tabular)',
                 'category': 'Salario',
                 'example': 3000.00
+            },
+            'SUELDO_BASE_DIARIO': {
+                'description': 'Sueldo base mensual dividido entre 30',
+                'category': 'Salario',
+                'example': 100.00
+            },
+            'SUELDO_BASE': {
+                'description': 'Alias para el sueldo base proporcional al periodo',
+                'category': 'Salario',
+                'example': 1500.00
+            },
+            'SUELDO_BASE_PERIODO': {
+                'description': 'Monto bruto del sueldo base correspondiente al periodo (sin deducciones)',
+                'category': 'Salario',
+                'example': 750.00
             },
             'COMPLEMENTO_MENSUAL': {
                 'description': 'Monto del complemento o bono no salarial mensual (VES)',
                 'category': 'Salario',
                 'example': 2000.00
             },
+            'COMPLEMENTO_PERIODO': {
+                'description': 'Monto del complemento correspondiente al periodo',
+                'category': 'Salario',
+                'example': 1000.00
+            },
             'SALARIO_DIARIO': {
-                'description': 'Salario mensual dividido entre 30 días',
+                'description': 'Salario total mensual dividido entre 30 días',
                 'category': 'Salario',
                 'example': 166.67
             },
@@ -180,6 +200,11 @@ class PayrollEngine:
                 'category': 'Novedades/Descansos',
                 'example': 2
             },
+            'H_EXTRA_DIURNA': {
+                'description': 'Alias para OVERTIME_HOURS (Horas extras diurnas)',
+                'category': 'Novedades/Horas',
+                'example': 2.0
+            },
             'H_EXTRA_NOCTURNA': {
                 'description': 'Alias para NIGHT_HOURS (Horas extras nocturnas)',
                 'category': 'Novedades/Horas',
@@ -194,6 +219,22 @@ class PayrollEngine:
                 'description': 'Cantidad de faltas injustificadas reportadas',
                 'category': 'Novedades/Ausencias',
                 'example': 1
+            },
+            # Variables especiales para fórmulas de ajuste (FIXED_AMOUNT)
+            'VALOR_BASE': {
+                'description': 'Valor fijo base del concepto (solo en fórmulas de ajuste)',
+                'category': 'Ajuste/FIXED_AMOUNT',
+                'example': 100.0
+            },
+            'CANTIDAD': {
+                'description': 'Multiplicador/cantidad de la novedad (solo en fórmulas de ajuste)',
+                'category': 'Ajuste/FIXED_AMOUNT',
+                'example': 1.0
+            },
+            'MONTO_CALCULADO': {
+                'description': 'Resultado de VALOR_BASE * CANTIDAD * TASA antes del ajuste',
+                'category': 'Ajuste/FIXED_AMOUNT',
+                'example': 5000.0
             },
         }
 
@@ -262,6 +303,14 @@ class PayrollEngine:
         # 4. Cargar sufijos de cantidad (_CANT) para evitar NameError
         quantities = {f"{c.code}_CANT": 1.0 for c in PayrollConcept.objects.filter(active=True)}
         context.update(quantities)
+
+        # 5. Variables especiales para fórmulas de ajuste en conceptos FIXED_AMOUNT
+        context.update({
+            'VALOR_BASE': 100.0,
+            'CANTIDAD': 1.0,
+            'TASA': 50.0,
+            'MONTO_CALCULADO': 5000.0,
+        })
 
         if custom_context:
             context.update(custom_context)
@@ -537,15 +586,49 @@ class PayrollEngine:
         if concept.computation_method == PayrollConcept.ComputationMethod.FIXED_AMOUNT:
             # Tasa de cambio según la moneda del concepto
             rate = self._get_exchange_rate_value(concept.currency)
-            # Monto = Valor Base * Multiplicador * Tasa
-            amount = base_val * m * rate
+            # Monto base = Valor Base * Multiplicador * Tasa
+            base_amount = base_val * m * rate
+            
+            # NUEVO: Evaluar fórmula de ajuste si existe
+            adjustment = Decimal('0.00')
+            adjustment_trace = ""
+            if concept.formula:
+                try:
+                    # Inyectar variables especiales para el ajuste
+                    context['VALOR_BASE'] = float(base_val)
+                    context['CANTIDAD'] = float(m)
+                    context['TASA'] = float(rate)
+                    context['MONTO_CALCULADO'] = float(base_amount)
+                    
+                    adjustment_result = simple_eval(
+                        concept.formula,
+                        names=context,
+                        functions=self._get_allowed_functions()
+                    )
+                    adjustment = Decimal(str(adjustment_result)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                    adjustment_breakdown = self._get_formula_breakdown(concept.formula, context)
+                    adjustment_trace = f" + Ajuste ({adjustment_breakdown['trace']}) = {float(adjustment):.2f}"
+                    variables.update(adjustment_breakdown['variables'])
+                    variables['formula_adjustment'] = concept.formula
+                except Exception as e:
+                    print(f"Error evaluando fórmula de ajuste [{concept.code}]: {concept.formula} -> {e}")
+                    adjustment_trace = f" (Error ajuste: {str(e)})"
+            
+            amount = (base_amount + adjustment).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
             
             trace_parts = [f"{float(base_val):.2f}"]
             if m != 1: trace_parts.append(f"Qty: {float(m):.2f}")
             if rate != 1: trace_parts.append(f"Tasa ({concept.currency.code}): {float(rate):.4f}")
             
             trace = " * ".join(trace_parts)
-            if rate == 1 and m == 1: trace += " Bs."
+            if len(trace_parts) == 1 and rate == 1 and m == 1: 
+                trace += " Bs."
+            else:
+                trace += f" = {float(base_amount):.2f}"
+            
+            if adjustment != 0:
+                trace += adjustment_trace
+                trace += f" → Final: {float(amount):.2f}"
 
         elif concept.computation_method == PayrollConcept.ComputationMethod.PERCENTAGE_OF_BASIC:
             # Multiplicador no suele aplicar aquí, pero lo guardamos por integridad
@@ -600,28 +683,49 @@ class PayrollEngine:
         }
 
 
-    def _handle_salary_base(self, cc, eval_context, company):
+    def _handle_salary_base(self, cc, eval_context, company, deducted_days=0):
         """
         Handler para el sueldo base. 
-        Asegura que el sueldo base se reporte por los días completos del periodo (15/30)
-        sin restar descansos o feriados, los cuales se calculan como conceptos aditivos.
+        Ahora soporta deducir días y su valor proporcional del monto base.
+        
+        Args:
+            cc: Diccionario con datos del concepto (code, name, amount_ves)
+            eval_context: Contexto de evaluación
+            company: Instancia de Company
+            deducted_days: Número de días a restar del periodo
         """
         lines = []
-        total_days = eval_context.get('DIAS', 15)
+        total_period_days = eval_context.get('DIAS', 15)
+        effective_days = max(total_period_days - deducted_days, 0)
         
-        # El Sueldo Base siempre representa la totalidad del periodo asignado (concept_data['base_ves'])
-        # No restamos nada para evitar modificar el monto principal.
+        # Calcular valor diario y deducción
+        base_amount = Decimal(str(cc['amount_ves']))
+        daily_rate = base_amount / total_period_days if total_period_days > 0 else Decimal('0.00')
+        deducted_value = daily_rate * Decimal(str(deducted_days))
+        effective_amount = (base_amount - deducted_value).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        
+        trace_parts = [f"{float(base_amount):.2f} Bs. ({total_period_days} días)"]
+        if deducted_days > 0:
+            trace_parts.append(f"- {float(deducted_value):.2f} ({deducted_days} días deducidos)")
+        trace_parts.append(f"= {float(effective_amount):.2f} ({effective_days} días efectivos)")
+        
         lines.append({
             'code': 'SUELDO_BASE',
             'name': cc['name'],
             'kind': 'EARNING',
-            'amount_ves': cc['amount_ves'],
-            'quantity': total_days,
+            'amount_ves': effective_amount,
+            'quantity': effective_days,
             'unit': 'días',
             'tipo_recibo': 'salario',
-            'trace': f"{float(cc['amount_ves']):.2f} Bs. (Total {total_days} días)",
+            'trace': ' '.join(trace_parts),
             'formula': 'SALARIO_PERIOD',
-            'variables': {'SALARIO_PERIOD': float(cc['amount_ves']), 'DIAS': total_days}
+            'variables': {
+                'SALARIO_PERIOD': float(base_amount), 
+                'DIAS_TOTALES': total_period_days,
+                'DIAS_DEDUCIDOS': deducted_days,
+                'DIAS_EFECTIVOS': effective_days,
+                'VALOR_DEDUCIDO': float(deducted_value)
+            }
         })
             
         return lines
@@ -704,9 +808,17 @@ class PayrollEngine:
             if c.code not in eval_context:
                 eval_context[c.code] = 0.0
                 eval_context[f"{c.code}_CANT"] = 0.0
-            elif f"{c.code}_CANT" not in eval_context:
-                # Si el código vino como novedad, el valor numérico inicial es también su cantidad
-                eval_context[f"{c.code}_CANT"] = eval_context[c.code]
+            else:
+                # Si YA existe (vino de novedad/input), aseguramos que:
+                # - CODE_CANT tenga la cantidad (input de la novedad)
+                # - CODE se resetee a 0.0 para que represente el MONTO (resultado calculado)
+                # 
+                # IMPORTANTE: _build_eval_context ya crea ambos (CODE y CODE_CANT) con el mismo valor,
+                # así que debemos forzar el reset del CODE principal aquí.
+                if f"{c.code}_CANT" not in eval_context:
+                    eval_context[f"{c.code}_CANT"] = eval_context[c.code]
+                # Siempre reseteamos el valor principal para que sea el acumulador de monto
+                eval_context[c.code] = 0.0
             
             # 2. Los acumuladores inician en 0.0
             if c.incidences:
@@ -727,14 +839,34 @@ class PayrollEngine:
             elif company.payroll_journey == 'WEEKLY':
                 salary_factor = Decimal('7') / Decimal('30')
         
+        # * PROTECCIÓN DE PRECISIÓN *
+        # Si el splitter nos devolvió valores protegidos en VES, los usamos directamente.
+        if 'base_ves_protected' in breakdown:
+            base_ves_calc = breakdown['base_ves_protected'] * salary_factor
+        else:
+            base_ves_calc = (breakdown['base'] * salary_factor * rate)
+            
         contract_data = {
-            'base_ves': (breakdown['base'] * salary_factor * rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP),
+            'base_ves': base_ves_calc.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP),
             'complement_ves': (breakdown['complement'] * salary_factor * rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP),
             'monthly_base': breakdown['base'],
             'monthly_complement': breakdown['complement'],
             'salary_factor': salary_factor,
             'rate': rate
         }
+        
+        # * INICIALIZACIÓN DE COMPLEMENTO DINÁMICO *
+        # Sembramos el valor base del contrato en el contexto para que los bonos se sumen a él
+        eval_context['COMPLEMENTO_PERIOD'] = float(contract_data['complement_ves'])
+        
+        # * VARIABLES DE PERIODO (SOLICITUD DE USUARIO) *
+        # Exponemos los valores brutos del periodo (sin deducciones) para uso en fórmulas
+        eval_context['SUELDO_BASE_PERIODO'] = float(contract_data['base_ves'])
+        eval_context['COMPLEMENTO_PERIODO'] = float(contract_data['complement_ves'])
+        
+        # Lista para registrar conceptos que se suman al complemento (para trazabilidad)
+        complement_additions = []  # [(nombre, monto), ...]
+        
         print(f"DEBUG ENGINE: Breakdown={breakdown}")
         print(f"DEBUG ENGINE: Rate={rate}, Factor={salary_factor}")
         print(f"DEBUG ENGINE: BaseVES={contract_data['base_ves']}, CompVES={contract_data['complement_ves']}")
@@ -760,8 +892,11 @@ class PayrollEngine:
             contract_override_val = overrides.get(concept.code)
 
             # --- FILTRADO DE CONCEPTOS GENÉRICOS ---
-            if concept.behavior in [PayrollConcept.ConceptBehavior.DYNAMIC, PayrollConcept.ConceptBehavior.FIXED]:
+            if concept.behavior == PayrollConcept.ConceptBehavior.FIXED:
                 if novelty_val is None and contract_override_val is None:
+                    continue
+            elif concept.behavior == PayrollConcept.ConceptBehavior.DYNAMIC:
+                if not concept.formula and novelty_val is None and contract_override_val is None:
                     continue
 
             # B. Despachar Lógica por Comportamiento
@@ -772,13 +907,25 @@ class PayrollEngine:
             tipo_recibo = 'salario'
 
             if concept.behavior == PayrollConcept.ConceptBehavior.SALARY_BASE:
+                # --- PRE-CÁLCULO DE DÍAS DEDUCIDOS ---
+                deducted_days = 0
+                for deductor_concept in all_concepts.filter(deducts_from_base_salary=True):
+                    deductor_novelty = self.input_variables.get(deductor_concept.code)
+                    if deductor_novelty is None:
+                        for k, v in self.input_variables.items():
+                            if deductor_concept.code.upper() == k.upper():
+                                deductor_novelty = v
+                                break
+                    if deductor_novelty is not None:
+                        deducted_days += float(deductor_novelty)
+                
                 # Lógica de Sueldo Base (Desglose)
                 temp_cc = {
                     'code': concept.code,
                     'name': concept.name,
                     'amount_ves': contract_data['base_ves']
                 }
-                salary_lines = self._handle_salary_base(temp_cc, eval_context, company)
+                salary_lines = self._handle_salary_base(temp_cc, eval_context, company, deducted_days=int(deducted_days))
                 total_base_ves = Decimal('0.00')
                 for sl in salary_lines:
                     sl['tipo_recibo'] = 'salario'
@@ -792,7 +939,7 @@ class PayrollEngine:
                 
                 # Inyectar resultado total al contexto
                 eval_context[concept.code] = float(total_base_ves)
-                eval_context[f"{concept.code}_CANT"] = float(eval_context.get('DIAS', 15))
+                eval_context[f"{concept.code}_CANT"] = float(eval_context.get('DIAS', 15) - deducted_days)
                 continue # Ya agregamos las líneas, saltamos al siguiente concepto
             
             elif concept.behavior == PayrollConcept.ConceptBehavior.CESTATICKET:
@@ -820,8 +967,30 @@ class PayrollEngine:
             elif concept.behavior == PayrollConcept.ConceptBehavior.COMPLEMENT:
                 # Lógica de Complemento
                 tipo_recibo = 'complemento'
-                amount = contract_data['complement_ves']
-                trace = f"{float(contract_data['monthly_complement']):.2f} (Complemento) * {float(salary_factor):.2f} (Fac) * {float(rate):.2f} (Tasa)"
+                # * ACTUALIZACIÓN DINÁMICA *
+                # Leemos del contexto acumulado en lugar del dato estático del contrato
+                # Esto permite que bonos previos (adds_to_complement) inflen este monto
+                dyn_base_complement = eval_context.get('COMPLEMENTO_PERIOD', contract_data['complement_ves'])
+                
+                amount = Decimal(str(dyn_base_complement))
+                
+                # Reconstruimos el trace para reflejar que es un valor compuesto con detalle
+                base_complement_val = float(contract_data['complement_ves'])
+                if complement_additions:
+                    # Construir trace detallado: "Base (1500.00) + BONO_X (200.00) + BONO_Y (100.00) = 1800.00"
+                    trace_parts = [f"Base ({base_complement_val:.2f})"]
+                    for nombre, monto in complement_additions:
+                        trace_parts.append(f"{nombre} ({monto:.2f})")
+                    trace = " + ".join(trace_parts) + f" = {float(amount):.2f}"
+                else:
+                    trace = f"{float(contract_data['monthly_complement']):.2f} (Complemento) * {float(salary_factor):.2f} (Fac) * {float(rate):.2f} (Tasa)"
+                
+                # Agregar las variables para auditoría
+                variables = {
+                    'COMPLEMENTO_BASE': base_complement_val,
+                    'COMPLEMENTO_TOTAL': float(amount),
+                    'CONCEPTOS_SUMADOS': [{'nombre': n, 'monto': m} for n, m in complement_additions]
+                }
 
             else:
                 # Lógica General (Fórmula o Fijo)
@@ -858,11 +1027,30 @@ class PayrollEngine:
                     line['quantity'] = eval_context[var_name]
                     line['unit'] = 'hrs' if 'HOURS' in var_name else 'días'
                 
-                results_lines.append(line)
+                # * OCULTAR SI SUMA AL COMPLEMENTO *
+                # Si el usuario pidió que se sume al complemento y no aparezca como línea aparte
+                if not getattr(concept, 'adds_to_complement', False):
+                    results_lines.append(line)
 
                 # D. Actualizar Acumuladores e inyectar al contexto para fórmulas subsecuentes
                 eval_context[concept.code] = float(amount)
                 
+                # * SUMA AL COMPLEMENTO / BONO *
+                if getattr(concept, 'adds_to_complement', False):
+                    # Actualizar variables de complemento en el contexto
+                    current_complement_period = eval_context.get('COMPLEMENTO_PERIOD', 0.0)
+                    new_complement_period = current_complement_period + float(amount)
+                    eval_context['COMPLEMENTO_PERIOD'] = new_complement_period
+                    
+                    # Registrar este concepto para la trazabilidad del complemento
+                    complement_additions.append((concept.name, float(amount)))
+                    
+                    # Para mantener consistencia, también actualizamos el mensual proyectado (estimado)
+                    factor = float(contract_data.get('salary_factor', 1))
+                    if factor > 0:
+                        projected_monthly = float(amount) / factor 
+                        eval_context['COMPLEMENTO_MENSUAL'] = eval_context.get('COMPLEMENTO_MENSUAL', 0.0) + projected_monthly
+
                 if concept.incidences:
                     for tag in concept.incidences:
                         accumulators[tag] += float(amount)
@@ -884,8 +1072,10 @@ class PayrollEngine:
             variables = {}
             formula = concept.formula
 
-            if concept.behavior == PayrollConcept.ConceptBehavior.LAW_DEDUCTION:
-                # ... (Lógica de Ley se mantiene igual)
+            # Lógica de Ley (SOLO si no se especificó una fórmula dinámica explícita)
+            if (concept.behavior == PayrollConcept.ConceptBehavior.LAW_DEDUCTION and 
+                concept.computation_method != PayrollConcept.ComputationMethod.DYNAMIC_FORMULA):
+                
                 # Lógica de Ley (Soporta system_params para configuración dinámica)
                 sm = company.national_minimum_salary if company else FALLBACK_SALARIO_MINIMO
                 num_lunes = eval_context.get('LUNES', 4)
