@@ -18,8 +18,7 @@ from .employee import Employee, LaborContract
 from .concepts import PayrollConcept, EmployeeConcept
 from .payroll import PayrollPeriod, PayrollReceipt, PayrollReceiptLine, PayrollNovelty
 from .loans import Loan, LoanPayment
-from .payroll import PayrollPeriod, PayrollReceipt, PayrollReceiptLine, PayrollNovelty
-from .loans import Loan, LoanPayment
+from .variations import VariationCause, EmployeeVariation
 from .social_benefits import SocialBenefitsLedger, SocialBenefitsSettlement
 
 # Exponer todos los modelos a nivel de paquete para compatibilidad
@@ -38,6 +37,9 @@ __all__ = [
     # Employee
     'Employee',
     'LaborContract',
+    # Variations
+    'VariationCause',
+    'EmployeeVariation',
     # Concepts
     'PayrollConcept',
     'EmployeeConcept',

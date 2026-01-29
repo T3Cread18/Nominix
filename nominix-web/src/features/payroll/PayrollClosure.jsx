@@ -299,6 +299,9 @@ const PayrollClosure = ({ initialPeriods, onRefresh }) => {
                                             <button onClick={() => { handleDownloadPdf(period.id, period.name, 'cestaticket'); setPdfDropdownOpen(null); }} className="w-full px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest hover:bg-nominix-electric hover:text-white transition-colors flex items-center gap-2 border-t border-gray-50">
                                                 <span className="text-lg">🍽️</span> Solo Cestaticket
                                             </button>
+                                            <button onClick={() => { handleDownloadPdf(period.id, period.name, 'vacaciones'); setPdfDropdownOpen(null); }} className="w-full px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest hover:bg-nominix-electric hover:text-white transition-colors flex items-center gap-2 border-t border-gray-50">
+                                                <span className="text-lg">🏖️</span> Solo Vacaciones
+                                            </button>
                                         </div>
                                     )}
                                 </div>

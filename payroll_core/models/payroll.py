@@ -152,6 +152,23 @@ class PayrollReceipt(models.Model):
         """Monto del recibo 3 (Cestaticket)"""
         return sum(d.amount_ves for d in self.lines.all() if d.tipo_recibo == 'cestaticket')
 
+    @property
+    def total_income_vacaciones(self) -> Decimal:
+        """Suma de ingresos del recibo de vacaciones"""
+        return sum(d.amount_ves for d in self.lines.all() if d.kind == 'EARNING' and d.tipo_recibo == 'vacaciones')
+
+    @property
+    def total_deductions_vacaciones(self) -> Decimal:
+        """Suma de deducciones legales del recibo de vacaciones"""
+        return sum(d.amount_ves for d in self.lines.all() if d.kind == 'DEDUCTION' and d.tipo_recibo == 'vacaciones')
+
+    @property
+    def net_pay_vacaciones(self) -> Decimal:
+        """Neto a pagar de vacaciones (Asignaciones - Deducciones de vacaciones)"""
+        income = self.total_income_vacaciones
+        deductions = self.total_deductions_vacaciones
+        return income - deductions
+
     class Meta:
         verbose_name = 'Recibo de Nómina'
         verbose_name_plural = 'Recibos de Nómina'
@@ -242,6 +259,7 @@ class PayrollReceiptLine(models.Model):
             ('salario', 'Salario Base'),
             ('complemento', 'Complemento'),
             ('cestaticket', 'Cestaticket'),
+            ('vacaciones', 'Vacaciones'),
         ],
         default='salario',
         verbose_name='Tipo de Recibo'

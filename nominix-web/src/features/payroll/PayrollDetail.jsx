@@ -277,6 +277,11 @@ const PayrollDetail = ({ period, allEmployees, initialConcepts }) => {
                                 <h2 className="text-2xl font-black italic tracking-tighter flex items-center gap-3">
                                     NÓMINIX
                                     <span className="bg-amber-500 text-[8px] px-2 py-0.5 rounded-full not-italic tracking-widest font-black uppercase">v2.0 AUDIT</span>
+                                    {payslipData.lines.some(l => l.tipo_recibo === 'vacaciones') && (
+                                        <span className="bg-blue-500 text-[8px] px-2 py-0.5 rounded-full not-italic tracking-widest font-black uppercase flex items-center gap-1">
+                                            🏖️ VACACIONES
+                                        </span>
+                                    )}
                                 </h2>
                                 <p className="text-[10px] uppercase tracking-widest opacity-60 mt-1">Vista Previa de Nómina</p>
 

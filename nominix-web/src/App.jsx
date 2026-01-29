@@ -15,6 +15,7 @@ import PayrollClosure from './features/payroll/PayrollClosure';
 import NovedadesGrid from './features/payroll/NovedadesGrid';
 import PayrollDashboard from './features/payroll/PayrollDashboard';
 import CompanySettings from './features/settings/CompanySettings';
+import VariationCausesPage from './features/settings/VariationCausesPage';
 import LoanManager from './features/loans/LoanManager';
 import TenantsLogin from './features/tenants/TenantsLogin';
 import TenantsAdmin from './features/tenants/TenantsAdmin';
@@ -92,6 +93,7 @@ function App() {
 
                 {/* Módulo: Configuración */}
                 <Route path="config" element={<CompanySettings />} />
+                <Route path="config/variations" element={<VariationCausesPage />} />
 
                 {/* Fallback */}
                 <Route path="*" element={<Navigate to="/" replace />} />

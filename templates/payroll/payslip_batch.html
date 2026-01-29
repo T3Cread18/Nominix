@@ -502,6 +502,11 @@
     {% endfor %}
     {% endwith %}
 
+    {# ========== RECIBO 4: VACACIONES ========== #}
+    {% if payslip.total_income_vacaciones > 0 %}
+    {% include "payroll/recibo_vacaciones.html" %}
+    {% endif %}
+
     {% endfor %}
 </body>
 

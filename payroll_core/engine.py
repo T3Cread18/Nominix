@@ -20,6 +20,7 @@ from .models import (
     Loan
 )
 from .services.salary import SalarySplitter
+from .services.variations_engine import VariationsEngine
 
 # Constantes de Configuración
 FALLBACK_SALARIO_MINIMO = Decimal('130.00')
@@ -48,10 +49,46 @@ class PayrollEngine:
         self._cached_rate_value = None
         
         # Cargar novedades
+        # Cargar novedades
         if input_variables is not None:
             self.input_variables = input_variables
         else:
             self.input_variables = self._load_novelties_from_db()
+
+        # --- VARIACIONES (Nuevo) ---
+        self.deducted_days = 0
+        self.variation_lines = [] # Para inyectar en recibo si es necesario
+        self.novelty_metadata = {} # Para guardar tipo_recibo, etc.
+        
+        if self.period:
+            impact = VariationsEngine.calculate_period_impact(
+                self.contract.employee, 
+                self.period.start_date, 
+                self.period.end_date
+            )
+            self.deducted_days = impact['deducted_days']
+            
+            # Inyectar novedades automáticas de variaciones (ej: VACACIONES=5)
+            # Se suman a las manuales.
+            for nov in impact['novelties']:
+                code = nov['concept_code']
+                val = float(nov['amount'])
+                
+                # Guardar metadata antes de sumar (tipo_recibo)
+                self.novelty_metadata[code] = {
+                    'tipo_recibo': nov.get('tipo_recibo', 'salario')
+                }
+
+                if code in self.input_variables:
+                    self.input_variables[code] += val
+                else:
+                    self.input_variables[code] = val
+                
+                # Guardamos metadata de tipo_recibo para usarla luego si es necesario
+                # Aunque el Engine procesa input_variables genéricos,
+                # modificaremos calculate_payroll para usar 'tipo_recibo' desde aquí si es posible.
+                # Por ahora, solo inyectamos la variable para que la fórmula funcione.
+                # TODO: Pasar metadata completa al procesar concepto.
 
     def _load_novelties_from_db(self) -> Dict[str, float]:
         if not self.period:
@@ -925,7 +962,9 @@ class PayrollEngine:
                     'name': concept.name,
                     'amount_ves': contract_data['base_ves']
                 }
-                salary_lines = self._handle_salary_base(temp_cc, eval_context, company, deducted_days=int(deducted_days))
+                # SUMAR días deducidos por variaciones (VariationsEngine) a los días deducidos por novedades
+                total_deducted_days = int(deducted_days) + int(self.deducted_days)
+                salary_lines = self._handle_salary_base(temp_cc, eval_context, company, deducted_days=total_deducted_days)
                 total_base_ves = Decimal('0.00')
                 for sl in salary_lines:
                     sl['tipo_recibo'] = 'salario'
@@ -1008,6 +1047,10 @@ class PayrollEngine:
                 # Determinar tipo recibo por convención si no es de sistema
                 if 'TICKET' in concept.code: tipo_recibo = 'cestaticket'
                 elif 'COMPLE' in concept.code and not concept.is_salary_incidence: tipo_recibo = 'complemento'
+                
+                # REGLA DE ORO: Si viene de una variación (Ej: Vacaciones), respetar su tipo
+                if concept.code in self.novelty_metadata:
+                    tipo_recibo = self.novelty_metadata[concept.code]['tipo_recibo']
 
             # C. Agregar Línea si corresponde
             if amount > 0 or (concept.show_even_if_zero and concept.show_on_payslip):

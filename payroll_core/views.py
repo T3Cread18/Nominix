@@ -32,9 +32,12 @@ from .serializers import (
     ACCUMULATOR_LABELS, BEHAVIOR_REQUIRED_PARAMS, ExchangeRateSerializer,
     # Social Benefits Serializers
     SocialBenefitsLedgerSerializer, SocialBenefitsSettlementSerializer,
-    InterestRateBCVSerializer, AdvanceRequestSerializer, QuarterlyGuaranteeSerializer
+    InterestRateBCVSerializer, AdvanceRequestSerializer, QuarterlyGuaranteeSerializer,
+    VariationCauseSerializer, EmployeeVariationSerializer
 )
 from .engine import PayrollEngine
+from .services.variations_engine import VariationsEngine
+from .models import VariationCause, EmployeeVariation
 
 
 
@@ -492,6 +495,7 @@ class PayrollPeriodViewSet(viewsets.ModelViewSet):
             'salario': 'payroll/recibo_salario.html',
             'complemento': 'payroll/recibo_complemento.html',
             'cestaticket': 'payroll/recibo_cestaticket.html',
+            'vacaciones': 'payroll/recibo_vacaciones_standalone.html',
         }
         template_name = template_map.get(tipo_recibo, 'payroll/payslip_batch.html')
 
@@ -742,6 +746,44 @@ class PayrollNoveltyViewSet(viewsets.ModelViewSet):
             'mappings': PayrollEngine.NOVELTY_MAP if hasattr(PayrollEngine, 'NOVELTY_MAP') else {}
         })
 
+    @action(detail=False, methods=['get'], url_path='preview')
+    def preview(self, request):
+        """
+        GET /api/payroll-novelties/preview/?period=ID
+        Calcula el impacto de las variaciones (vacaciones, etc) para todos los empleados
+        en el periodo seleccionado.
+        """
+        period_id = request.query_params.get('period')
+        if not period_id:
+            return Response({"error": "period is required"}, status=400)
+            
+        try:
+            period = PayrollPeriod.objects.get(id=period_id)
+        except PayrollPeriod.DoesNotExist:
+            return Response({"error": "Period not found"}, status=404)
+
+        # Usar VariationsEngine para pre-calcular impactos
+        from .services.variations_engine import VariationsEngine
+        from .models.employee import Employee
+        
+        employees = Employee.objects.filter(is_active=True)
+        results = []
+        
+        for emp in employees:
+            impact = VariationsEngine.calculate_period_impact(
+                emp, period.start_date, period.end_date
+            )
+            for nov in impact['novelties']:
+                results.append({
+                    'employee': emp.id,
+                    'concept_code': nov['concept_code'],
+                    'amount': nov['amount'],
+                    'notes': nov['notes'],
+                    'is_virtual': True  # Indica que viene de una variación
+                })
+                
+        return Response(results)
+
     @action(detail=False, methods=['post'], url_path='batch')
     def batch(self, request):
         """
@@ -779,6 +821,54 @@ class PayrollNoveltyViewSet(viewsets.ModelViewSet):
                 {"error": f"Falla en procesamiento batch: {str(e)}"}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
+class VariationCauseViewSet(viewsets.ModelViewSet):
+    queryset = VariationCause.objects.all()
+    serializer_class = VariationCauseSerializer
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    search_fields = ['name', 'code']
+    filterset_fields = ['category', 'is_active']
+
+class EmployeeVariationViewSet(viewsets.ModelViewSet):
+    queryset = EmployeeVariation.objects.all()
+    serializer_class = EmployeeVariationSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['employee', 'cause', 'start_date', 'end_date']
+
+    def perform_create(self, serializer):
+        data = serializer.validated_data
+        # Validar solapamiento usando el Engine
+        try:
+            VariationsEngine.validate_overlap(
+                employee=data['employee'],
+                start_date=data['start_date'],
+                end_date=data['end_date']
+            )
+            serializer.save()
+        except ValueError as e:
+            raise serializers.ValidationError({"detail": str(e)})
+
+    def perform_update(self, serializer):
+        data = serializer.validated_data
+        instance = serializer.instance
+        # Si no se pasan fechas, usar las existentes
+        start = data.get('start_date', instance.start_date)
+        end = data.get('end_date', instance.end_date)
+        
+        try:
+            VariationsEngine.validate_overlap(
+                employee=instance.employee,
+                start_date=start,
+                end_date=end,
+                exclude_id=instance.id
+            )
+            serializer.save()
+        except ValueError as e:
+            raise serializers.ValidationError({"detail": str(e)})
+
+
+
+
+
 class CompanyConfigView(views.APIView):
     """
     Endpoint único para obtener/editar la configuración de la empresa.

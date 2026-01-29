@@ -1,0 +1,106 @@
+<div class="page-break">
+    <div class="header" style="border-bottom: 2px solid #0052FF;">
+        <div class="header-left">
+            <div class="company-name" style="color: #0052FF;">{{ payslip.employee.branch.name|default:tenant_name }}
+            </div>
+            <div>RIF: {{ payslip.employee.branch.rif|default:tenant_rif }}</div>
+            <div>{{ payslip.employee.branch.address|default:tenant_address }}</div>
+        </div>
+        <div class="header-right">
+            <div style="font-size: 12px; font-weight: bold;">RECIBO DE PAGO - VACACIONES</div>
+            <div>N° {{ payslip.employee.national_id }}-{{ payment_date|date:"Ymd" }}-VAC</div>
+            <div>Período: {{ period_name }}</div>
+            <div>{{ start_date|date:"d/m/Y" }} al {{ end_date|date:"d/m/Y" }}</div>
+        </div>
+    </div>
+
+    <div class="grid-info">
+        <div class="row">
+            <div class="col"><span class="label">Trabajador:</span> {{ payslip.employee.full_name }}</div>
+            <div class="col"><span class="label">Cédula:</span> {{ payslip.employee.national_id }}</div>
+        </div>
+        <div class="row">
+            <div class="col"><span class="label">Cargo:</span> {{ payslip.contract_snapshot.position }}</div>
+            <div class="col"><span class="label">Departamento:</span> {{ payslip.employee.department.name|default:"N/D"
+                }}</div>
+        </div>
+        <div class="row">
+            <div class="col"><span class="label">Fecha Pago:</span> {{ payment_date|date:"d/m/Y" }}</div>
+            <div class="col"><span class="label">Tasa Cambio:</span> Bs. {{ payslip.exchange_rate_applied|floatformat:2
+                }}</div>
+        </div>
+    </div>
+
+    <!-- Banner Informativo -->
+    <div
+        style="background-color: #E3F2FD; padding: 10px; border-radius: 5px; margin-bottom: 15px; border-left: 4px solid #0052FF;">
+        <strong style="color: #1565C0;">AVISO DE DISFRUTE:</strong>
+        Se procede al pago correspondiente al disfrute de vacaciones anuales reglamentarias.
+    </div>
+
+    <table class="receipt-table">
+        <thead>
+            <tr>
+                <th style="width: 12%;">Cód</th>
+                <th style="width: 33%;">Concepto</th>
+                <th style="width: 15%; text-align: center;">Valor Auxiliar</th>
+                <th style="width: 20%; text-align: right;">Asignación</th>
+                <th style="width: 20%; text-align: right;">Deducción</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in payslip.processed_rows %}
+            {% if row.tipo_recibo == 'vacaciones' %}
+            <tr>
+                <td style="font-size: 9px; color: #555;">{{ row.code }}</td>
+                <td>{{ row.name }}</td>
+                <td style="text-align: center; font-family: monospace;">
+                    {% if row.quantity %}{{ row.quantity|floatformat:0 }} {{ row.unit|default:"días" }}{% else %}0
+                    {% endif %}
+                </td>
+                <td class="amount">
+                    {% if row.earning_amount > 0 %}{{ row.earning_amount|floatformat:2 }}{% else %}0.00{% endif %}
+                </td>
+                <td class="amount">
+                    {% if row.deduction_amount > 0 %}{{ row.deduction_amount|floatformat:2 }}{% else %}0.00{% endif %}
+                </td>
+            </tr>
+            {% endif %}
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="salario-totals" style="background-color: #F0F4FF; padding: 10px; border-radius: 5px; margin-top: 15px;">
+        <table style="border: none; width: 100%;">
+            <tr>
+                <td style="border: none;">Total Asignaciones:</td>
+                <td class="amount" style="border: none;">Bs. {{ payslip.total_income_vacaciones|floatformat:2 }}</td>
+                <td style="border: none;">Total Deducciones:</td>
+                <td class="amount" style="border: none;">Bs. {{ payslip.total_deductions_vacaciones|floatformat:2 }}
+                </td>
+            </tr>
+            <tr style="border-top: 1px solid #ccc;">
+                <td colspan="2" style="border: none; padding-top: 10px;">NETO A PAGAR VACACIONES:</td>
+                <td colspan="2" class="amount"
+                    style="border: none; padding-top: 10px; font-size: 14px; font-weight: bold; color: #0052FF;">
+                    Bs. {{ payslip.net_pay_vacaciones|floatformat:2 }}
+                </td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="firmas" style="margin-top: 40px; width: 100%;">
+        <div class="linea-firma"
+            style="border-top: 1px solid #000; width: 40%; display: inline-block; margin: 0 5%; text-align: center; padding-top: 5px; font-size: 9px;">
+            <br>Por la Empresa
+        </div>
+        <div class="linea-firma"
+            style="border-top: 1px solid #000; width: 40%; display: inline-block; margin: 0 5%; text-align: center; padding-top: 5px; font-size: 9px;">
+            <br>Recibí Conforme<br>C.I. {{ payslip.employee.national_id }}
+        </div>
+    </div>
+    <div class="footer"
+        style="margin-top: 20px; text-align: center; font-size: 8px; color: #999; border-top: 1px solid #eee; padding-top: 5px;">
+        Generado por Nóminix SaaS - {% now "d/m/Y H:i" %}
+    </div>
+</div>

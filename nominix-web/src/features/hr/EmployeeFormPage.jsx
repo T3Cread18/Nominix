@@ -16,7 +16,7 @@ import axiosClient from '../../api/axiosClient';
 
 import {
     ArrowLeft, Save, Briefcase, Calculator,
-    User, UserX, UserCheck, Shield
+    User, UserX, UserCheck, Shield, CalendarClock
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 
@@ -31,6 +31,7 @@ import EmployeeProfileForm from './components/EmployeeProfileForm';
 import LaborContractsManager from './contracts/LaborContractsManager';
 import EmployeeConcepts from './EmployeeConcepts';
 import ManageSocialBenefits from '../social-benefits/ManageSocialBenefits';
+import EmployeeVariationsTab from './components/EmployeeVariationsTab';
 
 const EmployeeFormPage = () => {
     const { id } = useParams();
@@ -293,6 +294,7 @@ const EmployeeFormPage = () => {
                         {isEditing && <TabsTrigger value="benefits" icon={Shield}>Prestaciones</TabsTrigger>}
                         {isEditing && <TabsTrigger value="contract" icon={Briefcase}>Contrato & Laboral</TabsTrigger>}
                         {isEditing && <TabsTrigger value="payroll" icon={Calculator}>Conceptos</TabsTrigger>}
+                        {isEditing && <TabsTrigger value="variations" icon={CalendarClock}>Incidencias</TabsTrigger>}
                     </TabsList>
 
                     <TabsContent value="profile">
@@ -338,6 +340,9 @@ const EmployeeFormPage = () => {
                                         employeeId={id}
                                     />
                                 </div>
+                            </TabsContent>
+                            <TabsContent value="variations">
+                                <EmployeeVariationsTab employeeId={id} />
                             </TabsContent>
                         </>
                     )}

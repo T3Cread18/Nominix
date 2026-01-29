@@ -12,7 +12,8 @@ from .views import (
     PayrollVariablesView, ValidateFormulaView, JobPositionViewSet,
     ConceptConfigMetadataView, PayrollPolicyView,
     # Social Benefits
-    SocialBenefitsViewSet, InterestRateBCVViewSet, ExchangeRateViewSet
+    SocialBenefitsViewSet, InterestRateBCVViewSet, ExchangeRateViewSet,
+    VariationCauseViewSet, EmployeeVariationViewSet
 )
 
 
@@ -39,6 +40,8 @@ router.register(r'loan-payments', LoanPaymentViewSet, basename='loan-payment')
 router.register(r'social-benefits', SocialBenefitsViewSet, basename='social-benefits')
 router.register(r'bcv-rates', InterestRateBCVViewSet, basename='bcv-rate')
 router.register(r'exchange-rates', ExchangeRateViewSet, basename='exchange-rate')
+router.register(r'variation-causes', VariationCauseViewSet, basename='variation-cause')
+router.register(r'employee-variations', EmployeeVariationViewSet, basename='employee-variation')
 
 urlpatterns = [
     path('company/config/', CompanyConfigView.as_view(), name='company-config'),

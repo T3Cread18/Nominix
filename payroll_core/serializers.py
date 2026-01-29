@@ -5,7 +5,8 @@ from .models import (
     PayrollNovelty, Company, Department, Loan, LoanPayment, JobPosition, ExchangeRate,
     PayrollPolicy,
     # Social Benefits
-    SocialBenefitsLedger, SocialBenefitsSettlement, InterestRateBCV
+    SocialBenefitsLedger, SocialBenefitsSettlement, InterestRateBCV,
+    VariationCause, EmployeeVariation
 )
 
 # ============================================================================
@@ -443,3 +444,21 @@ class QuarterlyGuaranteeSerializer(serializers.Serializer):
         required=False,
         help_text='Fecha del abono (default: hoy)'
     )
+
+
+class VariationCauseSerializer(serializers.ModelSerializer):
+    category_display = serializers.CharField(source='get_category_display', read_only=True)
+
+    class Meta:
+        model = VariationCause
+        fields = '__all__'
+
+class EmployeeVariationSerializer(serializers.ModelSerializer):
+    cause_name = serializers.CharField(source='cause.name', read_only=True)
+    employee_name = serializers.CharField(source='employee.full_name', read_only=True)
+
+    class Meta:
+        model = EmployeeVariation
+        fields = '__all__'
+        read_only_fields = ['created_at', 'updated_at', 'last_processed_date']
+
