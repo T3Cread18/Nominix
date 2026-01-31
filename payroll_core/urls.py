@@ -13,10 +13,8 @@ from .views import (
     ConceptConfigMetadataView, PayrollPolicyView,
     # Social Benefits
     SocialBenefitsViewSet, InterestRateBCVViewSet, ExchangeRateViewSet,
-    VariationCauseViewSet, EmployeeVariationViewSet
+    VariationCauseViewSet, EmployeeVariationViewSet, VacationBalanceViewSet
 )
-
-
 
 app_name = 'payroll_core'
 
@@ -42,6 +40,7 @@ router.register(r'bcv-rates', InterestRateBCVViewSet, basename='bcv-rate')
 router.register(r'exchange-rates', ExchangeRateViewSet, basename='exchange-rate')
 router.register(r'variation-causes', VariationCauseViewSet, basename='variation-cause')
 router.register(r'employee-variations', EmployeeVariationViewSet, basename='employee-variation')
+router.register(r'vacation-balances', VacationBalanceViewSet, basename='vacation-balance')
 
 urlpatterns = [
     path('company/config/', CompanyConfigView.as_view(), name='company-config'),

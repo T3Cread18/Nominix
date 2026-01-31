@@ -28,6 +28,10 @@ class Loan(models.Model):
         Paid = 'PAID', 'Pagado'            # Saldo 0
         Cancelled = 'CANCELLED', 'Anulado' # Cancelado administrativamente
 
+    class LoanType(models.TextChoices):
+        PERSONAL = 'PERSONAL', 'Préstamo Personal'
+        VACATION_ADVANCE = 'VACATION_ADVANCE', 'Anticipo de Vacaciones'
+
     class Frequency(models.TextChoices):
         ALL_PAYROLLS = 'ALL', 'Todas las Nóminas'
         SECOND_FORTNIGHT = '2ND_Q', 'Solo 2da Quincena (Fin de Mes)'
@@ -43,6 +47,22 @@ class Loan(models.Model):
         max_length=200,
         verbose_name='Descripción',
         help_text='Ej: Anticipo Prestaciones, Préstamo Personal'
+    )
+    
+    loan_type = models.CharField(
+        max_length=20,
+        choices=LoanType.choices,
+        default=LoanType.PERSONAL,
+        verbose_name='Tipo de Préstamo'
+    )
+    
+    vacation_balance = models.ForeignKey(
+        'VacationBalance',
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='advances',
+        verbose_name='Saldo de Vacaciones',
+        help_text='Asociado solo para anticipos de vacaciones'
     )
     
     # Datos Financieros

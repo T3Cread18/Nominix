@@ -19,7 +19,9 @@ from .concepts import PayrollConcept, EmployeeConcept
 from .payroll import PayrollPeriod, PayrollReceipt, PayrollReceiptLine, PayrollNovelty
 from .loans import Loan, LoanPayment
 from .variations import VariationCause, EmployeeVariation
+from .vacation import VacationBalance
 from .social_benefits import SocialBenefitsLedger, SocialBenefitsSettlement
+from .calendars import Holiday
 
 # Exponer todos los modelos a nivel de paquete para compatibilidad
 __all__ = [
@@ -40,6 +42,10 @@ __all__ = [
     # Variations
     'VariationCause',
     'EmployeeVariation',
+    # Vacations
+    'VacationBalance',
+    # Calendars
+    'Holiday',
     # Concepts
     'PayrollConcept',
     'EmployeeConcept',

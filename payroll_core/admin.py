@@ -6,7 +6,7 @@ monedas, tasas de cambio, empleados y contratos laborales.
 """
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import Currency, ExchangeRate, Employee, LaborContract, Branch, PayrollConcept, EmployeeConcept, Loan, LoanPayment
+from .models import Currency, ExchangeRate, Employee, LaborContract, Branch, PayrollConcept, EmployeeConcept, Loan, LoanPayment, VacationBalance, Holiday
 from typing import Tuple, List, Optional
 
 
@@ -426,3 +426,104 @@ class LaborContractAdmin(admin.ModelAdmin):
         )
     is_active_display.short_description = 'Estado'
     is_active_display.admin_order_field = 'is_active'
+
+
+@admin.register(VacationBalance)
+class VacationBalanceAdmin(admin.ModelAdmin):
+    """
+    Administrador del modelo VacationBalance.
+    Permite gestionar saldos de vacaciones por empleado y año de servicio.
+    """
+    
+    list_display = (
+        'employee',
+        'service_year',
+        'entitled_vacation_days',
+        'used_vacation_days',
+        'remaining_days_display',
+        'bonus_status_display',
+        'period_start',
+        'period_end',
+    )
+    
+    list_filter = (
+        'service_year',
+        'bonus_paid',
+        'period_start',
+    )
+    
+    search_fields = (
+        'employee__first_name',
+        'employee__last_name',
+        'employee__national_id',
+    )
+    
+    ordering = ('employee', '-service_year')
+    
+    readonly_fields = ('created_at', 'updated_at')
+    
+    raw_id_fields = ('employee', 'contract')
+    
+    fieldsets = (
+        ('Empleado y Período', {
+            'fields': (
+                'employee',
+                'contract',
+                ('service_year', 'period_start', 'period_end'),
+            )
+        }),
+        ('Días de Vacaciones', {
+            'fields': (
+                ('entitled_vacation_days', 'used_vacation_days'),
+            )
+        }),
+        ('Bono Vacacional', {
+            'fields': (
+                ('entitled_bonus_days', 'bonus_paid', 'bonus_paid_date'),
+            )
+        }),
+        ('Notas y Auditoría', {
+            'fields': ('notes', 'created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def remaining_days_display(self, obj):
+        days = obj.remaining_days
+        if days == 0:
+            return format_html('<span style="color: #6c757d;">0 días</span>')
+        return format_html('<span style="color: #28a745; font-weight: bold;">{} días</span>', days)
+    remaining_days_display.short_description = 'Disponibles'
+    
+    def bonus_status_display(self, obj):
+        if obj.bonus_paid:
+            return format_html(
+                '<span style="color: #28a745;">✓ Pagado</span>'
+            )
+        return format_html(
+            '<span style="color: #dc3545;">✗ Pendiente</span>'
+        )
+    bonus_status_display.short_description = 'Bono'
+
+
+@admin.register(Holiday)
+class HolidayAdmin(admin.ModelAdmin):
+    list_display = ('date', 'name', 'is_recurring', 'active', 'upcoming_date')
+    list_filter = ('is_recurring', 'active')
+    search_fields = ('name',)
+    date_hierarchy = 'date'
+    ordering = ('date',)
+    
+    def upcoming_date(self, obj):
+        from django.utils import timezone
+        today = timezone.now().date()
+        try:
+            current_year_date = obj.date.replace(year=today.year)
+            if current_year_date < today:
+                return obj.date.replace(year=today.year + 1)
+            return current_year_date
+        except ValueError:
+            # Para 29 de feb en años no bisiestos
+            return None
+    upcoming_date.short_description = 'Próxima Fecha'
+

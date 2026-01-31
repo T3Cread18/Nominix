@@ -6,7 +6,7 @@ from .models import (
     PayrollPolicy,
     # Social Benefits
     SocialBenefitsLedger, SocialBenefitsSettlement, InterestRateBCV,
-    VariationCause, EmployeeVariation
+    VariationCause, EmployeeVariation, VacationBalance
 )
 
 # ============================================================================
@@ -76,7 +76,8 @@ class PayrollConceptSerializer(serializers.ModelSerializer):
             'active', 'formula', 'show_on_payslip', 'appears_on_receipt',
             'show_even_if_zero', 'receipt_order', 'is_system', 
             'incidences', 'behavior', 'behavior_display', 'system_params',
-            'calculation_base', 'deducts_from_base_salary', 'adds_to_complement'
+            'calculation_base', 'deducts_from_base_salary', 'adds_to_complement',
+            'tipo_recibo'
         ]
         read_only_fields = ['is_system']
 
@@ -276,7 +277,7 @@ class CompanySerializer(serializers.ModelSerializer):
 
 class PayrollPolicySerializer(serializers.ModelSerializer):
     """
-    Serializer para Políticas de Nómina (factores de recargo).
+    Serializer para Políticas de Nómina (factores de recargo y vacaciones).
     """
     company_name = serializers.CharField(source='company.name', read_only=True)
     
@@ -284,9 +285,15 @@ class PayrollPolicySerializer(serializers.ModelSerializer):
         model = PayrollPolicy
         fields = [
             'id', 'company', 'company_name',
+            # Factores de recargo existentes
             'holiday_payout_factor', 'rest_day_payout_factor',
             'overtime_day_factor', 'overtime_night_factor',
-            'night_bonus_rate', 'updated_at'
+            'night_bonus_rate',
+            # Factores de vacaciones (LOTTT)
+            'vacation_days_base', 'vacation_days_per_year', 'vacation_days_max',
+            'vacation_bonus_days_base', 'vacation_bonus_days_per_year', 'vacation_bonus_days_max',
+            # Metadata
+            'updated_at'
         ]
         read_only_fields = ['company', 'updated_at']
 
@@ -455,10 +462,26 @@ class VariationCauseSerializer(serializers.ModelSerializer):
 
 class EmployeeVariationSerializer(serializers.ModelSerializer):
     cause_name = serializers.CharField(source='cause.name', read_only=True)
+    cause_category = serializers.CharField(source='cause.category', read_only=True)
     employee_name = serializers.CharField(source='employee.full_name', read_only=True)
 
     class Meta:
         model = EmployeeVariation
         fields = '__all__'
         read_only_fields = ['created_at', 'updated_at', 'last_processed_date']
+
+
+class VacationBalanceSerializer(serializers.ModelSerializer):
+    employee_name = serializers.CharField(source='employee.full_name', read_only=True)
+    
+    class Meta:
+        model = VacationBalance
+        fields = [
+            'id', 'employee', 'employee_name', 'contract', 'service_year',
+            'period_start', 'period_end', 'entitled_vacation_days',
+            'entitled_bonus_days', 'used_vacation_days', 'bonus_paid',
+            'bonus_paid_date', 'notes', 'remaining_days', 
+            'is_fully_consumed', 'is_complete', 'created_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at', 'remaining_days', 'is_fully_consumed', 'is_complete']
 

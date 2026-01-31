@@ -47,6 +47,24 @@ const variationsService = {
     getNoveltiesPreview: async (periodId) => {
         const response = await axiosClient.get(`/payroll-novelties/preview/?period=${periodId}`);
         return response.data;
+    },
+
+    // --- EXPORTAR RECIBO (PDF) ---
+    exportPdf: async (variationId) => {
+        const response = await axiosClient.get(`/employee-variations/${variationId}/export-pdf/`, {
+            responseType: 'blob'
+        });
+
+        // Crear un link temporal para la descarga
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `recibo_vacaciones_${variationId}.pdf`);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+
+        return true;
     }
 };
 

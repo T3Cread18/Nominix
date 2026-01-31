@@ -32,6 +32,7 @@ import LaborContractsManager from './contracts/LaborContractsManager';
 import EmployeeConcepts from './EmployeeConcepts';
 import ManageSocialBenefits from '../social-benefits/ManageSocialBenefits';
 import EmployeeVariationsTab from './components/EmployeeVariationsTab';
+import VacationManager from './components/vacations/VacationManager';
 
 const EmployeeFormPage = () => {
     const { id } = useParams();
@@ -295,6 +296,7 @@ const EmployeeFormPage = () => {
                         {isEditing && <TabsTrigger value="contract" icon={Briefcase}>Contrato & Laboral</TabsTrigger>}
                         {isEditing && <TabsTrigger value="payroll" icon={Calculator}>Conceptos</TabsTrigger>}
                         {isEditing && <TabsTrigger value="variations" icon={CalendarClock}>Incidencias</TabsTrigger>}
+                        {isEditing && <TabsTrigger value="vacations" icon={CalendarClock}>Vacaciones</TabsTrigger>}
                     </TabsList>
 
                     <TabsContent value="profile">
@@ -343,6 +345,11 @@ const EmployeeFormPage = () => {
                             </TabsContent>
                             <TabsContent value="variations">
                                 <EmployeeVariationsTab employeeId={id} />
+                            </TabsContent>
+                            <TabsContent value="vacations">
+                                <div className="bg-white p-8 rounded-[2rem] border border-gray-100">
+                                    <VacationManager employeeId={id} />
+                                </div>
                             </TabsContent>
                         </>
                     )}

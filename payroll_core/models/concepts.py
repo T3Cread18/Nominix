@@ -180,6 +180,20 @@ Variables especiales para ajuste: VALOR_BASE, CANTIDAD, MONTO_CALCULADO, y todos
         help_text='Si es True, el monto resultante se suma a la variable COMPLEMENTO_MENSUAL/PERIOD en el cálculo.'
     )
 
+    class TipoRecibo(models.TextChoices):
+        """Tipo de recibo donde aparece el concepto."""
+        SALARIO = 'salario', 'Salario Base'
+        COMPLEMENTO = 'complemento', 'Complemento'
+        CESTATICKET = 'cestaticket', 'Cestaticket'
+        VACACIONES = 'vacaciones', 'Vacaciones'
+
+    tipo_recibo: models.CharField = models.CharField(
+        max_length=20,
+        choices=TipoRecibo.choices,
+        default=TipoRecibo.SALARIO,
+        verbose_name='Tipo de Recibo',
+        help_text='Determina en qué tipo de recibo aparecerá este concepto.'
+    )
 
     class Meta:
         verbose_name = 'Concepto de Nómina'

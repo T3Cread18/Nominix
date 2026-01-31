@@ -189,7 +189,8 @@ export default function ConceptFormBuilder({ initialData, onSave, onCancel }) {
             calculation_base: initialData?.calculation_base || 'TOTAL',
             receipt_order: initialData?.receipt_order || 0,
             deducts_from_base_salary: initialData?.deducts_from_base_salary ?? false,
-            adds_to_complement: initialData?.adds_to_complement ?? false
+            adds_to_complement: initialData?.adds_to_complement ?? false,
+            tipo_recibo: initialData?.tipo_recibo || 'salario'
         }
     });
 
@@ -591,6 +592,19 @@ export default function ConceptFormBuilder({ initialData, onSave, onCancel }) {
                                 )}
                                 <div className="pt-2">
                                     <CustomInput label="Orden en Recibo" type="number" icon={ArrowUpDown} {...register('receipt_order')} />
+                                </div>
+                                <div className="pt-2">
+                                    <CustomSelect
+                                        label="Tipo de Recibo"
+                                        icon={Layers}
+                                        {...register('tipo_recibo')}
+                                        options={[
+                                            { value: 'salario', label: 'Salario Base' },
+                                            { value: 'complemento', label: 'Complemento' },
+                                            { value: 'cestaticket', label: 'Cestaticket' },
+                                            { value: 'vacaciones', label: 'Vacaciones' }
+                                        ]}
+                                    />
                                 </div>
                             </div>
                         </FormSection>

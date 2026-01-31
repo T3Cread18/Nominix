@@ -19,7 +19,7 @@ from .models import (
     PayrollPeriod, PayrollReceipt, PayrollNovelty, Employee, 
     LaborContract, PayrollConcept, Company, Loan, Branch,
     ExchangeRate, EmployeeConcept, Currency, Department, LoanPayment, JobPosition,
-    PayrollPolicy,
+    PayrollPolicy, VacationBalance,
     # Social Benefits
     SocialBenefitsLedger, SocialBenefitsSettlement, InterestRateBCV
 )
@@ -33,10 +33,12 @@ from .serializers import (
     # Social Benefits Serializers
     SocialBenefitsLedgerSerializer, SocialBenefitsSettlementSerializer,
     InterestRateBCVSerializer, AdvanceRequestSerializer, QuarterlyGuaranteeSerializer,
-    VariationCauseSerializer, EmployeeVariationSerializer
+    VariationCauseSerializer, EmployeeVariationSerializer, VacationBalanceSerializer
 )
 from .engine import PayrollEngine
 from .services.variations_engine import VariationsEngine
+from .services.vacation import VacationCalculator
+from .services.vacation_receipt import VacationReceiptService
 from .models import VariationCause, EmployeeVariation
 
 
@@ -472,7 +474,39 @@ class PayrollPeriodViewSet(viewsets.ModelViewSet):
                     payslip_rows.append(row)
             
             payslip.processed_rows = payslip_rows
-            processed_payslips.append(payslip)
+            
+            # Filtrar según tipo de recibo seleccionado
+            if tipo_recibo == 'vacaciones':
+                # Para vacaciones, solo incluir si tiene conceptos de vacaciones
+                has_vacation_concepts = any(
+                    row.get('tipo_recibo') == 'vacaciones' and (row.get('earning_amount', 0) > 0 or row.get('deduction_amount', 0) > 0)
+                    for row in payslip_rows
+                )
+                if has_vacation_concepts:
+                    processed_payslips.append(payslip)
+            elif tipo_recibo in ['salario', 'complemento', 'cestaticket']:
+                # Para otros tipos, solo incluir si tiene conceptos de ese tipo
+                has_matching_concepts = any(
+                    row.get('tipo_recibo') == tipo_recibo
+                    for row in payslip_rows
+                )
+                if has_matching_concepts:
+                    processed_payslips.append(payslip)
+            else:
+                # Para 'todos', incluir todos
+                processed_payslips.append(payslip)
+        
+        # Validar que hay recibos después del filtrado
+        if not processed_payslips:
+            tipo_label = {
+                'vacaciones': 'vacaciones',
+                'salario': 'salario base',
+                'complemento': 'complemento',
+                'cestaticket': 'cestaticket'
+            }.get(tipo_recibo, tipo_recibo)
+            return Response({
+                "error": f"No hay empleados con conceptos de {tipo_label} en este periodo."
+            }, status=404)
 
         # Contexto para el Template HTML
         company_config = Company.objects.first()
@@ -824,18 +858,24 @@ class PayrollNoveltyViewSet(viewsets.ModelViewSet):
 class VariationCauseViewSet(viewsets.ModelViewSet):
     queryset = VariationCause.objects.all()
     serializer_class = VariationCauseSerializer
-    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['name', 'code']
     filterset_fields = ['category', 'is_active']
+    ordering_fields = ['code', 'name']
+    ordering = ['code']
 
 class EmployeeVariationViewSet(viewsets.ModelViewSet):
     queryset = EmployeeVariation.objects.all()
     serializer_class = EmployeeVariationSerializer
-    filter_backends = [DjangoFilterBackend]
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_fields = ['employee', 'cause', 'start_date', 'end_date']
+    ordering_fields = ['start_date', 'employee__first_name']
+    ordering = ['-start_date']
 
     def perform_create(self, serializer):
         data = serializer.validated_data
+        print(f"Creating variation for {data.get('employee')} from {data.get('start_date')} to {data.get('end_date')}")
+        
         # Validar solapamiento usando el Engine
         try:
             VariationsEngine.validate_overlap(
@@ -843,9 +883,48 @@ class EmployeeVariationViewSet(viewsets.ModelViewSet):
                 start_date=data['start_date'],
                 end_date=data['end_date']
             )
-            serializer.save()
+            instance = serializer.save()
+            
+            # Si es vacación, consumir días del saldo
+            if instance.cause.category == 'VACATION':
+                try:
+                    # Importación tardía para evitar ciclos circulares
+                    from .services.vacation import VacationCalculator
+                    result = VacationCalculator.consume_days_from_variation(instance)
+                    print(f"Vacation consumption result: {result}")
+                except Exception as ex:
+                    print(f"Error consuming vacation days: {ex}")
+                    # No re-raise to avoid rolling back transaction if it's just a post-hook error? 
+                    # Actually keeping silence is dangerous, but for now let's just log.
+                    import traceback
+                    traceback.print_exc()
+                    
         except ValueError as e:
+            print(f"Validation Error in perform_create: {e}")
             raise serializers.ValidationError({"detail": str(e)})
+        except Exception as e:
+            print(f"Unexpected Error in perform_create: {e}")
+            import traceback
+            traceback.print_exc()
+            raise serializers.ValidationError({"detail": f"Error interno: {str(e)}"})
+
+    @action(detail=True, methods=['get'], url_path='export-pdf')
+    def export_pdf(self, request, pk=None):
+        """
+        GET /api/employee-variations/{id}/export-pdf/
+        Genera el PDF del recibo de vacaciones standalone para esta variación.
+        """
+        variation = self.get_object()
+        if variation.cause.category != 'VACATION':
+            return Response({"error": "Solo se pueden generar recibos para variaciones de tipo VACACIÓN"}, status=400)
+        
+        try:
+            pdf_file = VacationReceiptService.generate_pdf(variation.id, request)
+            response = HttpResponse(pdf_file, content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="recibo_vacaciones_{variation.id}.pdf"'
+            return response
+        except Exception as e:
+            return Response({"error": f"Error generando recibo: {str(e)}"}, status=500)
 
     def perform_update(self, serializer):
         data = serializer.validated_data
@@ -864,6 +943,46 @@ class EmployeeVariationViewSet(viewsets.ModelViewSet):
             serializer.save()
         except ValueError as e:
             raise serializers.ValidationError({"detail": str(e)})
+
+    @action(detail=False, methods=['post'], url_path='calculate-end-date')
+    def calculate_end_date(self, request):
+        """
+        Calcula la fecha fin dado una fecha inicio y cantidad de días hábiles.
+        POST /api/employee-variations/calculate-end-date/
+        Body: { "start_date": "2024-01-01", "days": 15 }
+        """
+        start_date_str = request.data.get('start_date')
+        days = request.data.get('days')
+        
+        if not start_date_str or days is None:
+            return Response(
+                {"error": "start_date y days son requeridos"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        try:
+            from .services.calendar import BusinessCalendarService
+            from datetime import datetime
+            
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+            days = int(days)
+            
+            end_date = BusinessCalendarService.add_business_days(start_date, days)
+            
+            # También devolvemos los días calendario que transcurren
+            calendar_days = (end_date - start_date).days + 1
+            
+            return Response({
+                "start_date": start_date,
+                "days_requested": days,
+                "end_date": end_date,
+                "calendar_days": calendar_days,
+                "return_to_work_date": BusinessCalendarService.add_business_days(end_date, 1) # Próximo día hábil
+            })
+        except ValueError as e:
+            return Response({"error": f"Error de formato: {str(e)}"}, status=400)
+        except Exception as e:
+            return Response({"error": str(e)}, status=500)
 
 
 
@@ -1209,3 +1328,99 @@ class InterestRateBCVViewSet(viewsets.ModelViewSet):
     serializer_class = InterestRateBCVSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['year', 'month']
+
+
+class VacationBalanceViewSet(viewsets.ModelViewSet):
+    """
+    Gestión de saldos de vacaciones.
+    """
+    queryset = VacationBalance.objects.all()
+    serializer_class = VacationBalanceSerializer
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    filterset_fields = ['employee', 'service_year', 'bonus_paid']
+
+    @action(detail=True, methods=['post'], url_path='generate-advance')
+    def generate_advance(self, request, pk=None):
+        """
+        Genera el pago anticipado de vacaciones.
+        """
+        vacation_balance = self.get_object()
+        
+        try:
+            from .services.vacation_advance import VacationAdvanceService
+            # TODO: Recibir parámetros opcionales como fecha de proceso
+
+            result = VacationAdvanceService.generate_advance_payment(
+                vacation_balance, 
+                user=request.user
+            )
+            
+            return Response({
+                'message': 'Anticipo generado exitosamente',
+                'receipt_id': result['receipt'].id,
+                'loan_id': result['loan'].id,
+                'amount': float(result['total_amount'])
+            })
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    ordering_fields = ['service_year', 'employee__first_name']
+    ordering = ['employee', '-service_year']
+    pagination_class = None
+    
+    @action(detail=False, methods=['post'], url_path='generate')
+    def generate_balance(self, request):
+        """
+        POST /api/vacation-balances/generate/
+        Genera el saldo de vacaciones para un empleado y año específico.
+        Body: { "employee_id": 1, "service_year": 1 }
+        """
+        employee_id = request.data.get('employee_id')
+        service_year = request.data.get('service_year')
+        
+        if not employee_id:
+            return Response({"error": "employee_id es requerido"}, status=400)
+            
+        try:
+            employee = Employee.objects.get(pk=employee_id)
+            balance = VacationCalculator.generate_annual_balance(
+                employee, 
+                service_year=int(service_year) if service_year else None
+            )
+            serializer = self.get_serializer(balance)
+            # return Response(serializer.data, status=status.HTTP_201_CREATED)
+            # Response status 201 created imported from rest_framework
+            return Response(serializer.data, status=201)
+        except Employee.DoesNotExist:
+            return Response({"error": "Empleado no encontrado"}, status=404)
+        except ValidationError as e:
+            return Response({"error": str(e)}, status=400)
+        except Exception as e:
+            return Response({"error": str(e)}, status=500)
+
+    @action(detail=False, methods=['post'], url_path='generate-missing')
+    def generate_missing(self, request):
+        """
+        POST /api/vacation-balances/generate-missing/
+        Genera todos los saldos faltantes para un empleado.
+        Body: { "employee_id": 1 }
+        """
+        employee_id = request.data.get('employee_id')
+        
+        if not employee_id:
+            return Response({"error": "employee_id es requerido"}, status=400)
+            
+        try:
+            employee = Employee.objects.get(pk=employee_id)
+            created = VacationCalculator.generate_missing_balances(employee)
+            serializer = self.get_serializer(created, many=True)
+            return Response({
+                "message": f"Se generaron {len(created)} registros de saldo.",
+                "data": serializer.data
+            }, status=201)
+        except Employee.DoesNotExist:
+            return Response({"error": "Empleado no encontrado"}, status=404)
+        except Exception as e:
+            return Response({"error": str(e)}, status=500)

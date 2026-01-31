@@ -198,14 +198,31 @@ const EmployeeVariationsTab = ({ employeeId }) => {
                                 </div>
                             </div>
 
-                            {!v.is_processed && (
-                                <button
-                                    onClick={() => handleDelete(v.id)}
-                                    className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                                >
-                                    <Trash2 size={16} />
-                                </button>
-                            )}
+                            <div className="flex items-center gap-2">
+                                {v.cause_category === 'VACATION' && (
+                                    <button
+                                        onClick={async () => {
+                                            try {
+                                                await variationsService.exportPdf(v.id);
+                                            } catch (error) {
+                                                toast.error("Error al descargar recibo");
+                                            }
+                                        }}
+                                        title="Descargar Recibo de Vacaciones"
+                                        className="p-2 text-nominix-electric hover:bg-nominix-electric/10 rounded-lg transition-colors"
+                                    >
+                                        <FileText size={16} />
+                                    </button>
+                                )}
+                                {!v.is_processed && (
+                                    <button
+                                        onClick={() => handleDelete(v.id)}
+                                        className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     ))}
                 </div>

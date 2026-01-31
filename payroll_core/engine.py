@@ -17,7 +17,9 @@ from .models import (
     PayrollPeriod, 
     PayrollNovelty,
     Company,
-    Loan
+    Loan,
+    EmployeeVariation,
+    VariationCause
 )
 from .services.salary import SalarySplitter
 from .services.variations_engine import VariationsEngine
@@ -91,13 +93,51 @@ class PayrollEngine:
                 # TODO: Pasar metadata completa al procesar concepto.
 
     def _load_novelties_from_db(self) -> Dict[str, float]:
-        if not self.period:
+        if not self.period or getattr(self.period, 'id', 0) == 0:
             return {}
         novelties = PayrollNovelty.objects.filter(employee=self.contract.employee, period=self.period)
         variables = {}
         for nov in novelties:
             variables[nov.concept_code] = float(nov.amount)
         return variables
+
+    def _calculate_vacation_mondays(self) -> int:
+        """
+        Cuenta los lunes que caen dentro de períodos de vacaciones del empleado
+        durante el período de nómina actual.
+        
+        Esto permite excluir esos lunes del cálculo de deducciones de ley (IVSS, FAOV, RPE)
+        ya que el empleado no estaba trabajando esos días.
+        
+        Returns:
+            int: Número de lunes dentro de períodos de vacaciones que se solapan con el período actual.
+        """
+        if not self.period:
+            return 0
+        
+        vacation_mondays = 0
+        
+        # Obtener variaciones de vacaciones que se solapan con el período
+        vacation_variations = EmployeeVariation.objects.filter(
+            employee=self.contract.employee,
+            cause__category=VariationCause.Category.VACATION,
+            start_date__lte=self.period.end_date,
+            end_date__gte=self.period.start_date
+        )
+        
+        for var in vacation_variations:
+            # Calcular intersección de fechas
+            effective_start = max(self.period.start_date, var.start_date)
+            effective_end = min(self.period.end_date, var.end_date)
+            
+            # Contar lunes dentro de la intersección
+            curr = effective_start
+            while curr <= effective_end:
+                if curr.weekday() == 0:  # Lunes
+                    vacation_mondays += 1
+                curr += timedelta(days=1)
+        
+        return vacation_mondays
 
     def _get_exchange_rate_value(self, target_currency: Currency) -> Decimal:
         if target_currency.code == 'VES': return Decimal('1.00')
@@ -513,7 +553,11 @@ class PayrollEngine:
             'DIAS_SABADO': 0.0,  # Por defecto 0 (pedido por usuario)
             'DIAS_DOMINGO': 0.0, # Por defecto 0 (pedido por usuario)
             'DIAS_FERIADO': 0.0, # Por defecto 0 (pedido por usuario)
-            'LUNES': mondays,
+            
+            # Lunes efectivos para deducciones de ley (excluye lunes de vacaciones)
+            'LUNES': mondays - self._calculate_vacation_mondays(),  # Ajustado
+            'LUNES_TOTALES': mondays,  # Lunes totales del calendario (sin ajustar)
+            'LUNES_VACACIONES': self._calculate_vacation_mondays(),  # Lunes en vacaciones (auditoría)
             
             # Defaults para evitar errores
             'OVERTIME_HOURS': 0.0,
@@ -550,6 +594,34 @@ class PayrollEngine:
                 'TASA_BONO_NOCTURNO': float(policy.night_bonus_rate),
                 'FACTOR_FERIADO': float(policy.holiday_payout_factor),
                 'FACTOR_DESCANSO': float(policy.rest_day_payout_factor),
+            })
+            
+            # Calcular días de vacaciones según antigüedad (LOTTT Venezuela)
+            seniority = self.contract.employee.seniority_years
+            
+            # Días de disfrute: base + (antigüedad - 1) * adicionales, máximo permitido
+            vacation_days = min(
+                policy.vacation_days_base + max(seniority - 1, 0) * policy.vacation_days_per_year,
+                policy.vacation_days_max
+            )
+            
+            # Días de bono vacacional: base + (antigüedad - 1) * adicionales, máximo permitido
+            vacation_bonus_days = min(
+                policy.vacation_bonus_days_base + max(seniority - 1, 0) * policy.vacation_bonus_days_per_year,
+                policy.vacation_bonus_days_max
+            )
+            
+            # Inyectar variables para uso en fórmulas
+            context.update({
+                'DIAS_VACACIONES_LEY': vacation_days,        # Días de disfrute según antigüedad
+                'BONO_VACACIONAL_DIAS_LEY': vacation_bonus_days,  # Días de bono según antigüedad
+                # Factores de política de vacaciones (para referencia en fórmulas)
+                'VACACIONES_BASE': policy.vacation_days_base,
+                'VACACIONES_MAX': policy.vacation_days_max,
+                'VACACIONES_INCREMENTO': policy.vacation_days_per_year,
+                'BONO_VAC_BASE': policy.vacation_bonus_days_base,
+                'BONO_VAC_MAX': policy.vacation_bonus_days_max,
+                'BONO_VAC_INCREMENTO': policy.vacation_bonus_days_per_year,
             })
 
         # Mapeo de códigos de novedades (DB) a nombres de variables (Fórmulas)
@@ -941,7 +1013,7 @@ class PayrollEngine:
             trace = ""
             variables = {}
             formula = concept.formula
-            tipo_recibo = 'salario'
+            tipo_recibo = getattr(concept, 'tipo_recibo', 'salario') or 'salario'
 
             if concept.behavior == PayrollConcept.ConceptBehavior.SALARY_BASE:
                 # --- PRE-CÁLCULO DE DÍAS DEDUCIDOS ---
@@ -1183,7 +1255,7 @@ class PayrollEngine:
                     'name': concept.name,
                     'kind': concept.kind,
                     'amount_ves': amount,
-                    'tipo_recibo': 'salario',
+                    'tipo_recibo': getattr(concept, 'tipo_recibo', 'salario') or 'salario',
                     'trace': trace,
                     'formula': formula,
                     'variables': variables
@@ -1223,9 +1295,17 @@ class PayrollEngine:
                  trace_loan += f" * {float(l_rate):.4f} (Tasa)"
 
             if amount_ves > 0:
+                # Determinar código y nombre según tipo de préstamo
+                loan_code = 'LOAN'
+                loan_name = f"Préstamo: {loan.description}"
+                
+                if getattr(loan, 'loan_type', None) == Loan.LoanType.VACATION_ADVANCE:
+                    loan_code = 'ANTICIPO_VACACIONES'
+                    loan_name = f"Deducción Anticipo Vacaciones ({loan.description})"
+
                 results_lines.append({
-                    'code': 'LOAN',
-                    'name': f"Préstamo: {loan.description}",
+                    'code': loan_code,
+                    'name': loan_name,
                     'kind': 'DEDUCTION',
                     'amount_ves': amount_ves,
                     'tipo_recibo': 'salario',

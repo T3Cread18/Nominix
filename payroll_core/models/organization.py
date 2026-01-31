@@ -401,6 +401,48 @@ class PayrollPolicy(models.Model):
         verbose_name="Bono Nocturno (%)",
         help_text="Porcentaje de recargo por bono nocturno (ej: 0.30 = 30%)"
     )
+    
+    # ==========================================================================
+    # FACTORES DE VACACIONES (LOTTT Venezuela)
+    # ==========================================================================
+    
+    # Días de Disfrute de Vacaciones
+    vacation_days_base = models.PositiveSmallIntegerField(
+        default=15,
+        verbose_name="Días Base Vacaciones",
+        help_text="Días hábiles de vacaciones para el primer año de servicio (LOTTT: 15)"
+    )
+    
+    vacation_days_per_year = models.PositiveSmallIntegerField(
+        default=1,
+        verbose_name="Días Adicionales por Año",
+        help_text="Días adicionales por cada año de servicio (LOTTT: 1)"
+    )
+    
+    vacation_days_max = models.PositiveSmallIntegerField(
+        default=30,
+        verbose_name="Máximo Días Vacaciones",
+        help_text="Máximo de días de vacaciones permitidos (LOTTT: 30)"
+    )
+    
+    # Bono Vacacional
+    vacation_bonus_days_base = models.PositiveSmallIntegerField(
+        default=15,
+        verbose_name="Días Base Bono Vacacional",
+        help_text="Días de salario para bono vacacional el primer año (LOTTT: 15)"
+    )
+    
+    vacation_bonus_days_per_year = models.PositiveSmallIntegerField(
+        default=1,
+        verbose_name="Días Adicionales Bono por Año",
+        help_text="Días adicionales de bono por cada año de servicio (LOTTT: 1)"
+    )
+    
+    vacation_bonus_days_max = models.PositiveSmallIntegerField(
+        default=30,
+        verbose_name="Máximo Días Bono Vacacional",
+        help_text="Máximo de días para bono vacacional (LOTTT: 30)"
+    )
 
     updated_at = models.DateTimeField(auto_now=True)
 

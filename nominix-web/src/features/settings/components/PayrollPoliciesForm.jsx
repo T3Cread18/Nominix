@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { usePayrollPolicies, useUpdatePayrollPolicies } from '../../../hooks/useOrganization';
 import { Button, Card, InputField } from '../../../components/ui';
 import { SkeletonForm } from '../../../components/ui/Skeleton';
-import { Save, Calculator, Clock, Percent, Info } from 'lucide-react';
+import { Save, Calculator, Clock, Percent, Info, Sun, CircleDollarSign } from 'lucide-react';
 
 const PayrollPoliciesForm = () => {
     const { data: policies, isLoading } = usePayrollPolicies();
@@ -102,6 +102,70 @@ const PayrollPoliciesForm = () => {
                                 placeholder="Ej: 0.30"
                                 {...register('night_bonus_rate', { valueAsNumber: true })}
                             />
+                        </div>
+                    </Card.Section>
+                </Card>
+
+                <Card>
+                    <Card.Section
+                        title="Políticas de Vacaciones"
+                        icon={Sun}
+                        description="Parámetros según LOTTT para el cálculo de días de disfrute y bono vacacional"
+                    >
+                        <div className="space-y-8">
+                            <div>
+                                <h4 className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-4 opacity-70 uppercase tracking-tight">
+                                    <Sun size={14} className="text-nominix-blue" />
+                                    Días de Disfrute
+                                </h4>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    <InputField
+                                        label="Días Base"
+                                        type="number"
+                                        placeholder="15"
+                                        {...register('vacation_days_base', { valueAsNumber: true })}
+                                    />
+                                    <InputField
+                                        label="Días por Año"
+                                        type="number"
+                                        placeholder="1"
+                                        {...register('vacation_days_per_year', { valueAsNumber: true })}
+                                    />
+                                    <InputField
+                                        label="Días Máximo"
+                                        type="number"
+                                        placeholder="30"
+                                        {...register('vacation_days_max', { valueAsNumber: true })}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="pt-4 border-t border-gray-100/50">
+                                <h4 className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-4 opacity-70 uppercase tracking-tight">
+                                    <CircleDollarSign size={14} className="text-nominix-blue" />
+                                    Bono Vacacional
+                                </h4>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    <InputField
+                                        label="Días Base"
+                                        type="number"
+                                        placeholder="15"
+                                        {...register('vacation_bonus_days_base', { valueAsNumber: true })}
+                                    />
+                                    <InputField
+                                        label="Días por Año"
+                                        type="number"
+                                        placeholder="1"
+                                        {...register('vacation_bonus_days_per_year', { valueAsNumber: true })}
+                                    />
+                                    <InputField
+                                        label="Días Máximo"
+                                        type="number"
+                                        placeholder="30"
+                                        {...register('vacation_bonus_days_max', { valueAsNumber: true })}
+                                    />
+                                </div>
+                            </div>
                         </div>
                     </Card.Section>
                 </Card>

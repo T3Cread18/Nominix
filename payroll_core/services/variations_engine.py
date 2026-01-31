@@ -3,6 +3,7 @@ from typing import List, Dict, Tuple, Any
 from django.db.models import Q
 from ..models.variations import EmployeeVariation
 from ..models.payroll import PayrollPeriod
+from .calendar import BusinessCalendarService
 
 class VariationsEngine:
     """
@@ -56,7 +57,7 @@ class VariationsEngine:
             # Min(fin_periodo, fin_var)
             effective_end = min(period_end, var.end_date)
             
-            # Días efectivos en este periodo
+            # Días efectivos en este periodo (calendario)
             days_in_period = (effective_end - effective_start).days + 1
             
             if days_in_period <= 0:
@@ -68,14 +69,18 @@ class VariationsEngine:
 
             # 2. Generación de Concepto de Pago (Novedad)
             if var.cause.pay_concept_code:
-                # Determinar tipo de recibo
+                # Determinar tipo de recibo y cantidad
                 tipo_recibo = 'salario'
+                amount = days_in_period
+                
                 if var.cause.category == 'VACATION':
                     tipo_recibo = 'vacaciones'
+                    # Para vacaciones, pagamos DÍAS HÁBILES
+                    amount = BusinessCalendarService.count_business_days(effective_start, effective_end)
                 
                 novelties.append({
                     'concept_code': var.cause.pay_concept_code,
-                    'amount': days_in_period,
+                    'amount': amount,
                     'tipo_recibo': tipo_recibo,
                     'notes': f"Variación: {var.cause.name} ({effective_start} - {effective_end})"
                 })
