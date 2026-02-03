@@ -1,7 +1,13 @@
 """
 Servicios de la aplicación Payroll Core.
 """
-from .currency import SalaryConverter, BCVRateService, CurrencyNotFoundError, ExchangeRateNotFoundError
+from .currency import (
+    SalaryConverter, 
+    BCVRateService, 
+    CurrencyNotFoundError, 
+    ExchangeRateNotFoundError,
+    get_usd_exchange_rate,
+)
 from .employee import EmployeeService
 from .payroll import PayrollProcessor
 from .social_benefits_engine import (
@@ -19,6 +25,7 @@ __all__ = [
     'BCVRateService',
     'CurrencyNotFoundError',
     'ExchangeRateNotFoundError',
+    'get_usd_exchange_rate',
     'EmployeeService',
     'PayrollProcessor',
     # Social Benefits Engine

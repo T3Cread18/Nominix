@@ -130,6 +130,18 @@ Para FIXED_AMOUNT: Fórmula de AJUSTE que se SUMA al monto fijo (ej: OTRO_CONCEP
 Variables especiales para ajuste: VALOR_BASE, CANTIDAD, MONTO_CALCULADO, y todos los conceptos calculados previamente.'''
     )
 
+    tipo_recibo = models.CharField(
+        max_length=20,
+        choices=[
+            ('salario', 'Salario Base'),
+            ('complemento', 'Complemento'),
+            ('cestaticket', 'Cestaticket'),
+        ],
+        default='salario',
+        verbose_name='Tipo de Recibo',
+        help_text='Determina en qué recibo se agrupa este concepto (Salario, Complemento o Cestaticket)'
+    )
+
     class ConceptBehavior(models.TextChoices):
         """Comportamiento del concepto (determina qué Handler usar)."""
         SALARY_BASE = 'SALARY_BASE', 'Sueldo Base (Desglosable)'

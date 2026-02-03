@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { useCompanyConfig, useUpdateCompanyConfig } from '../../../hooks/useOrganization';
 import { Button, Card, InputField, SelectField, ToggleField } from '../../../components/ui';
 import { SkeletonForm } from '../../../components/ui/Skeleton';
-import { Building2, Save, DollarSign } from 'lucide-react';
+import { Building2, Save, DollarSign, Umbrella } from 'lucide-react';
 
 const CompanyForm = () => {
     const { data: company, isLoading } = useCompanyConfig();
@@ -120,6 +120,36 @@ const CompanyForm = () => {
                                 label="Mostrar Cestaticket"
                                 {...register('show_tickets')}
                             />
+                        </div>
+                    </Card.Section>
+
+                    {/* Configuración de Vacaciones */}
+                    <Card.Section title="Configuración de Vacaciones" icon={Umbrella}>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <SelectField
+                                label="Base Salarial para Cálculo"
+                                {...register('vacation_salary_basis')}
+                                options={[
+                                    { value: 'BASE_ONLY', label: 'Solo Sueldo Base' },
+                                    { value: 'BASE_PLUS_COMPLEMENT', label: 'Sueldo Base + Complemento (Paquete Total)' }
+                                ]}
+                            />
+                            <SelectField
+                                label="Moneda del Recibo"
+                                {...register('vacation_receipt_currency')}
+                                options={[
+                                    { value: 'USD', label: 'Dólares (USD)' },
+                                    { value: 'VES', label: 'Bolívares (Bs.)' },
+                                    { value: 'DUAL', label: 'Ambas Monedas' }
+                                ]}
+                            />
+                            <div className="md:col-span-2 text-[10px] text-gray-400 italic bg-blue-50/50 p-3 rounded-xl border border-dashed border-blue-200/50">
+                                <Umbrella size={12} className="inline mr-1 text-blue-400" />
+                                {watch('vacation_salary_basis') === 'BASE_ONLY'
+                                    ? `El cálculo de vacaciones usará solo el ${watch('split_percentage_base') || 30}% del paquete salarial (sueldo base según LOTTT).`
+                                    : 'El cálculo de vacaciones usará el paquete salarial completo (base + complemento).'
+                                }
+                            </div>
                         </div>
                     </Card.Section>
                 </Card>

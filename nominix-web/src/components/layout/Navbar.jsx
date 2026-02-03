@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { cn } from '../../utils/cn';
 import {
     LogOut, Loader2, Calculator, Users, ClipboardList,
-    Settings, ShieldCheck, FileSpreadsheet, PieChart, Banknote
+    Settings, ShieldCheck, FileSpreadsheet, PieChart, Banknote, Calendar
 } from 'lucide-react';
 
 /**
@@ -25,6 +25,7 @@ const Navbar = () => {
         { path: '/catalog', icon: ClipboardList, label: 'Conceptos' },
         //{ path: '/novelties', icon: FileSpreadsheet, label: 'Novedades' },
         { path: '/closures', icon: ShieldCheck, label: 'Cierres' },
+        { path: '/vacations', icon: Calendar, label: 'Vacaciones' },
         { path: '/config', icon: Settings, label: 'Config' },
     ];
 

@@ -342,6 +342,37 @@ class Company(models.Model):
     show_tickets = models.BooleanField(default=True, verbose_name="Mostrar Cestaticket en Recibo")
     show_seniority = models.BooleanField(default=True, verbose_name="Mostrar Antigüedad en Recibo")
 
+    # ==========================================================================
+    # CONFIGURACIÓN DE VACACIONES
+    # ==========================================================================
+    
+    class VacationSalaryBasis(models.TextChoices):
+        """Base salarial para cálculo de vacaciones."""
+        BASE_ONLY = 'BASE_ONLY', 'Solo Sueldo Base'
+        BASE_PLUS_COMPLEMENT = 'BASE_PLUS_COMPLEMENT', 'Sueldo Base + Complemento (Paquete Total)'
+    
+    vacation_salary_basis = models.CharField(
+        max_length=25,
+        choices=VacationSalaryBasis.choices,
+        default=VacationSalaryBasis.BASE_PLUS_COMPLEMENT,
+        verbose_name="Base Salarial para Vacaciones",
+        help_text="Define qué componentes del sueldo inciden en el pago de vacaciones"
+    )
+    
+    class VacationReceiptCurrency(models.TextChoices):
+        """Moneda para recibo de vacaciones."""
+        USD = 'USD', 'Dólares (USD)'
+        VES = 'VES', 'Bolívares (Bs.)'
+        DUAL = 'DUAL', 'Ambas Monedas'
+    
+    vacation_receipt_currency = models.CharField(
+        max_length=10,
+        choices=VacationReceiptCurrency.choices,
+        default=VacationReceiptCurrency.USD,
+        verbose_name="Moneda del Recibo de Vacaciones",
+        help_text="En qué moneda se muestran los montos del recibo PDF"
+    )
+
     class Meta:
         verbose_name = "Configuración de Empresa"
         verbose_name_plural = "Configuración de Empresa"

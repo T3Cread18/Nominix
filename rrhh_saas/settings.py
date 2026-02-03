@@ -68,6 +68,7 @@ TENANT_APPS: List[str] = [
     'django_cleanup.apps.CleanupConfig',
     # Apps de nómina y RRHH
     'payroll_core',
+    'vacations',  # Módulo de Gestión de Vacaciones
 ]
 
 # Combinación de todas las apps instaladas

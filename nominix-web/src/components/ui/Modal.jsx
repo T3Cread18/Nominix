@@ -117,12 +117,12 @@ const Modal = ({
             >
                 {/* Header */}
                 {(title || showCloseButton) && (
-                    <div className="flex items-start justify-between p-8 pb-0">
+                    <div className="flex items-start justify-between p-4 sm:p-8 pb-0 sm:pb-0">
                         <div className="flex-1 pr-4">
                             {title && (
                                 <h2
                                     id="modal-title"
-                                    className="text-xl font-black text-nominix-dark"
+                                    className="text-lg sm:text-xl font-black text-nominix-dark"
                                 >
                                     {title}
                                 </h2>
@@ -130,7 +130,7 @@ const Modal = ({
                             {description && (
                                 <p
                                     id="modal-description"
-                                    className="text-sm text-gray-500 mt-1"
+                                    className="text-xs sm:text-sm text-gray-500 mt-1"
                                 >
                                     {description}
                                 </p>
@@ -139,17 +139,17 @@ const Modal = ({
                         {showCloseButton && (
                             <button
                                 onClick={onClose}
-                                className="p-3 hover:bg-gray-100 rounded-2xl transition-all text-gray-300 hover:text-nominix-dark"
+                                className="p-2 sm:p-3 hover:bg-gray-100 rounded-2xl transition-all text-gray-300 hover:text-nominix-dark"
                                 aria-label="Cerrar"
                             >
-                                <X size={24} />
+                                <X size={20} className="sm:w-6 sm:h-6" />
                             </button>
                         )}
                     </div>
                 )}
 
                 {/* Content */}
-                <div className="p-8">
+                <div className="p-4 sm:p-8">
                     {children}
                 </div>
             </div>

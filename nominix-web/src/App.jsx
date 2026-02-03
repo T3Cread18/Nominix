@@ -18,6 +18,8 @@ import CompanySettings from './features/settings/CompanySettings';
 import LoanManager from './features/loans/LoanManager';
 import TenantsLogin from './features/tenants/TenantsLogin';
 import TenantsAdmin from './features/tenants/TenantsAdmin';
+import VacationManager from './features/vacations/VacationManager';
+import VacationSettings from './features/vacations/VacationSettings';
 
 /**
  * App - Componente principal de la aplicación.
@@ -92,6 +94,10 @@ function App() {
 
                 {/* Módulo: Configuración */}
                 <Route path="config" element={<CompanySettings />} />
+
+                {/* Módulo: Vacaciones */}
+                <Route path="vacations" element={<VacationManager />} />
+                <Route path="vacations/settings" element={<VacationSettings />} />
 
                 {/* Fallback */}
                 <Route path="*" element={<Navigate to="/" replace />} />

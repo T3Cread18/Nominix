@@ -75,6 +75,7 @@ def formula_ivss(contract: Any, context: Dict[str, Any]) -> Decimal:
     """
     Seguro Social Obligatorio (IVSS) - 4%.
     Tope: 5 Salarios Mínimos.
+    Opción B: Descuenta lunes de vacaciones ya cotizados.
     """
     rate = context.get('rate', Decimal('1.00'))
     payment_date = context.get('payment_date')
@@ -84,10 +85,14 @@ def formula_ivss(contract: Any, context: Dict[str, Any]) -> Decimal:
     limit = MINIMUM_WAGE_VES * 5
     base_salary = min(salary_ves, limit)
     
+    # Ajuste por Vacaciones Opción B: Restar lunes ya cotizados
     mondays = count_mondays(payment_date)
+    vacation_mondays = context.get('LUNES_VACACIONES', 0)
+    effective_mondays = max(0, mondays - vacation_mondays)
+    
     weekly_base = (base_salary * 12) / 52
     
-    amount = weekly_base * mondays * Decimal('0.04')
+    amount = weekly_base * Decimal(effective_mondays) * Decimal('0.04')
     return amount.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
 def formula_rpe(contract: Any, context: Dict[str, Any]) -> Decimal:
@@ -103,19 +108,29 @@ def formula_rpe(contract: Any, context: Dict[str, Any]) -> Decimal:
     base_salary = min(salary_ves, limit)
     
     mondays = count_mondays(payment_date)
+    vacation_mondays = context.get('LUNES_VACACIONES', 0)
+    effective_mondays = max(0, mondays - vacation_mondays)
+    
     weekly_base = (base_salary * 12) / 52
     
-    amount = weekly_base * mondays * Decimal('0.005')
+    amount = weekly_base * Decimal(effective_mondays) * Decimal('0.005')
     return amount.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
 def formula_faov(contract: Any, context: Dict[str, Any]) -> Decimal:
     """
     FAOV (Vivienda y Hábitat) - 1%.
+    Opción B: Descuenta Anticipo de Vacaciones de la base.
     """
     rate = context.get('rate', Decimal('1.00'))
     salary_ves = _get_salary_in_ves(contract, rate)
     
-    amount = salary_ves * Decimal('0.01')
+    # Ajuste por Vacaciones Opción B: Restar monto anticipo
+    # Usamos ANTICIPO_VAC_CANT (días) en vez del resultado del concepto para evitar dependencia de orden
+    advance_days = Decimal(str(context.get('ANTICIPO_VAC_CANT', 0)))
+    vacation_advance = (salary_ves / 30) * advance_days
+    base = max(Decimal('0.00'), salary_ves - vacation_advance)
+    
+    amount = base * Decimal('0.01')
     return amount.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
 # ==========================================
