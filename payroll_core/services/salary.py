@@ -90,7 +90,7 @@ class SalarySplitter:
                         # Si el Cargo (JobPosition) define la base en VES, protegemos ese valor
                         # independientemente de si el contrato es USD o VES.
                         result = {
-                            'base': fixed_base_usd.quantize(Decimal('0.01')),
+                            'base': fixed_base, # Retornar valor en Bs (User Request)
                             'complement': (total_salary - fixed_base_usd).quantize(Decimal('0.01')),
                             'total': total_salary.quantize(Decimal('0.01')),
                             'base_ves_protected': fixed_base # Valor exacto del cargo
@@ -153,11 +153,26 @@ class SalarySplitter:
             complement = Decimal('0.00')
 
         # Redondear a 2 decimales
-        return {
+        result = {
             'base': base_salary.quantize(Decimal('0.01')),
             'complement': complement.quantize(Decimal('0.01')),
             'total': total_salary.quantize(Decimal('0.01'))
         }
+
+        # Si el contrato está en VES, protegemos el total
+        try:
+            contract_curr_code = 'USD'
+            if hasattr(contract.salary_currency, 'code'):
+                contract_curr_code = contract.salary_currency.code
+            else:
+                contract_curr_code = str(contract.salary_currency)
+                
+            if contract_curr_code == 'VES':
+                result['total_ves_protected'] = total_salary
+        except Exception:
+            pass
+            
+        return result
 
 
     @staticmethod

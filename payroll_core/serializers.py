@@ -99,6 +99,7 @@ class PayrollConceptSerializer(serializers.ModelSerializer):
         return value
 
     def validate(self, attrs):
+        print(f"DEBUG VALIDATE: {attrs}")
         # 1. Recuperar datos (Merge de lo que envían + lo que ya existe en DB)
         instance = self.instance
         behavior = attrs.get('behavior') or (instance.behavior if instance else None)
@@ -106,6 +107,18 @@ class PayrollConceptSerializer(serializers.ModelSerializer):
         system_params = attrs.get('system_params') 
         if system_params is None and instance:
             system_params = instance.system_params
+        
+        # FIX: Si viene system_params pero está incompleto, hacemos merge con lo que había
+        # Esto evita que se borren claves importantes (rate, etc) si el frontend no las envía todas
+        if instance and isinstance(system_params, dict) and isinstance(instance.system_params, dict):
+            # Usamos los valores actuales como base
+            merged_params = instance.system_params.copy()
+            # Sobrescribimos con lo nuevo
+            merged_params.update(system_params)
+            system_params = merged_params
+            # IMPORANTE: Actualizar attrs para que se guarde el merge completo
+            attrs['system_params'] = system_params
+            
         if system_params is None:
             system_params = {}
 

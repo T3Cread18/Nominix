@@ -211,9 +211,15 @@
                 </div>
                 <div class="col">
                     <span class="label">Salario Base:</span>
-                    {% if receipt_currency == 'USD' or receipt_currency == 'DUAL' %}${{ monthly_salary|floatformat:2}}
+                    {% if receipt_currency == 'USD' or receipt_currency == 'DUAL' %}
+                    {% if salary_basis_used == 'BASE_ONLY' and base_total_salary > 0 %}
+                    ${{ monthly_salary|floatformat:2}}
+                    {% else %}
+                    ${{ monthly_salary|floatformat:2}}
                     {% endif %}
-                    {% if receipt_currency == 'VES' %}Bs. {{ monthly_salary_ves|default:monthly_salary|floatformat:2}}
+                    {% endif %}
+                    {% if receipt_currency == 'VES' %}
+                    Bs. {{ monthly_salary_ves|default:monthly_salary|floatformat:2}}
                     {% endif %}
                 </div>
             </div>
