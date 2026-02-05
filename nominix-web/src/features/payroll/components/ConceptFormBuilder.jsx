@@ -207,6 +207,7 @@ export default function ConceptFormBuilder({ initialData, onSave, onCancel }) {
         } else if (selectedBehavior === 'LAW_DEDUCTION') {
             setValue('computation_method', 'PERCENTAGE_OF_BASIC');
         }
+        // NOTE: For 'LOAN', we do NOT force a method, allowing DYNAMIC_FORMULA or FIXED_AMOUNT
     }, [selectedBehavior, setValue]);
 
     // 3. Mutation
@@ -230,7 +231,10 @@ export default function ConceptFormBuilder({ initialData, onSave, onCancel }) {
             onSave && onSave();
         },
         onError: (err) => {
-            toast.error('Error: ' + (err.response?.data?.detail || 'No se pudo procesar la solicitud'));
+            console.error("FULL MUTATION ERROR:", err);
+            console.error("RESPONSE DATA:", err.response?.data);
+            const errorDetails = err.response?.data ? JSON.stringify(err.response.data, null, 2) : err.message;
+            toast.error('Error: ' + errorDetails);
         }
     });
 
@@ -252,12 +256,31 @@ export default function ConceptFormBuilder({ initialData, onSave, onCancel }) {
             }
         }
 
-        if (payload.behavior !== 'LAW_DEDUCTION') {
-            // Limpieza: Solo limpiar fórmula si NO es DYNAMIC ni FIXED (FIXED ahora puede tener fórmula de ajuste)
-            if (payload.behavior !== 'DYNAMIC' && payload.computation_method !== 'FIXED_AMOUNT') {
-                payload.formula = '';
-            }
+        // --- MANEJO ESPECIFICO PARA LAW_DEDUCTION ---
+        if (payload.behavior === 'LAW_DEDUCTION') {
+            // Asegurar que system_params tenga lo necesario
+            payload.system_params = {
+                ...payload.system_params,
+                rate: payload.value, // La tasa viene del campo visual 'value'
+                base_source: payload.system_params?.base_source || 'BASIC_SALARY' // Default seguro
+            };
         }
+
+        // --- LIMPIEZA DE INCIDENCIAS ---
+        // Las deducciones no deberían llevar incidencias (acumuladores de base) usualmente, 
+        // y el UI las oculta, así que limpiamos para evitar que se envíe basura oculta.
+        if (payload.kind === 'DEDUCTION') {
+            payload.incidences = [];
+        }
+
+        // --- LIMPIEZA GENERAL ---
+        // Solo limpiamos la fórmula si el método NO permite fórmula.
+        // DYNAMIC_FORMULA requiere fórmula. FIXED_AMOUNT acepta fórmula de ajuste.
+        if (payload.computation_method !== 'DYNAMIC_FORMULA' && payload.computation_method !== 'FIXED_AMOUNT') {
+            payload.formula = '';
+        }
+
+        console.log("Submitting Payload FINAL:", JSON.stringify(payload, null, 2));
         mutation.mutate(payload);
     };
 
@@ -361,6 +384,36 @@ export default function ConceptFormBuilder({ initialData, onSave, onCancel }) {
                                     }))}
                                 />
                             </div>
+
+                            {/* CONFIGURACIÓN ESPECÍFICA: LAW_DEDUCTION */}
+                            {selectedBehavior === 'LAW_DEDUCTION' && (
+                                <div className="mb-6 p-4 bg-blue-500/5 border border-blue-500/10 rounded-2xl animate-in slide-in-from-top-2 duration-300">
+                                    <div className="flex items-center gap-2 mb-4 text-blue-400">
+                                        <ShieldCheck size={16} />
+                                        <h4 className="text-xs font-bold uppercase tracking-widest">Parámetros de Deducción Legal</h4>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <CustomSelect
+                                            label="Fuente de Base Imponible"
+                                            icon={Database}
+                                            {...register('system_params.base_source', { required: 'Requerido para deducciones de ley' })}
+                                            options={[
+                                                { value: 'BASIC_SALARY', label: 'Sueldo Base Mensual' },
+                                                { value: 'TOTAL_EARNINGS', label: 'Total Asignaciones (Salario Normal)' },
+                                                { value: 'ACCUMULATOR', label: 'Acumulador Específico' }
+                                            ]}
+                                        />
+                                        {currentParams?.base_source === 'ACCUMULATOR' && (
+                                            <CustomInput
+                                                label="Etiqueta Acumulador (Tag)"
+                                                icon={Tag}
+                                                placeholder="Ej: FAOV_BASE"
+                                                {...register('system_params.base_label', { required: 'Si elige acumulador, debe especificar fl etiqueta' })}
+                                            />
+                                        )}
+                                    </div>
+                                </div>
+                            )}
 
                             {selectedMethod !== 'DYNAMIC_FORMULA' && (
                                 <div className="mb-6 animate-in slide-in-from-top-2 duration-300">
