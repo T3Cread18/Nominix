@@ -585,7 +585,86 @@ DEDUCCIONES (Base: {deduction_base:,.2f}):
 NETO A PAGAR: {net_total:,.2f}
 """.strip()
         
+        # =====================================================================
+        # 8. GENERAR TRAZAS ESTRUCTURADAS
+        # =====================================================================
+        # Helper para formatear montos
+        def fmt(val):
+             return f"{val:,.2f}"
+
+        traces = {
+            'daily_salary': {
+                'formula': 'Salario Mensual / 30',
+                'values': {
+                    'Salario Mensual': fmt(monthly_salary),
+                    'Divisor': '30'
+                },
+                'result': fmt(daily_salary)
+            },
+            'vacation_amount': {
+                'formula': f'{vacation_days} días * Salario Diario',
+                'values': {
+                    'Días': str(vacation_days),
+                    'Salario Diario': fmt(daily_salary)
+                },
+                'result': fmt(vacation_amount)
+            },
+            'rest_amount': {
+                'formula': f'{rest_days} días * Salario Diario',
+                'values': {
+                    'Días': str(rest_days),
+                    'Salario Diario': fmt(daily_salary)
+                },
+                'result': fmt(rest_amount)
+            },
+            'holiday_amount': {
+                'formula': f'{holiday_days} días * Salario Diario',
+                'values': {
+                    'Días': str(holiday_days),
+                    'Salario Diario': fmt(daily_salary)
+                },
+                'result': fmt(holiday_amount)
+            },
+            'bonus_amount': {
+                'formula': f'{bonus_days} días * Salario Diario',
+                'values': {
+                    'Días': str(bonus_days),
+                    'Salario Diario': fmt(daily_salary)
+                },
+                'result': fmt(bonus_amount)
+            },
+            'ivss_amount': {
+                'formula': '((Base Mensual * 12) / 52) * 4% * Lunes',
+                'values': {
+                    'Base Mensual': fmt(min(deduction_base, tope_ivss)),
+                    'Tope IVSS': fmt(tope_ivss),
+                    'Lunes': str(mondays_count),
+                    'Porcentaje': '4%'
+                },
+                'result': fmt(ivss_amount)
+            },
+            'faov_amount': {
+                'formula': 'Base Deducciones * 1%',
+                'values': {
+                    'Base Deducciones': fmt(deduction_base),
+                    'Porcentaje': '1%'
+                },
+                'result': fmt(faov_amount)
+            },
+            'rpe_amount': {
+                'formula': '((Base Mensual * 12) / 52) * 0.5% * Lunes',
+                'values': {
+                    'Base Mensual': fmt(min(deduction_base, tope_ivss)),
+                    'Lunes': str(mondays_count),
+                    'Porcentaje': '0.5%'
+                },
+                'result': fmt(rpe_amount)
+            }
+        }
+        
         result = {
+            'traces': traces,
+            
             # Salario
             'daily_salary': daily_salary,
             'monthly_salary': monthly_salary,

@@ -24,6 +24,7 @@ import Badge from '../../components/ui/Badge';
 import vacationService from '../../services/vacation.service';
 import { cn } from '../../utils/cn';
 import VacationPaymentModal from './VacationPaymentModal';
+import VacationApprovalModal from './VacationApprovalModal';
 
 /**
  * VacationRequestsList - Lista de solicitudes de vacaciones con acciones.
@@ -40,6 +41,11 @@ const VacationRequestsList = ({ onRefresh }) => {
     // Payment modal state
     const [selectedRequest, setSelectedRequest] = useState(null);
     const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+
+    // Approval modal state
+    const [selectedApprovalRequest, setSelectedApprovalRequest] = useState(null);
+    const [isApprovalModalOpen, setIsApprovalModalOpen] = useState(false);
+
     const [downloadingId, setDownloadingId] = useState(null);
 
     // Cargar solicitudes
@@ -62,8 +68,24 @@ const VacationRequestsList = ({ onRefresh }) => {
         fetchRequests();
     }, [fetchRequests]);
 
-    // Aprobar solicitud
-    const handleApprove = async (id) => {
+    // Calcular días dinámicamente si no vienen del backend
+    const calculateDays = (start, end) => {
+        if (!start || !end) return 0;
+        const startDate = new Date(start);
+        const endDate = new Date(end);
+        const diffTime = Math.abs(endDate - startDate);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+        return diffDays;
+    };
+
+    // Abrir modal de aprobación
+    const handleOpenApprovalModal = (request) => {
+        setSelectedApprovalRequest(request);
+        setIsApprovalModalOpen(true);
+    };
+
+    // Confirmar aprobación
+    const handleConfirmApprove = async (id) => {
         try {
             setActionLoading(id);
             await vacationService.approveRequest(id);
@@ -72,6 +94,7 @@ const VacationRequestsList = ({ onRefresh }) => {
         } catch (err) {
             console.error('Error approving:', err);
             setError(err.response?.data?.error || 'Error al aprobar');
+            throw err; // Propagate error to modal
         } finally {
             setActionLoading(null);
         }
@@ -270,7 +293,7 @@ const VacationRequestsList = ({ onRefresh }) => {
                                                 <Button
                                                     variant="success"
                                                     size="sm"
-                                                    onClick={() => handleApprove(req.id)}
+                                                    onClick={() => handleOpenApprovalModal(req)}
                                                     loading={actionLoading === req.id}
                                                     icon={CheckCircle2}
                                                 >
@@ -372,6 +395,17 @@ const VacationRequestsList = ({ onRefresh }) => {
                     }}
                     vacationRequest={selectedRequest}
                     onSuccess={fetchRequests}
+                />
+
+                {/* Approval Modal */}
+                <VacationApprovalModal
+                    isOpen={isApprovalModalOpen}
+                    onClose={() => {
+                        setIsApprovalModalOpen(false);
+                        setSelectedApprovalRequest(null);
+                    }}
+                    vacationRequest={selectedApprovalRequest}
+                    onApprove={handleConfirmApprove}
                 />
             </CardContent>
         </Card>
