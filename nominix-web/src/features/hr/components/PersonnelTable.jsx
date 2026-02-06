@@ -1,12 +1,14 @@
 
 import React from 'react';
 import {
-    Filter, Loader2, CheckCircle2, XCircle, Trash2, Edit3,
+    Filter, CheckCircle2, XCircle, Trash2, Edit3,
     Hash, Building2
 } from 'lucide-react';
 import { cn } from '../../../utils/cn';
+import Avatar from '../../../components/ui/Avatar';
+import { SkeletonTable } from '../../../components/ui/Skeleton';
 
-// Helper local para fotos
+// Helper local para fotos (si es necesario, aunque Avatar maneja src)
 const getPhotoUrl = (path) => {
     if (!path) return null;
     if (path.startsWith('http')) return path;
@@ -18,17 +20,15 @@ const PersonnelTable = ({
     loading,
     searchTerm,
     selectedBranch,
-    deletingId,
     onRowClick,
     onRequestDelete
 }) => {
 
-    // Loading State
+    // Skeleton Loading
     if (loading && employees.length === 0) {
         return (
-            <div className="flex-1 flex flex-col items-center justify-center h-full text-slate-300">
-                <Loader2 className="animate-spin mb-4 text-nominix-electric" size={40} />
-                <p className="font-black uppercase text-[10px] tracking-[0.3em]">Buscando...</p>
+            <div className="p-6">
+                <SkeletonTable rows={8} columns={5} />
             </div>
         );
     }
@@ -55,25 +55,13 @@ const PersonnelTable = ({
                             <td className="px-6 py-4">
                                 <div className="flex items-center gap-4">
                                     <div className="relative">
-                                        <div className="w-11 h-11 rounded-2xl overflow-hidden bg-slate-100 flex items-center justify-center border-2 border-white shadow-sm ring-1 ring-slate-100 flex-shrink-0">
-                                            {emp.photo ? (
-                                                <img
-                                                    src={getPhotoUrl(emp.photo)}
-                                                    alt={emp.first_name}
-                                                    className="w-full h-full object-cover"
-                                                    onError={(e) => {
-                                                        e.target.style.display = 'none';
-                                                        e.target.nextSibling.style.display = 'flex';
-                                                    }}
-                                                />
-                                            ) : null}
-                                            <span
-                                                className="w-full h-full flex items-center justify-center font-black text-xs text-slate-500 uppercase"
-                                                style={{ display: emp.photo ? 'none' : 'flex' }}
-                                            >
-                                                {emp.first_name?.[0]}{emp.last_name?.[0]}
-                                            </span>
-                                        </div>
+                                        <Avatar
+                                            src={getPhotoUrl(emp.photo)}
+                                            name={`${emp.first_name} ${emp.last_name}`}
+                                            size="md"
+                                            rounded="xl"
+                                            className="ring-1 ring-slate-100 shadow-sm"
+                                        />
                                         <div className={cn(
                                             "absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-white",
                                             emp.is_active ? "bg-green-500 shadow-sm" : "bg-slate-300"
@@ -127,10 +115,9 @@ const PersonnelTable = ({
 
                                     <button
                                         onClick={(e) => onRequestDelete(e, emp.id)}
-                                        disabled={deletingId === emp.id}
                                         className="p-2 hover:bg-red-50 rounded-lg text-slate-400 hover:text-red-500 border border-transparent hover:border-red-100 transition-all"
                                     >
-                                        {deletingId === emp.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                                        <Trash2 size={16} />
                                     </button>
                                 </div>
                             </td>
@@ -156,3 +143,4 @@ const PersonnelTable = ({
 };
 
 export default PersonnelTable;
+

@@ -8,7 +8,7 @@ from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
 from decimal import Decimal
 
-from .currency import Currency
+from customers.models import Currency
 
 
 class Branch(models.Model):
@@ -186,6 +186,24 @@ class JobPosition(models.Model):
         help_text='Moneda del sueldo base (generalmente USD)'
     )
     
+    split_fixed_amount: models.DecimalField = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        validators=[MinValueValidator(Decimal('0.00'))],
+        verbose_name='Monto Fijo (Estrategia)',
+        help_text='Monto fijo para usar en estrategias FIXED_BASE o FIXED_BONUS'
+    )
+
+    split_fixed_currency: models.ForeignKey = models.ForeignKey(
+        Currency,
+        on_delete=models.PROTECT,
+        default='USD',
+        related_name='job_positions_fixed',
+        verbose_name='Moneda Monto Fijo',
+        help_text='Moneda del monto fijo para la estrategia (ej: USD)'
+    )
+    
     # ==========================================================================
     # ESTADO Y METADATA
     # ==========================================================================
@@ -287,15 +305,6 @@ class Company(models.Model):
         verbose_name="Porcentaje Base (%)",
         help_text="Para modo PERCENTAGE: porcentaje del total que es sueldo base (ej: 30.00)"
     )
-    
-    split_fixed_amount = models.DecimalField(
-        max_digits=12,
-        decimal_places=2,
-        default=Decimal('0.00'),
-        validators=[MinValueValidator(Decimal('0.00'))],
-        verbose_name="Monto Fijo",
-        help_text="Para modos FIXED_BASE o FIXED_BONUS: monto fijo en la moneda del contrato"
-    )
 
     # Configuración de Frecuencias y Pagos
     PAYROLL_JOURNEY_CHOICES = [
@@ -333,6 +342,37 @@ class Company(models.Model):
     show_tickets = models.BooleanField(default=True, verbose_name="Mostrar Cestaticket en Recibo")
     show_seniority = models.BooleanField(default=True, verbose_name="Mostrar Antigüedad en Recibo")
 
+    # ==========================================================================
+    # CONFIGURACIÓN DE VACACIONES
+    # ==========================================================================
+    
+    class VacationSalaryBasis(models.TextChoices):
+        """Base salarial para cálculo de vacaciones."""
+        BASE_ONLY = 'BASE_ONLY', 'Solo Sueldo Base'
+        BASE_PLUS_COMPLEMENT = 'BASE_PLUS_COMPLEMENT', 'Sueldo Base + Complemento (Paquete Total)'
+    
+    vacation_salary_basis = models.CharField(
+        max_length=25,
+        choices=VacationSalaryBasis.choices,
+        default=VacationSalaryBasis.BASE_PLUS_COMPLEMENT,
+        verbose_name="Base Salarial para Vacaciones",
+        help_text="Define qué componentes del sueldo inciden en el pago de vacaciones"
+    )
+    
+    class VacationReceiptCurrency(models.TextChoices):
+        """Moneda para recibo de vacaciones."""
+        USD = 'USD', 'Dólares (USD)'
+        VES = 'VES', 'Bolívares (Bs.)'
+        DUAL = 'DUAL', 'Ambas Monedas'
+    
+    vacation_receipt_currency = models.CharField(
+        max_length=10,
+        choices=VacationReceiptCurrency.choices,
+        default=VacationReceiptCurrency.USD,
+        verbose_name="Moneda del Recibo de Vacaciones",
+        help_text="En qué moneda se muestran los montos del recibo PDF"
+    )
+
     class Meta:
         verbose_name = "Configuración de Empresa"
         verbose_name_plural = "Configuración de Empresa"
@@ -340,8 +380,135 @@ class Company(models.Model):
     def __str__(self):
         return self.name
 
-    def save(self, *args, **kwargs):
-        # Garantizar que solo haya 1 registro (Singleton pattern simple)
-        if not self.pk and Company.objects.exists():
-            raise Exception("Solo puede haber una configuración de empresa.")
         super().save(*args, **kwargs)
+
+
+class PayrollPolicy(models.Model):
+    """
+    Políticas de Nómina y Factores Globales.
+    
+    Este modelo centraliza los factores de cálculo que aplican a toda la empresa,
+    permitiendo ajustar porcentajes de recargos sin modificar fórmulas.
+    """
+    company = models.OneToOneField(
+        Company, 
+        on_delete=models.CASCADE, 
+        related_name='policy',
+        verbose_name="Empresa"
+    )
+    
+    # Factores de pago (Multiplicadores)
+    holiday_payout_factor = models.DecimalField(
+        max_digits=5, decimal_places=2, 
+        default=Decimal('1.50'),
+        verbose_name="Factor Feriados",
+        help_text="Multiplicador para días feriados trabajados (ej: 1.50)"
+    )
+    
+    rest_day_payout_factor = models.DecimalField(
+        max_digits=5, decimal_places=2, 
+        default=Decimal('1.50'),
+        verbose_name="Factor Descansos",
+        help_text="Multiplicador para días de descanso trabajados"
+    )
+    
+    overtime_day_factor = models.DecimalField(
+        max_digits=5, decimal_places=2, 
+        default=Decimal('1.50'),
+        verbose_name="Horas Extra Diurnas",
+        help_text="Recargo para horas extras diurnas (ej: 1.50 = 50% recargo)"
+    )
+    
+    overtime_night_factor = models.DecimalField(
+        max_digits=5, decimal_places=2, 
+        default=Decimal('1.50'),
+        verbose_name="Horas Extra Nocturnas",
+        help_text="Recargo para horas extras nocturnas"
+    )
+    
+    night_bonus_rate = models.DecimalField(
+        max_digits=5, decimal_places=2, 
+        default=Decimal('0.30'),
+        verbose_name="Bono Nocturno (%)",
+        help_text="Porcentaje de recargo por bono nocturno (ej: 0.30 = 30%)"
+    )
+
+    # Configuración de Vacaciones (LOTTT)
+    vacation_days_base = models.PositiveSmallIntegerField(
+        default=15,
+        verbose_name="Días Base Vacaciones",
+        help_text="Días correspondientes al primer año (Art. 190)"
+    )
+    
+    vacation_days_per_year = models.PositiveSmallIntegerField(
+        default=1,
+        verbose_name="Días Adicionales por Año",
+        help_text="Días adicionales por cada año de servicio"
+    )
+    
+    vacation_days_max = models.PositiveSmallIntegerField(
+        default=15,
+        verbose_name="Máximo Días Adicionales",
+        help_text="Tope de días adicionales acumulables (Total máx = Base + Máx)"
+    )
+    
+    vacation_bonus_days_base = models.PositiveSmallIntegerField(
+        default=15,
+        verbose_name="Días Base Bono Vacacional",
+        help_text="Días de bono para el primer año (Art. 192)"
+    )
+    
+    vacation_bonus_days_per_year = models.PositiveSmallIntegerField(
+        default=1,
+        verbose_name="Días Adicionales Bono por Año",
+        help_text="Días adicionales de bono por cada año de servicio"
+    )
+    
+    vacation_bonus_days_max = models.PositiveSmallIntegerField(
+        default=30,
+        verbose_name="Máximo Días Bono Vacacional",
+        help_text="Tope máximo de días de bono vacacional"
+    )
+    
+    # Campos adicionales para configuración No-Code
+    min_service_months = models.PositiveSmallIntegerField(
+        default=12,
+        verbose_name="Meses Mínimos para Derecho",
+        help_text="Antigüedad mínima en meses para generar derecho a vacaciones (LOTTT: 12)"
+    )
+    
+    pay_rest_days = models.BooleanField(
+        default=True,
+        verbose_name="Pagar Días de Descanso",
+        help_text="Incluir sábados/domingos del período vacacional en el pago"
+    )
+    
+    pay_holidays = models.BooleanField(
+        default=True,
+        verbose_name="Pagar Feriados",
+        help_text="Incluir feriados nacionales del período vacacional en el pago"
+    )
+    
+    class AccrualMode(models.TextChoices):
+        """Modo de acumulación de días de vacaciones."""
+        ANNUAL = 'ANNUAL', 'Anual (Al cumplir cada año)'
+        MONTHLY = 'MONTHLY', 'Mensual Proporcional'
+        PROPORTIONAL = 'PROPORTIONAL', 'Proporcional a Días Trabajados'
+    
+    accrual_mode = models.CharField(
+        max_length=15,
+        choices=AccrualMode.choices,
+        default=AccrualMode.ANNUAL,
+        verbose_name="Modo de Acumulación",
+        help_text="Cómo se acumulan los días de vacaciones"
+    )
+
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Política de Nómina"
+        verbose_name_plural = "Políticas de Nómina"
+
+    def __str__(self):
+        return f"Políticas de {self.company.name}"
+

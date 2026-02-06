@@ -1,30 +1,38 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axiosClient from '../../api/axiosClient';
-import { toast } from 'sonner';
+import { useEmployees, useDeleteEmployee } from '../../hooks/useEmployees'; // Nuevo Hook
+import { useBranches } from '../../hooks/useOrganization'; // Nuevo Hook
 import ConfirmationModal from '../../components/ConfirmationModal';
 import HeaderToolbar from './components/HeaderToolbar';
 import PersonnelTable from './components/PersonnelTable';
 import PaginationToolbar from './components/PaginationToolbar';
+import Card from '../../components/ui/Card';
 
 const PersonnelManager = () => {
     const navigate = useNavigate();
 
-    // --- ESTADOS ---
-    const [employees, setEmployees] = useState([]);
-    const [branches, setBranches] = useState([]);
-    const [loading, setLoading] = useState(true);
+    // --- ESTADOS DE FILTRO Y PAGINACIÓN ---
+    const [page, setPage] = useState(1);
+    const [search, setSearch] = useState('');
+    const [branch, setBranch] = useState('');
 
-    // Filtros
-    const [searchTerm, setSearchTerm] = useState('');
-    const [selectedBranch, setSelectedBranch] = useState('');
+    // --- HOOKS ---
+    // Cargar empleados con React Query
+    const {
+        data: employeeData,
+        isLoading: loadingEmployees,
+        isFetching
+    } = useEmployees({
+        page,
+        search,
+        branch
+    });
 
-    // Paginación
-    const [currentPage, setCurrentPage] = useState(1);
-    const [totalPages, setTotalPages] = useState(1);
+    // Cargar sedes para el filtro
+    const { data: branches = [] } = useBranches();
 
-    // Estado para borrado (loading)
-    const [deletingId, setDeletingId] = useState(null);
+    // Hook de eliminación
+    const { mutate: deleteEmployee, isPending: isDeleting } = useDeleteEmployee();
 
     // --- ESTADO PARA EL MODAL DE CONFIRMACIÓN ---
     const [confirmState, setConfirmState] = useState({
@@ -35,87 +43,40 @@ const PersonnelManager = () => {
         isDangerous: false
     });
 
-    // --- CARGA DE CATÁLOGOS ---
-    useEffect(() => {
-        const loadBranches = async () => {
-            try {
-                const res = await axiosClient.get('/branches/');
-                setBranches(res.data.results || res.data);
-            } catch (error) {
-                console.error("Error cargando sedes", error);
-            }
-        };
-        loadBranches();
-    }, []);
+    // --- HANDLERS ---
 
-    // --- FUNCIÓN PRINCIPAL DE CARGA ---
-    const fetchEmployees = useCallback(async (page, search, branchId) => {
-        setLoading(true);
-        try {
-            let url = `/employees/?page=${page}`;
-            if (search) url += `&search=${search}`;
-            if (branchId) url += `&branch=${branchId}`;
-
-            const response = await axiosClient.get(url);
-
-            if (response.data.results) {
-                setEmployees(response.data.results);
-                setTotalPages(Math.ceil(response.data.count / 20) || 1);
-            } else {
-                setEmployees(response.data);
-                setTotalPages(1);
-            }
-        } catch (error) {
-            console.error("Error cargando personal:", error);
-        } finally {
-            setLoading(false);
-        }
-    }, []);
-
-    // --- EFECTO: DISPARAR BÚSQUEDA ---
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            fetchEmployees(currentPage, searchTerm, selectedBranch);
-        }, 300);
-        return () => clearTimeout(timer);
-    }, [currentPage, searchTerm, selectedBranch, fetchEmployees]);
-
-    // --- LÓGICA DE BORRADO ACTUALIZADA ---
-    const executeDelete = async (id) => {
-        setDeletingId(id);
-        setConfirmState(prev => ({ ...prev, isOpen: false })); // Cerramos modal
-
-        try {
-            await axiosClient.delete(`/employees/${id}/`);
-            toast.success("Expediente eliminado correctamente");
-            // Recargamos la lista
-            fetchEmployees(currentPage, searchTerm, selectedBranch);
-        } catch (error) {
-            console.error(error);
-            if (error.response && error.response.status === 400) {
-                toast.error(error.response.data.error || "No se puede eliminar el registro.");
-            } else {
-                toast.error("Ocurrió un error al intentar eliminar.");
-            }
-        } finally {
-            setDeletingId(null);
-        }
+    // Cambio de filtros (resetea página)
+    const handleSearchCheck = (val) => {
+        setSearch(val);
+        setPage(1);
     };
 
-    const requestDelete = (e, id) => {
-        e.stopPropagation(); // Evita navegar al detalle
+    const handleBranchChange = (val) => {
+        setBranch(val);
+        setPage(1);
+    };
+
+    // Lógica de borrado
+    const handleDeleteClick = (e, id) => {
+        e.stopPropagation();
         setConfirmState({
             isOpen: true,
             title: '¿Eliminar Expediente?',
-            message: 'Esta acción eliminará permanentemente al colaborador y sus datos asociados. Si tiene historial de nómina, la acción será bloqueada por seguridad.',
-            action: () => executeDelete(id),
+            message: 'Esta acción eliminará permanentemente al colaborador y sus datos asociados. Acciones irreversibles.',
+            action: () => {
+                deleteEmployee(id, {
+                    onSuccess: () => setConfirmState(prev => ({ ...prev, isOpen: false }))
+                });
+            },
             isDangerous: true
         });
     };
 
+    const employees = employeeData?.results || [];
+    const totalPages = Math.ceil((employeeData?.count || 0) / 20) || 1;
+
     return (
         <div className="relative h-[calc(100vh-100px)]">
-
             <ConfirmationModal
                 isOpen={confirmState.isOpen}
                 onClose={() => setConfirmState(prev => ({ ...prev, isOpen: false }))}
@@ -123,43 +84,35 @@ const PersonnelManager = () => {
                 title={confirmState.title}
                 message={confirmState.message}
                 isDangerous={confirmState.isDangerous}
-                confirmText="Sí, Eliminar"
+                confirmText={isDeleting ? "Eliminando..." : "Sí, Eliminar"}
                 cancelText="Cancelar"
             />
 
-            <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 flex flex-col h-full overflow-hidden">
-
+            <Card className="flex flex-col h-full overflow-hidden !p-0 !rounded-[2rem]">
                 <HeaderToolbar
-                    searchTerm={searchTerm}
-                    setSearchTerm={(val) => {
-                        setSearchTerm(val);
-                        setCurrentPage(1);
-                    }}
-                    selectedBranch={selectedBranch}
-                    setSelectedBranch={(val) => {
-                        setSelectedBranch(val);
-                        setCurrentPage(1);
-                    }}
+                    searchTerm={search}
+                    setSearchTerm={handleSearchCheck}
+                    selectedBranch={branch}
+                    setSelectedBranch={handleBranchChange}
                     branches={branches}
                     onNewClick={() => navigate('/personnel/create')}
                 />
 
                 <PersonnelTable
                     employees={employees}
-                    loading={loading}
-                    searchTerm={searchTerm}
-                    selectedBranch={selectedBranch}
-                    deletingId={deletingId}
+                    loading={loadingEmployees || isFetching}
+                    searchTerm={search}
+                    selectedBranch={branch}
                     onRowClick={(id) => navigate(`/personnel/${id}`)}
-                    onRequestDelete={requestDelete}
+                    onRequestDelete={handleDeleteClick}
                 />
 
                 <PaginationToolbar
-                    currentPage={currentPage}
+                    currentPage={page}
                     totalPages={totalPages}
-                    onPageChange={setCurrentPage}
+                    onPageChange={setPage}
                 />
-            </div>
+            </Card>
         </div>
     );
 };

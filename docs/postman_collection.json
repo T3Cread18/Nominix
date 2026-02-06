@@ -1,0 +1,196 @@
+{
+    "info": {
+        "_postman_id": "nominix-api-collection",
+        "name": "Nóminix API v1.3.1",
+        "description": "Colección de pruebas para la API de Nóminix Suite. Incluye flujos de Auth, HR y Payroll.",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "Auth",
+            "item": [
+                {
+                    "name": "Login",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"username\": \"admin\",\n    \"password\": \"password123\"\n}"
+                        },
+                        "url": {
+                            "protocol": "https",
+                            "host": [
+                                "{{tenant}}",
+                                "nominix",
+                                "com",
+                                "ve"
+                            ],
+                            "path": [
+                                "api",
+                                "auth",
+                                "login",
+                                ""
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Status (Me)",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "protocol": "https",
+                            "host": [
+                                "{{tenant}}",
+                                "nominix",
+                                "com",
+                                "ve"
+                            ],
+                            "path": [
+                                "api",
+                                "auth",
+                                "me",
+                                ""
+                            ]
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "HR",
+            "item": [
+                {
+                    "name": "List Employees",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "protocol": "https",
+                            "host": [
+                                "{{tenant}}",
+                                "nominix",
+                                "com",
+                                "ve"
+                            ],
+                            "path": [
+                                "api",
+                                "employees",
+                                ""
+                            ],
+                            "query": [
+                                {
+                                    "key": "is_active",
+                                    "value": "true"
+                                }
+                            ]
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "Payroll",
+            "item": [
+                {
+                    "name": "Simulate Payslip",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"OVERTIME_HOURS\": 5\n}"
+                        },
+                        "url": {
+                            "protocol": "https",
+                            "host": [
+                                "{{tenant}}",
+                                "nominix",
+                                "com",
+                                "ve"
+                            ],
+                            "path": [
+                                "api",
+                                "employees",
+                                "1",
+                                "simulate-payslip",
+                                ""
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Latest Exchange Rate",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "protocol": "https",
+                            "host": [
+                                "{{tenant}}",
+                                "nominix",
+                                "com",
+                                "ve"
+                            ],
+                            "path": [
+                                "api",
+                                "exchange-rates",
+                                "latest",
+                                ""
+                            ],
+                            "query": [
+                                {
+                                    "key": "currency",
+                                    "value": "USD"
+                                }
+                            ]
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        }
+    ],
+    "event": [
+        {
+            "listen": "prerequest",
+            "script": {
+                "type": "text/javascript",
+                "exec": [
+                    ""
+                ]
+            }
+        },
+        {
+            "listen": "test",
+            "script": {
+                "type": "text/javascript",
+                "exec": [
+                    ""
+                ]
+            }
+        }
+    ],
+    "variable": [
+        {
+            "key": "tenant",
+            "value": "demo"
+        }
+    ]
+}

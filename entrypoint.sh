@@ -11,6 +11,10 @@ echo "Base de datos disponible."
 echo "Ejecutando migraciones de esquemas compartidos..."
 python manage.py migrate_schemas --shared --noinput
 
+# Recolectar estáticos
+echo "Recolectando archivos estáticos..."
+python manage.py collectstatic --noinput
+
 # Inicializar superusuario y tenant público
 echo "Ejecutando script de inicialización maestra..."
 python scripts/init_superadmin.py

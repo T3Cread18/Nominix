@@ -317,36 +317,58 @@
         <table class="receipt-table">
             <thead>
                 <tr>
-                    <th style="width: 40%;">Concepto</th>
+                    <th style="width: 12%;">Cód</th>
+                    <th style="width: 33%;">Concepto</th>
                     <th style="width: 15%; text-align: center;">Valor Auxiliar</th>
-                    <th style="width: 22.5%; text-align: right;">Asignación</th>
-                    <th style="width: 22.5%; text-align: right;">Deducción</th>
+                    <th style="width: 20%; text-align: right;">Asignación</th>
+                    <th style="width: 20%; text-align: right;">Deducción</th>
                 </tr>
             </thead>
             <tbody>
                 {% for row in payslip.processed_rows %}
                 {% if row.tipo_recibo == 'salario' %}
                 <tr>
+                    <td style="font-size: 9px; color: #555;">{{ row.code }}</td>
                     <td>{{ row.name }}</td>
                     <td style="text-align: center; font-family: monospace;">
-                        {% if row.quantity %}{{ row.quantity }} {{ row.unit|default:"días" }}{% else %}0{% endif %}
+                        {% if row.quantity %}{{ row.quantity|floatformat:0 }} {{ row.unit|default:"días" }}{% else %}0
+                        {% endif %}
                     </td>
                     <td class="amount">
-                        {% if row.earning_amount is not None %}{{ row.earning_amount|floatformat:2 }}{% else %}
+                        {% if row.earning_amount > 0 %}{{ row.earning_amount|floatformat:2 }}{% else %}
                         0.00{% endif %}
                     </td>
                     <td class="amount">
-                        {% if row.deduction_amount is not None %}{{ row.deduction_amount|floatformat:2 }}{% else %}
+                        {% if row.deduction_amount > 0 %}{{ row.deduction_amount|floatformat:2 }}{% else %}
                         0.00{% endif %}
                     </td>
                 </tr>
                 {% endif %}
-                {% endfor %}
+                {% empty %}
                 <tr>
-                    <td colspan="4" style="text-align: center; padding: 20px; color: #999;">
-                        No hay conceptos configurados para este recibo.
+                    <td colspan="5" style="text-align: center; padding: 20px; color: #999;">
+                        No hay conceptos registrados para la nómina base.
                     </td>
                 </tr>
+                {% endfor %}
+
+                {% if not payslip.total_income_salario and not payslip.total_deductions_ves %}
+                <tr>
+                    <td colspan="5" style="text-align: center; padding: 20px; color: #999;">
+                        No hay conceptos de salario para este periodo.
+                    </td>
+                </tr>
+                {% endif %}
+
+                {% if payslip.complemento_amount or payslip.cestaticket_amount %}
+                <tr>
+                    <td colspan="5"
+                        style="text-align: center; padding: 15px; color: #3498db; font-size: 10px; border-top: 1px dashed #eee;">
+                        <i class="fas fa-info-circle"></i> Este colaborador posee recibos adicionales (Bono/Ticket) que
+                        se muestran en hojas separadas.
+                    </td>
+                </tr>
+                {% endif %}
             </tbody>
         </table>
 
@@ -373,7 +395,7 @@
     </div>
 
     {# ========== RECIBO 2: COMPLEMENTO ========== #}
-    {% with payslip.details.all as details %}
+    {% with payslip.lines.all as details %}
     {% for detail in details %}
     {% if detail.concept_code == 'COMPLEMENTO' and detail.amount_ves %}
     <div class="page-break">
@@ -427,7 +449,7 @@
     {% endwith %}
 
     {# ========== RECIBO 3: CESTATICKET ========== #}
-    {% with payslip.details.all as details %}
+    {% with payslip.lines.all as details %}
     {% for detail in details %}
     {% if detail.concept_code == 'CESTATICKET' and detail.amount_ves %}
     <div class="page-break">

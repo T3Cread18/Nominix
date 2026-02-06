@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Recibo de Vacaciones</title>
+    <style>
+        @page {
+            size: letter;
+            margin: 1cm;
+        }
+
+        body {
+            font-family: 'Helvetica', sans-serif;
+            font-size: 11px;
+            color: #333;
+        }
+
+        .page-break {
+            page-break-after: always;
+        }
+
+        .header {
+            border-bottom: 2px solid #0052FF;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+            display: table;
+            width: 100%;
+        }
+
+        .header-left {
+            display: table-cell;
+            width: 60%;
+            vertical-align: top;
+        }
+
+        .header-right {
+            display: table-cell;
+            width: 40%;
+            text-align: right;
+            vertical-align: top;
+        }
+
+        .company-name {
+            font-size: 14px;
+            font-weight: bold;
+            text-transform: uppercase;
+            color: #0052FF;
+        }
+
+        .receipt-title {
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+
+        .grid-info {
+            display: table;
+            width: 100%;
+            margin-bottom: 15px;
+            font-size: 10px;
+        }
+
+        .row {
+            display: table-row;
+        }
+
+        .col {
+            display: table-cell;
+            padding: 2px 0;
+            width: 33%;
+        }
+
+        .label {
+            font-weight: bold;
+            color: #666;
+            margin-right: 5px;
+        }
+
+        .highlight {
+            background-color: #FFF3CD;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-weight: bold;
+        }
+
+        .receipt-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            border: 1px solid #dee2e6;
+        }
+
+        .receipt-table th {
+            background-color: #0052FF;
+            color: white;
+            padding: 8px;
+            font-size: 10px;
+            text-transform: uppercase;
+            border: 1px solid #0041cc;
+        }
+
+        .receipt-table td {
+            padding: 6px 8px;
+            border-bottom: 1px solid #eee;
+            border-left: 1px solid #eee;
+            border-right: 1px solid #eee;
+            font-size: 10px;
+        }
+
+        .receipt-table tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+
+        .amount {
+            text-align: right;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+        }
+
+        .totals {
+            margin-top: 15px;
+            background-color: #F0F4FF;
+            padding: 10px;
+            border-radius: 5px;
+        }
+
+        .net-pay {
+            font-size: 14px;
+            font-weight: bold;
+            color: #0052FF;
+        }
+
+        .firmas {
+            margin-top: 50px;
+            width: 100%;
+        }
+
+        .linea-firma {
+            border-top: 1px solid #000;
+            width: 40%;
+            display: inline-block;
+            margin: 0 5%;
+            text-align: center;
+            padding-top: 5px;
+            font-size: 9px;
+        }
+
+        .footer {
+            margin-top: 30px;
+            text-align: center;
+            font-size: 8px;
+            color: #999;
+            border-top: 1px solid #eee;
+            padding-top: 5px;
+        }
+
+        /* Utilitarios para doble moneda */
+        .dual-amount {
+            font-size: 9px;
+        }
+
+        .text-ves {
+            color: #666;
+            font-size: 8px;
+        }
+
+        .text-usd {
+            color: #000;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="page-break">
+        <!-- ENCABEZADO -->
+        <div class="header">
+            <div class="header-left">
+                <div class="company-name">
+                    {{employee.branch.name|default:company.name|default:company_name|default:"EMPRESA" }}</div>
+                <div>RIF: {{ employee.branch.rif|default:company.rif|default:company_rif }}</div>
+                <div>{{ employee.branch.address|default:company.address|default:"Dirección Fiscal" }}</div>
+            </div>
+            <div class="header-right">
+                <div class="receipt-title">Recibo de Vacaciones</div>
+                <div>N° {{ employee.document_id }}-{{ payment_date|date:"Ymd" }}-VAC</div>
+                <div>Fecha Pago: {{ payment_date|date:"d/m/Y" }}</div>
+            </div>
+        </div>
+
+        <!-- DATOS DEL TRABAJADOR Y PERIODO -->
+        <div class="grid-info">
+            <div class="row">
+                <div class="col">
+                    <span class="label">Trabajador:</span> {{ employee.full_name }}
+                </div>
+                <div class="col">
+                    <span class="label">Cédula:</span> {{ employee.national_id }}
+                </div>
+                <div class="col">
+                    <span class="label">Cargo:</span> {{ contract.position|default:"-" }}
+                </div>
+            </div>
+            <div class="row">
+                <div class="col">
+                    <span class="label">Fecha Ingreso:</span> {{ employee.hire_date|date:"d/m/Y" }}
+                </div>
+                <div class="col">
+                    <span class="label">Antigüedad:</span> {{ years_of_service }} años
+                </div>
+                <div class="col">
+                    <span class="label">Salario Base:</span>
+                    {% if receipt_currency == 'USD' or receipt_currency == 'DUAL' %}
+                    {% if salary_basis_used == 'BASE_ONLY' and base_total_salary > 0 %}
+                    ${{ monthly_salary|floatformat:2}}
+                    {% else %}
+                    ${{ monthly_salary|floatformat:2}}
+                    {% endif %}
+                    {% endif %}
+                    {% if receipt_currency == 'VES' %}
+                    Bs. {{ monthly_salary_ves|default:monthly_salary|floatformat:2}}
+                    {% endif %}
+                </div>
+            </div>
+            <div class="row" style="margin-top: 10px;">
+                <div class="col">
+                    <span class="label">Disfrute Desde:</span> <span class="highlight">
+                        {{ start_date|date:"d/m/Y" }}</span>
+                </div>
+                <div class="col">
+                    <span class="label">Hasta:</span> <span class="highlight">{{ end_date|date:"d/m/Y" }}</span>
+                </div>
+                <div class="col">
+                    <span class="label">Reincorporación:</span> {{ return_date|date:"d/m/Y" }}
+                </div>
+            </div>
+            {% if exchange_rate and receipt_currency == 'DUAL' or receipt_currency == 'VES' %}
+            <div class="row">
+                <div class="col">
+                    <span class="label">Tasa Cambio:</span> Bs. {{ exchange_rate|floatformat:2 }}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- TABLA DE CONCEPTOS -->
+        <table class="receipt-table">
+            <thead>
+                <tr>
+                    <th style="width: 40%">Concepto</th>
+                    <th style="width: 10%; text-align: center;">Días/%</th>
+                    {% if receipt_currency == 'DUAL' %}
+                    <th style="width: 25%; text-align: right;">Asignación ($/Bs)</th>
+                    <th style="width: 25%; text-align: right;">Deducción ($/Bs)</th>
+                    {% elif receipt_currency == 'VES' %}
+                    <th style="width: 25%; text-align: right;">Asignación (Bs.)</th>
+                    <th style="width: 25%; text-align: right;">Deducción (Bs.)</th>
+                    {% else %}
+                    <th style="width: 25%; text-align: right;">Asignación ($)</th>
+                    <th style="width: 25%; text-align: right;">Deducción ($)</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                <!-- ASIGNACIONES -->
+                <!-- Vacaciones -->
+                <tr>
+                    <td>Días de Vacaciones (Art. 190 LOTTT)</td>
+                    <td style="text-align: center;">{{ vacation_days }}</td>
+                    <td class="amount">
+                        {% if receipt_currency == 'DUAL' %}
+                        <div class="text-usd">{{ vacation_amount|floatformat:2 }}</div>
+                        <div class="text-ves">Bs. {{ vacation_amount_ves|floatformat:2 }}</div>
+                        {% elif receipt_currency == 'VES' %}
+                        {{ vacation_amount_ves|floatformat:2 }}
+                        {% else %}
+                        {{ vacation_amount|floatformat:2 }}
+                        {% endif %}
+                    </td>
+                    <td class="amount"></td>
+                </tr>
+                <!-- Descanso -->
+                {% if rest_amount > 0 or rest_amount_ves > 0 %}
+                <tr>
+                    <td>Días de Descanso y Feriados</td>
+                    <td style="text-align: center;">{{ rest_days|add:holiday_days }}</td>
+                    <td class="amount">
+                        {% if receipt_currency == 'DUAL' %}
+                        <div class="text-usd">{{ rest_amount|add:holiday_amount|floatformat:2 }}</div>
+                        <div class="text-ves">Bs. {{ rest_amount_ves|add:holiday_amount_ves|floatformat:2 }}</div>
+                        {% elif receipt_currency == 'VES' %}
+                        {{ rest_amount_ves|add:holiday_amount_ves|floatformat:2 }}
+                        {% else %}
+                        {{ rest_amount|add:holiday_amount|floatformat:2 }}
+                        {% endif %}
+                    </td>
+                    <td class="amount"></td>
+                </tr>
+                {% endif %}
+                <!-- Bono Vacacional -->
+                <tr>
+                    <td>Bono Vacacional (Art. 192 LOTTT)</td>
+                    <td style="text-align: center;">{{ bonus_days }}</td>
+                    <td class="amount">
+                        {% if receipt_currency == 'DUAL' %}
+                        <div class="text-usd">{{ bonus_amount|floatformat:2 }}</div>
+                        <div class="text-ves">Bs. {{ bonus_amount_ves|floatformat:2 }}</div>
+                        {% elif receipt_currency == 'VES' %}
+                        {{ bonus_amount_ves|floatformat:2 }}
+                        {% else %}
+                        {{ bonus_amount|floatformat:2 }}
+                        {% endif %}
+                    </td>
+                    <td class="amount"></td>
+                </tr>
+
+                <!-- DEDUCCIONES -->
+                <!-- IVSS -->
+                <tr>
+                    <td>IVSS (S.S.O)</td>
+                    <td style="text-align: center;">4.00%</td>
+                    <td class="amount"></td>
+                    <td class="amount">
+                        {% if receipt_currency == 'DUAL' %}
+                        <div class="text-usd">{{ ivss_amount|floatformat:2 }}</div>
+                        <div class="text-ves">Bs. {{ ivss_amount_ves|floatformat:2 }}</div>
+                        {% elif receipt_currency == 'VES' %}
+                        {{ ivss_amount_ves|floatformat:2 }}
+                        {% else %}
+                        {{ ivss_amount|floatformat:2 }}
+                        {% endif %}
+                    </td>
+                </tr>
+                <!-- FAOV -->
+                <tr>
+                    <td>FAOV (Vivienda)</td>
+                    <td style="text-align: center;">1.00%</td>
+                    <td class="amount"></td>
+                    <td class="amount">
+                        {% if receipt_currency == 'DUAL' %}
+                        <div class="text-usd">{{ faov_amount|floatformat:2 }}</div>
+                        <div class="text-ves">Bs. {{ faov_amount_ves|floatformat:2 }}</div>
+                        {% elif receipt_currency == 'VES' %}
+                        {{ faov_amount_ves|floatformat:2 }}
+                        {% else %}
+                        {{ faov_amount|floatformat:2 }}
+                        {% endif %}
+                    </td>
+                </tr>
+                <!-- RPE -->
+                <tr>
+                    <td>RPE (Paro Forzoso)</td>
+                    <td style="text-align: center;">0.50%</td>
+                    <td class="amount"></td>
+                    <td class="amount">
+                        {% if receipt_currency == 'DUAL' %}
+                        <div class="text-usd">{{ rpe_amount|floatformat:2 }}</div>
+                        <div class="text-ves">Bs. {{ rpe_amount_ves|floatformat:2 }}</div>
+                        {% elif receipt_currency == 'VES' %}
+                        {{ rpe_amount_ves|floatformat:2 }}
+                        {% else %}
+                        {{ rpe_amount|floatformat:2 }}
+                        {% endif %}
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- TOTALES -->
+        <div class="totals">
+            <table style="width: 100%; border: none;">
+                <tr>
+                    <td style="border: none; width: 50%;">Total Asignaciones:</td>
+                    <td class="amount" style="border: none;">
+                        {% if receipt_currency == 'DUAL' %}
+                        $ {{ gross_total|floatformat:2 }} / Bs. {{ gross_total_ves|floatformat:2 }}
+                        {% elif receipt_currency == 'VES' %}
+                        Bs. {{ gross_total_ves|floatformat:2 }}
+                        {% else %}
+                        $ {{ gross_total|floatformat:2 }}
+                        {% endif %}
+                    </td>
+                    <td style="border: none; width: 30%;">Total Deducciones:</td>
+                    <td class="amount" style="border: none;">
+                        {% if receipt_currency == 'DUAL' %}
+                        $ {{ total_deductions|floatformat:2 }} / Bs. {{ total_deductions_ves|floatformat:2 }}
+                        {% elif receipt_currency == 'VES' %}
+                        Bs. {{ total_deductions_ves|floatformat:2 }}
+                        {% else %}
+                        $ {{ total_deductions|floatformat:2 }}
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr style="font-size: 12px; border-top: 1px solid #ccc;">
+                    <td colspan="2" style="border: none; padding-top: 10px;">NETO A PAGAR:</td>
+                    <td colspan="2" class="amount net-pay" style="border: none; padding-top: 10px;">
+                        {% if receipt_currency == 'DUAL' %}
+                        $ {{ net_total|floatformat:2 }}
+                        <div style="font-size: 10px; color: #666;">Bs. {{ net_total_ves|floatformat:2 }}</div>
+                        {% elif receipt_currency == 'VES' %}
+                        Bs. {{ net_total_ves|floatformat:2 }}
+                        {% else %}
+                        $ {{ net_total|floatformat:2 }}
+                        {% endif %}
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        <div style="margin-top: 15px; font-size: 9px; text-align: justify; color: #666; font-style: italic;">
+            <strong>DECLARACIÓN:</strong> Recibí a mi entera satisfacción el monto neto arriba indicado por concepto de
+            pago de vacaciones y bono vacacional, conforme a los artículos 190 y 192 de la LOTTT.
+        </div>
+
+        <!-- FIRMAS -->
+        <div class="firmas">
+            <div class="linea-firma">
+                <br>Por la Empresa
+            </div>
+            <div class="linea-firma">
+                <br>Recibí Conforme<br>C.I. {{ employee.document_id }}
+            </div>
+        </div>
+
+        <div class="footer">
+            Generado por Nóminix - {% now "d/m/Y H:i" %}
+        </div>
+    </div>
+</body>
+
+</html>

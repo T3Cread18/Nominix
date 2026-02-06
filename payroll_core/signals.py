@@ -13,8 +13,14 @@ def initialize_tenant_data(sender, **kwargs):
     """
     Se ejecuta después de que un esquema ha sido creado y sincronizado.
     """
+    tenant = kwargs.get('tenant')
     schema_name = kwargs.get('schema_name')
-    if schema_name == 'public':
+    
+    # Robust extraction: some versions of django-tenants might pass the object or just the name
+    if tenant and hasattr(tenant, 'schema_name'):
+        schema_name = tenant.schema_name
+    
+    if not schema_name or schema_name == 'public':
         return
 
     logger.info(f"Inicializando conceptos de sistema para el tenant: {schema_name}")
@@ -23,7 +29,7 @@ def initialize_tenant_data(sender, **kwargs):
             count = create_system_concepts()
             logger.info(f"Se crearon/actualizaron {count} conceptos de sistema en {schema_name}")
     except Exception as e:
-        logger.error(f"Error inicializando tenant {schema_name}: {e}")
+        logger.error(f"Error inicializando tenant {schema_name}: {str(e)}")
 
 @receiver(post_save, sender=Company)
 def on_company_created(sender, instance, created, **kwargs):

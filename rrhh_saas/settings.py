@@ -21,6 +21,9 @@ DEBUG: bool = os.environ.get('DEBUG', 'True').lower() in ('true', '1', 'yes')
 
 ALLOWED_HOSTS: List[str] = ['localhost', '127.0.0.1', '.localhost']
 
+# Dominio base para la creación automática de subdominios
+TENANT_BASE_DOMAIN: str = os.environ.get('TENANT_BASE_DOMAIN', 'localhost')
+
 # Orígenes confiables para CSRF (Necesario para el frontend desacoplado)
 CSRF_TRUSTED_ORIGINS: List[str] = [
     'http://localhost:3000',
@@ -65,6 +68,7 @@ TENANT_APPS: List[str] = [
     'django_cleanup.apps.CleanupConfig',
     # Apps de nómina y RRHH
     'payroll_core',
+    'vacations',  # Módulo de Gestión de Vacaciones
 ]
 
 # Combinación de todas las apps instaladas
@@ -171,7 +175,7 @@ USE_TZ: bool = True
 # ARCHIVOS ESTÁTICOS
 # =============================================================================
 
-STATIC_URL: str = 'static/'
+STATIC_URL: str = '/static/'
 STATIC_ROOT: Path = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS: List[Path] = [
     BASE_DIR / 'static',

@@ -1,38 +1,17 @@
-import React, { useState, useEffect } from 'react';
-import axiosClient from '../api/axiosClient';
+import React, { useState } from 'react';
 import { Plus, Check, ChevronDown, Loader2, X, Layers } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '../utils/cn';
+import { useDepartments, useCreateDepartment } from '../hooks/useOrganization';
 
 export default function DepartmentSelector({ value, onChange, error, branchId, disabled }) {
-    const [departments, setDepartments] = useState([]);
-    const [loading, setLoading] = useState(false);
+    // Hooks
+    const { data: departments = [], isLoading } = useDepartments(branchId, { enabled: !!branchId });
+    const createMutation = useCreateDepartment();
+
+    // Local State
     const [isCreating, setIsCreating] = useState(false);
     const [newDeptName, setNewDeptName] = useState('');
-    const [createLoading, setCreateLoading] = useState(false);
-
-    useEffect(() => {
-        loadDepartments();
-    }, [branchId]);
-
-    const loadDepartments = async () => {
-        setLoading(true);
-        try {
-            // Si no hay sede seleccionada, traemos lista vacía o todas (depende de tu lógica)
-            // Aquí forzamos vacía para obligar a seleccionar sede primero
-            if (!branchId) {
-                setDepartments([]);
-                return;
-            }
-            const response = await axiosClient.get(`/departments/?branch=${branchId}`);
-            setDepartments(response.data.results || response.data);
-        } catch (err) {
-            console.error(err);
-            toast.error('Error cargando departamentos');
-        } finally {
-            setLoading(false);
-        }
-    };
 
     const handleCreate = async () => {
         if (!newDeptName.trim()) return;
@@ -42,33 +21,26 @@ export default function DepartmentSelector({ value, onChange, error, branchId, d
             return;
         }
 
-        setCreateLoading(true);
         try {
-            const response = await axiosClient.post('/departments/', {
+            const newDept = await createMutation.mutateAsync({
                 name: newDeptName,
                 description: 'Creado rápido desde ficha de ingreso',
                 branch: branchId
             });
 
-            const newDept = response.data;
-            // Optimistic update: agregamos el nuevo y lo seleccionamos
-            setDepartments([...departments, newDept]);
+            // Auto-select
             onChange(newDept.id);
 
             // Reset UI
             setIsCreating(false);
             setNewDeptName('');
-            toast.success('Departamento creado');
         } catch (err) {
             console.error(err);
-            toast.error('Error creando departamento');
-        } finally {
-            setCreateLoading(false);
         }
     };
 
-    // --- ESTADO DE CARGA INICIAL ---
-    if (loading) return (
+    // --- ESTADO DE CARGA INICIAL (Solo si hay branch seleccionado pero cargando) ---
+    if (isLoading && branchId) return (
         <div className="w-full h-[50px] bg-gray-50 rounded-2xl animate-pulse flex items-center px-4">
             <div className="h-2 w-24 bg-gray-200 rounded"></div>
         </div>
@@ -96,11 +68,11 @@ export default function DepartmentSelector({ value, onChange, error, branchId, d
                 <button
                     type="button"
                     onClick={handleCreate}
-                    disabled={createLoading || !newDeptName.trim()}
+                    disabled={createMutation.isPending || !newDeptName.trim()}
                     className="h-full aspect-square flex items-center justify-center bg-nominix-electric text-white rounded-xl hover:bg-black transition-colors shadow-lg shadow-nominix-electric/20"
                     title="Guardar"
                 >
-                    {createLoading ? <Loader2 className="animate-spin" size={18} /> : <Check size={18} />}
+                    {createMutation.isPending ? <Loader2 className="animate-spin" size={18} /> : <Check size={18} />}
                 </button>
 
                 <button
@@ -124,7 +96,7 @@ export default function DepartmentSelector({ value, onChange, error, branchId, d
                     <Layers className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={16} />
 
                     <select
-                        value={value || ''}
+                        value={typeof value === 'object' ? value?.id : (value || '')}
                         onChange={(e) => onChange(e.target.value)}
                         disabled={!branchId || disabled}
                         className={cn(

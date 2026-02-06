@@ -5,6 +5,7 @@ Define los serializers para la API REST de gestión de tenants.
 """
 from rest_framework import serializers
 from django.db import connection
+from django.conf import settings
 from .models import Client, Domain
 from typing import Dict, Any
 import logging
@@ -27,7 +28,7 @@ class ClientSerializer(serializers.ModelSerializer):
     Incluye los dominios asociados y valida la creación de nuevos tenants.
     """
     
-    domains = DomainSerializer(many=True, read_only=True, source='domain_set')
+    domains = DomainSerializer(many=True, read_only=True)
     primary_domain = serializers.CharField(
         write_only=True, 
         required=True,
@@ -181,6 +182,10 @@ class ClientCreateSerializer(serializers.Serializer):
     def validate_domain(self, value: str) -> str:
         """Valida que el dominio no esté en uso."""
         value = value.lower().strip()
+        
+        # Si no tiene puntos, asumimos que es un subdominio y agregamos el dominio base
+        if '.' not in value:
+            value = f"{value}.{settings.TENANT_BASE_DOMAIN}"
         
         if Domain.objects.filter(domain=value).exists():
             raise serializers.ValidationError(

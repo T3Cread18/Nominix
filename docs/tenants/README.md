@@ -1,6 +1,6 @@
 # 📋 Índice de Tenants
 
-_Última actualización: 27/12/2025 13:07_
+_Última actualización: 16/01/2026 12:45_
 
 ## Resumen
 

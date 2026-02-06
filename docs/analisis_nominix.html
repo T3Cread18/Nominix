@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Análisis Completo del Sistema Nominix</title>
+    
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    
+    * {
+        box-sizing: border-box;
+    }
+    
+    body {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        line-height: 1.6;
+        color: #1f2937;
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 40px;
+        background: #ffffff;
+    }
+    
+    h1 {
+        color: #111827;
+        border-bottom: 3px solid #6366f1;
+        padding-bottom: 10px;
+        font-size: 2em;
+    }
+    
+    h2 {
+        color: #374151;
+        border-bottom: 2px solid #e5e7eb;
+        padding-bottom: 8px;
+        margin-top: 40px;
+    }
+    
+    h3 {
+        color: #4b5563;
+        margin-top: 30px;
+    }
+    
+    h4 {
+        color: #6b7280;
+    }
+    
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 20px 0;
+        font-size: 0.9em;
+    }
+    
+    th, td {
+        border: 1px solid #e5e7eb;
+        padding: 12px;
+        text-align: left;
+    }
+    
+    th {
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        color: white;
+        font-weight: 600;
+    }
+    
+    tr:nth-child(even) {
+        background-color: #f9fafb;
+    }
+    
+    tr:hover {
+        background-color: #f3f4f6;
+    }
+    
+    code {
+        background-color: #f3f4f6;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-family: 'Consolas', 'Monaco', monospace;
+        font-size: 0.9em;
+        color: #6366f1;
+    }
+    
+    pre {
+        background: linear-gradient(135deg, #1f2937 0%, #374151 100%);
+        color: #f9fafb;
+        padding: 20px;
+        border-radius: 8px;
+        overflow-x: auto;
+        font-size: 0.85em;
+    }
+    
+    pre code {
+        background: none;
+        color: #f9fafb;
+        padding: 0;
+    }
+    
+    blockquote {
+        border-left: 4px solid #6366f1;
+        margin: 20px 0;
+        padding: 10px 20px;
+        background-color: #eef2ff;
+        border-radius: 0 8px 8px 0;
+    }
+    
+    a {
+        color: #6366f1;
+        text-decoration: none;
+    }
+    
+    a:hover {
+        text-decoration: underline;
+    }
+    
+    hr {
+        border: none;
+        border-top: 2px solid #e5e7eb;
+        margin: 40px 0;
+    }
+    
+    /* Badges */
+    .emoji {
+        font-size: 1.2em;
+    }
+    
+    /* Print styles */
+    @media print {
+        body {
+            padding: 20px;
+        }
+        
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        
+        table {
+            page-break-inside: avoid;
+        }
+    }
+</style>
+
+</head>
+<body>
+    <h1 id="analisis-completo-del-sistema-nominix">🔍 Análisis Completo del Sistema Nominix</h1>
+<blockquote>
+<p><strong>Fecha de Análisis</strong>: 16 de Enero, 2026<br />
+<strong>Versión Detectada</strong>: ~V1.2.6 (basado en documentación)</p>
+</blockquote>
+<hr />
+<h2 id="resumen-ejecutivo">📋 Resumen Ejecutivo</h2>
+<p><strong>Nominix</strong> es una plataforma SaaS multi-tenant para gestión de Recursos Humanos y Nómina, optimizada para el marco legal venezolano (LOTTT, IVSS, FAOV). El sistema está compuesto por:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Capa</th>
+<th style="text-align: left;">Tecnología</th>
+<th style="text-align: left;">Estado</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">Backend</td>
+<td style="text-align: left;">Django 5.0 + DRF</td>
+<td style="text-align: left;">✅ Completo</td>
+</tr>
+<tr>
+<td style="text-align: left;">Frontend</td>
+<td style="text-align: left;">React 18 + Vite</td>
+<td style="text-align: left;">✅ Completo</td>
+</tr>
+<tr>
+<td style="text-align: left;">Base de Datos</td>
+<td style="text-align: left;">PostgreSQL (Multi-tenant)</td>
+<td style="text-align: left;">✅ Completo</td>
+</tr>
+<tr>
+<td style="text-align: left;">Motor de Nómina</td>
+<td style="text-align: left;">Motor de Reglas Dinámico</td>
+<td style="text-align: left;">✅ Completo</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="arquitectura-del-sistema">🏗️ Arquitectura del Sistema</h2>
+<h3 id="estructura-de-directorios-principal">Estructura de Directorios Principal</h3>
+<div class="codehilite"><pre><span></span><code>c:\Desarrollo\RRHH\
+├── 📁 customers/           # App Django - Gestión Multi-Tenant
+├── 📁 payroll_core/        # App Django - Motor de Nómina (Core)
+│   ├── 📁 models/          # Modelos de datos
+│   ├── 📁 services/        # Lógica de negocio
+│   ├── engine.py           # Motor de cálculo de nómina
+│   ├── formulas.py         # Fórmulas legales venezolanas
+│   └── views.py            # API REST endpoints
+├── 📁 nominix-web/         # Frontend React/Vite
+│   └── 📁 src/
+│       ├── 📁 features/    # Módulos funcionales
+│       ├── 📁 api/         # Cliente Axios
+│       └── 📁 services/    # Servicios de datos
+├── 📁 rrhh_saas/           # Configuración Django Project
+├── 📁 templates/           # Templates HTML (Recibos PDF)
+└── docker-compose.yml      # Orquestación Docker
+</code></pre></div>
+
+<hr />
+<h2 id="lo-que-esta-implementado">✅ Lo Que ESTÁ Implementado</h2>
+<h3 id="1-backend-modelos-de-datos">1. Backend - Modelos de Datos</h3>
+<h4 id="modulo-payroll_coremodels">Módulo: <code>payroll_core/models/</code></h4>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Modelo</th>
+<th style="text-align: left;">Archivo</th>
+<th style="text-align: left;">Propósito</th>
+<th style="text-align: left;">Estado</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>Employee</code></td>
+<td style="text-align: left;"><a href="file:///c:/Desarrollo/RRHH/payroll_core/models/employee.py">employee.py</a></td>
+<td style="text-align: left;">Datos del empleado (cédula, género, estado civil, banco)</td>
+<td style="text-align: left;">✅ Completo</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>LaborContract</code></td>
+<td style="text-align: left;"><a href="file:///c:/Desarrollo/RRHH/payroll_core/models/employee.py#L309-542">employee.py</a></td>
+<td style="text-align: left;">Contratos laborales (salario, cargo, frecuencia de pago)</td>
+<td style="text-align: left;">✅ Completo</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>PayrollConcept</code></td>
+<td style="text-align: left;"><a href="file:///c:/Desarrollo/RRHH/payroll_core/models/concepts.py">concepts.py</a></td>
+<td style="text-align: left;">Catálogo de conceptos (asignaciones/deducciones)</td>
+<td style="text-align: left;">✅ Completo</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>EmployeeConcept</code></td>
+<td style="text-align: left;"><a href="file:///c:/Desarrollo/RRHH/payroll_core/models/concepts.py#L179-234">concepts.py</a></td>
+<td style="text-align: left;">Asignación personalizada de conceptos a empleados</td>
+<td style="text-align: left;">✅ Completo</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>PayrollPeriod</code></td>
+<td style="text-align: left;"><a href="file:///c:/Desarrollo/RRHH/payroll_core/models/payroll.py">payroll.py</a></td>
+<td style="text-align: left;">Periodos de nómina (quincenas/meses)</td>
+<td style="text-align: left;">✅ Completo</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>PayrollReceipt</code></td>
+<td style="text-align: left;"><a href="file:///c:/Desarrollo/RRHH/payroll_core/models/payroll.py#L46-163">payroll.py</a></td>
+<td style="text-align: left;">Recibos de pago (header)</td>
+<td style="text-align: left;">✅ Completo</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>PayrollReceiptLine</code></td>
+<td style="text-align: left;"><a href="file:///c:/Desarrollo/RRHH/payroll_core/models/payroll.py#L211-293">payroll.py</a></td>
+<td style="text-align: left;">Líneas de detalle del recibo</td>
+<td style="text-align: left;">✅ Completo</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>PayrollNovelty</code></td>
+<td style="text-align: left;"><a href="file:///c:/Desarrollo/RRHH/payroll_core/models/payroll.py#L167-208">payroll.py</a></td>
+<td style="text-align: left;">Novedades (horas extra, faltas, bonos transitorios)</td>
+<td style="text-align: left;">✅ Completo</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Branch</code></td>
+<td style="text-align: left;"><a href="file:///c:/Desarrollo/RRHH/payroll_core/models/organization.py">organization.py</a></td>
+<td style="text-align: left;">Sedes/Sucursales</td>
+<td style="text-align: left;">✅ Completo</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Department</code></td>
+<td style="text-align: left;"><a href="file:///c:/Desarrollo/RRHH/payroll_core/models/organization.py#L92-120">organization.py</a></td>
+<td style="text-align: left;">Departamentos organizacionales</td>
+<td style="text-align: left;">✅ Completo</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>JobPosition</code></td>
+<td style="text-align: left;"><a href="file:///c:/Desarrollo/RRHH/payroll_core/models/organization.py#L123-224">organization.py</a></td>
+<td style="text-align: left;">Cargos con sueldo base por defecto</td>
+<td style="text-align: left;">✅ Completo</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Company</code></td>
+<td style="text-align: left;"><a href="file:///c:/Desarrollo/RRHH/payroll_core/models/organization.py#L227-343">organization.py</a></td>
+<td style="text-align: left;">Configuración de la empresa (singleton)</td>
+<td style="text-align: left;">✅ Completo</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>PayrollPolicy</code></td>
+<td style="text-align: left;"><a href="file:///c:/Desarrollo/RRHH/payroll_core/models/organization.py#L346-403">organization.py</a></td>
+<td style="text-align: left;">Políticas globales (% horas extra, bono nocturno)</td>
+<td style="text-align: left;">✅ Completo</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Currency</code></td>
+<td style="text-align: left;"><a href="file:///c:/Desarrollo/RRHH/payroll_core/models/currency.py">currency.py</a></td>
+<td style="text-align: left;">Monedas (USD, VES, EUR)</td>
+<td style="text-align: left;">✅ Completo</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>ExchangeRate</code></td>
+<td style="text-align: left;"><a href="file:///c:/Desarrollo/RRHH/payroll_core/models/currency.py#L80-154">currency.py</a></td>
+<td style="text-align: left;">Tasas de cambio históricas (BCV)</td>
+<td style="text-align: left;">✅ Completo</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Loan</code></td>
+<td style="text-align: left;"><a href="file:///c:/Desarrollo/RRHH/payroll_core/models/loans.py">loans.py</a></td>
+<td style="text-align: left;">Préstamos y anticipos a empleados</td>
+<td style="text-align: left;">✅ Completo</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>LoanPayment</code></td>
+<td style="text-align: left;"><a href="file:///c:/Desarrollo/RRHH/payroll_core/models/loans.py#L146-200">loans.py</a></td>
+<td style="text-align: left;">Abonos/amortizaciones de préstamos</td>
+<td style="text-align: left;">✅ Completo</td>
+</tr>
+</tbody>
+</table>
+<h4 id="modulo-customers">Módulo: <code>customers/</code></h4>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Modelo</th>
+<th style="text-align: left;">Propósito</th>
+<th style="text-align: left;">Estado</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>Client</code></td>
+<td style="text-align: left;">Tenant/Empresa (esquema PostgreSQL separado)</td>
+<td style="text-align: left;">✅ Completo</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Domain</code></td>
+<td style="text-align: left;">Dominios/subdominios por tenant</td>
+<td style="text-align: left;">✅ Completo</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="2-backend-motor-de-nomina">2. Backend - Motor de Nómina</h3>
+<h4 id="enginepy-881-lineas"><a href="file:///c:/Desarrollo/RRHH/payroll_core/engine.py">engine.py</a> - 881 líneas</h4>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Funcionalidad</th>
+<th style="text-align: left;">Método</th>
+<th style="text-align: left;">Estado</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">Inicialización con contrato y periodo</td>
+<td style="text-align: left;"><code>__init__</code></td>
+<td style="text-align: left;">✅</td>
+</tr>
+<tr>
+<td style="text-align: left;">Carga de novedades desde BD</td>
+<td style="text-align: left;"><code>_load_novelties_from_db</code></td>
+<td style="text-align: left;">✅</td>
+</tr>
+<tr>
+<td style="text-align: left;">Obtención de tasa de cambio</td>
+<td style="text-align: left;"><code>_get_exchange_rate_value</code></td>
+<td style="text-align: left;">✅</td>
+</tr>
+<tr>
+<td style="text-align: left;">Inventario de variables disponibles</td>
+<td style="text-align: left;"><code>get_variable_inventory</code></td>
+<td style="text-align: left;">✅</td>
+</tr>
+<tr>
+<td style="text-align: left;">Construcción de contexto de evaluación</td>
+<td style="text-align: left;"><code>_build_eval_context</code></td>
+<td style="text-align: left;">✅</td>
+</tr>
+<tr>
+<td style="text-align: left;">Cálculo de concepto individual</td>
+<td style="text-align: left;"><code>calculate_concept</code></td>
+<td style="text-align: left;">✅</td>
+</tr>
+<tr>
+<td style="text-align: left;">Handler: Sueldo Base</td>
+<td style="text-align: left;"><code>_handle_salary_base</code></td>
+<td style="text-align: left;">✅</td>
+</tr>
+<tr>
+<td style="text-align: left;">Handler: Deducciones de Ley (IVSS, FAOV)</td>
+<td style="text-align: left;"><code>_handle_law_deduction</code></td>
+<td style="text-align: left;">✅</td>
+</tr>
+<tr>
+<td style="text-align: left;">Orquestación completa</td>
+<td style="text-align: left;"><code>calculate_payroll</code></td>
+<td style="text-align: left;">✅</td>
+</tr>
+<tr>
+<td style="text-align: left;">Validación de fórmulas</td>
+<td style="text-align: left;"><code>validate_formula</code></td>
+<td style="text-align: left;">✅</td>
+</tr>
+</tbody>
+</table>
+<h4 id="variables-disponibles-para-formulas">Variables Disponibles para Fórmulas</h4>
+<p>El motor expone estas variables para las fórmulas dinámicas:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Variable</th>
+<th style="text-align: left;">Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>SALARIO</code></td>
+<td style="text-align: left;">Salario mensual del contrato</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>DIAS</code></td>
+<td style="text-align: left;">Días del periodo (15 o 30)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>LUNES</code></td>
+<td style="text-align: left;">Cantidad de lunes del periodo</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>TASA</code></td>
+<td style="text-align: left;">Tasa de cambio USD→VES</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>ANTIGUEDAD</code></td>
+<td style="text-align: left;">Años de antigüedad</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>SALARIO_MINIMO</code></td>
+<td style="text-align: left;">Salario mínimo vigente</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>SALARIO_DIARIO</code></td>
+<td style="text-align: left;">Salario mensual / 30</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>SALARIO_HORA</code></td>
+<td style="text-align: left;">Salario diario / 8</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="3-backend-servicios">3. Backend - Servicios</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Servicio</th>
+<th style="text-align: left;">Propósito</th>
+<th style="text-align: left;">Estado</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><a href="file:///c:/Desarrollo/RRHH/payroll_core/services/calculator.py">calculator.py</a></td>
+<td style="text-align: left;">Cálculos auxiliares</td>
+<td style="text-align: left;">✅</td>
+</tr>
+<tr>
+<td style="text-align: left;"><a href="file:///c:/Desarrollo/RRHH/payroll_core/services/currency.py">currency.py</a></td>
+<td style="text-align: left;">Sincronización con BCV</td>
+<td style="text-align: left;">✅</td>
+</tr>
+<tr>
+<td style="text-align: left;"><a href="file:///c:/Desarrollo/RRHH/payroll_core/services/employee.py">employee.py</a></td>
+<td style="text-align: left;">Lógica de empleados</td>
+<td style="text-align: left;">✅</td>
+</tr>
+<tr>
+<td style="text-align: left;"><a href="file:///c:/Desarrollo/RRHH/payroll_core/services/initialization.py">initialization.py</a></td>
+<td style="text-align: left;">Datos iniciales del sistema</td>
+<td style="text-align: left;">✅</td>
+</tr>
+<tr>
+<td style="text-align: left;"><a href="file:///c:/Desarrollo/RRHH/payroll_core/services/payroll.py">payroll.py</a></td>
+<td style="text-align: left;">Procesamiento de nómina</td>
+<td style="text-align: left;">✅</td>
+</tr>
+<tr>
+<td style="text-align: left;"><a href="file:///c:/Desarrollo/RRHH/payroll_core/services/payroll_persistence.py">payroll_persistence.py</a></td>
+<td style="text-align: left;">Persistencia de recibos (cierre)</td>
+<td style="text-align: left;">✅</td>
+</tr>
+<tr>
+<td style="text-align: left;"><a href="file:///c:/Desarrollo/RRHH/payroll_core/services/salary.py">salary.py</a></td>
+<td style="text-align: left;">Cálculo de salario (SalarySplitter)</td>
+<td style="text-align: left;">✅</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="4-backend-api-rest">4. Backend - API REST</h3>
+<h4 id="viewspy-viewsets"><a href="file:///c:/Desarrollo/RRHH/payroll_core/views.py">views.py</a> - ViewSets</h4>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">ViewSet</th>
+<th style="text-align: left;">Endpoints</th>
+<th style="text-align: left;">Estado</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>EmployeeViewSet</code></td>
+<td style="text-align: left;">CRUD + <code>simulate-payslip</code></td>
+<td style="text-align: left;">✅</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>LaborContractViewSet</code></td>
+<td style="text-align: left;">CRUD de contratos</td>
+<td style="text-align: left;">✅</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>PayrollConceptViewSet</code></td>
+<td style="text-align: left;">CRUD de conceptos</td>
+<td style="text-align: left;">✅</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>EmployeeConceptViewSet</code></td>
+<td style="text-align: left;">Asignación de conceptos</td>
+<td style="text-align: left;">✅</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>PayrollPeriodViewSet</code></td>
+<td style="text-align: left;">CRUD + <code>preview-payroll</code> + <code>close</code> + <code>export-pdf</code></td>
+<td style="text-align: left;">✅</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>PayrollReceiptViewSet</code></td>
+<td style="text-align: left;">Consulta de recibos</td>
+<td style="text-align: left;">✅</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>BranchViewSet</code></td>
+<td style="text-align: left;">CRUD de sedes</td>
+<td style="text-align: left;">✅</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>DepartmentViewSet</code></td>
+<td style="text-align: left;">CRUD de departamentos</td>
+<td style="text-align: left;">✅</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>JobPositionViewSet</code></td>
+<td style="text-align: left;">CRUD de cargos</td>
+<td style="text-align: left;">✅</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>CurrencyViewSet</code></td>
+<td style="text-align: left;">CRUD de monedas</td>
+<td style="text-align: left;">✅</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>LoanViewSet</code></td>
+<td style="text-align: left;">CRUD de préstamos</td>
+<td style="text-align: left;">✅</td>
+</tr>
+</tbody>
+</table>
+<h4 id="customersviewspy-gestion-multi-tenant"><a href="file:///c:/Desarrollo/RRHH/customers/views.py">customers/views.py</a> - Gestión Multi-Tenant</h4>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Vista</th>
+<th style="text-align: left;">Funcionalidad</th>
+<th style="text-align: left;">Estado</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>ClientViewSet</code></td>
+<td style="text-align: left;">CRUD de tenants + <code>stats</code> + <code>deep_stats</code> + <code>users</code></td>
+<td style="text-align: left;">✅</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>TenantInfoView</code></td>
+<td style="text-align: left;">Información del tenant actual</td>
+<td style="text-align: left;">✅</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>AuthView</code></td>
+<td style="text-align: left;">Login/Logout/Me</td>
+<td style="text-align: left;">✅</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="5-frontend-modulos-react">5. Frontend - Módulos React</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Módulo</th>
+<th style="text-align: left;">Componentes</th>
+<th style="text-align: left;">Estado</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Auth</strong></td>
+<td style="text-align: left;">LoginPage</td>
+<td style="text-align: left;">✅</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>HR</strong></td>
+<td style="text-align: left;">PersonnelManager, EmployeeFormPage, CreateEmployeeModal, CreateContractModal, EmployeeConcepts</td>
+<td style="text-align: left;">✅</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Payroll</strong></td>
+<td style="text-align: left;">ConceptCatalog, PayrollDashboard, PayrollClosure, PayrollDetail, NovedadesGrid, PayrollPreviewModal, PayslipsListModal</td>
+<td style="text-align: left;">✅</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Settings</strong></td>
+<td style="text-align: left;">CompanySettings, OrganizationManager</td>
+<td style="text-align: left;">✅</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Loans</strong></td>
+<td style="text-align: left;">LoanManager, LoanFormModal</td>
+<td style="text-align: left;">✅</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Tenants</strong></td>
+<td style="text-align: left;">TenantsAdmin, TenantsLogin, TenantWizard</td>
+<td style="text-align: left;">⚠️ TenantWizard incompleto</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="lo-que-falta-o-esta-incompleto">⚠️ Lo Que FALTA o Está Incompleto</h2>
+<h3 id="1-funcionalidades-criticas-faltantes">1. Funcionalidades Críticas Faltantes</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Área</th>
+<th style="text-align: left;">Descripción</th>
+<th style="text-align: left;">Prioridad</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Reportes</strong></td>
+<td style="text-align: left;">No hay módulo de reportes gerenciales (resúmenes, gráficos, exportación masiva)</td>
+<td style="text-align: left;">🔴 Alta</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Vacaciones</strong></td>
+<td style="text-align: left;">No hay gestión de vacaciones, cálculo de días disfrutados/pendientes</td>
+<td style="text-align: left;">🔴 Alta</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Prestaciones Sociales</strong></td>
+<td style="text-align: left;">No hay cálculo de prestaciones (antigüedad, intereses, garantía)</td>
+<td style="text-align: left;">🔴 Alta</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Utilidades</strong></td>
+<td style="text-align: left;">No hay cálculo de utilidades anuales (según LOTTT)</td>
+<td style="text-align: left;">🔴 Alta</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Liquidación</strong></td>
+<td style="text-align: left;">No hay módulo de liquidación final de empleados</td>
+<td style="text-align: left;">🔴 Alta</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>ISLR</strong></td>
+<td style="text-align: left;">No hay cálculo de retención de Impuesto Sobre la Renta</td>
+<td style="text-align: left;">🟡 Media</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>RPE</strong></td>
+<td style="text-align: left;">No hay cálculo de aporte al Régimen Prestacional de Empleo</td>
+<td style="text-align: left;">🟡 Media</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>INCES</strong></td>
+<td style="text-align: left;">No hay cálculo de aporte al INCES (2%)</td>
+<td style="text-align: left;">🟡 Media</td>
+</tr>
+</tbody>
+</table>
+<h3 id="2-modulos-de-frontend-incompletos">2. Módulos de Frontend Incompletos</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Componente</th>
+<th style="text-align: left;">Problema</th>
+<th style="text-align: left;">Archivo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>TenantWizard</code></td>
+<td style="text-align: left;">Solo 104 bytes - Archivo placeholder</td>
+<td style="text-align: left;"><a href="file:///c:/Desarrollo/RRHH/nominix-web/src/features/tenants/TenantWizard.jsx">TenantWizard.jsx</a></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>ConceptFormBuilder</code></td>
+<td style="text-align: left;">Problema con campos code/name en modo edición (según historial de conversaciones)</td>
+<td style="text-align: left;"><a href="file:///c:/Desarrollo/RRHH/nominix-web/src/features/payroll/components/ConceptFormBuilder.jsx">ConceptFormBuilder.jsx</a></td>
+</tr>
+</tbody>
+</table>
+<h3 id="3-funcionalidades-de-infraestructura">3. Funcionalidades de Infraestructura</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Área</th>
+<th style="text-align: left;">Estado</th>
+<th style="text-align: left;">Comentario</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Tests Unitarios</strong></td>
+<td style="text-align: left;">⚠️ Mínimos</td>
+<td style="text-align: left;">Solo <code>tests.py</code> y <code>tests_loans.py</code> básicos</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>CI/CD</strong></td>
+<td style="text-align: left;">❌ Falta</td>
+<td style="text-align: left;">No hay pipelines de GitHub Actions o similar</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Logs Estructurados</strong></td>
+<td style="text-align: left;">⚠️ Básico</td>
+<td style="text-align: left;">Solo logging básico de Python</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Backup Automático</strong></td>
+<td style="text-align: left;">❌ Falta</td>
+<td style="text-align: left;">No hay estrategia de backup documentada</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Rate Limiting API</strong></td>
+<td style="text-align: left;">❌ Falta</td>
+<td style="text-align: left;">No implementado (vulnerable a abusos)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Documentación API</strong></td>
+<td style="text-align: left;">⚠️ Parcial</td>
+<td style="text-align: left;">Sin Swagger/OpenAPI automático</td>
+</tr>
+</tbody>
+</table>
+<h3 id="4-seguridad">4. Seguridad</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Aspecto</th>
+<th style="text-align: left;">Estado</th>
+<th style="text-align: left;">Recomendación</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">Autenticación</td>
+<td style="text-align: left;">✅ Session-based</td>
+<td style="text-align: left;">Considerar JWT para mobile</td>
+</tr>
+<tr>
+<td style="text-align: left;">Permisos</td>
+<td style="text-align: left;">⚠️ Básico</td>
+<td style="text-align: left;">Falta sistema de roles granulares (solo superuser)</td>
+</tr>
+<tr>
+<td style="text-align: left;">Auditoría</td>
+<td style="text-align: left;">❌ Falta</td>
+<td style="text-align: left;">No hay log de acciones (quién modificó qué)</td>
+</tr>
+<tr>
+<td style="text-align: left;">2FA</td>
+<td style="text-align: left;">❌ Falta</td>
+<td style="text-align: left;">No hay autenticación de dos factores</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="resumen-visual-del-sistema">📊 Resumen Visual del Sistema</h2>
+<div class="codehilite"><pre><span></span><code><span class="n">graph</span><span class="w"> </span><span class="n">TB</span>
+<span class="w">    </span><span class="n">subgraph</span><span class="w"> </span><span class="n">Frontend</span><span class="p">[</span><span class="s">&quot;Frontend (React/Vite)&quot;</span><span class="p">]</span>
+<span class="w">        </span><span class="n">A1</span><span class="p">[</span><span class="n">Auth</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">A2</span><span class="p">[</span><span class="n">HR</span><span class="w"> </span><span class="n">Module</span><span class="p">]</span>
+<span class="w">        </span><span class="n">A1</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">A3</span><span class="p">[</span><span class="n">Payroll</span><span class="w"> </span><span class="n">Module</span><span class="p">]</span>
+<span class="w">        </span><span class="n">A1</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">A4</span><span class="p">[</span><span class="n">Settings</span><span class="p">]</span>
+<span class="w">        </span><span class="n">A1</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">A5</span><span class="p">[</span><span class="n">Loans</span><span class="p">]</span>
+<span class="w">        </span><span class="n">A1</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">A6</span><span class="p">[</span><span class="n">Tenants</span><span class="w"> </span><span class="n">Admin</span><span class="p">]</span>
+<span class="w">    </span><span class="n">end</span>
+
+<span class="w">    </span><span class="n">subgraph</span><span class="w"> </span><span class="n">Backend</span><span class="p">[</span><span class="s">&quot;Backend (Django)&quot;</span><span class="p">]</span>
+<span class="w">        </span><span class="n">B1</span><span class="p">[</span><span class="n">REST</span><span class="w"> </span><span class="n">API</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">B2</span><span class="p">[</span><span class="s">&quot;PayrollEngine&quot;</span><span class="p">]</span>
+<span class="w">        </span><span class="n">B1</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">B3</span><span class="p">[</span><span class="n">Services</span><span class="p">]</span>
+<span class="w">        </span><span class="n">B2</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">B4</span><span class="p">[</span><span class="n">Models</span><span class="p">]</span>
+<span class="w">        </span><span class="n">B3</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">B4</span>
+<span class="w">    </span><span class="n">end</span>
+
+<span class="w">    </span><span class="n">subgraph</span><span class="w"> </span><span class="n">Database</span><span class="p">[</span><span class="s">&quot;PostgreSQL&quot;</span><span class="p">]</span>
+<span class="w">        </span><span class="n">D1</span><span class="p">[</span><span class="n">Schema</span><span class="o">:</span><span class="w"> </span><span class="n">public</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">D2</span><span class="p">[</span><span class="s">&quot;Client/Domain&quot;</span><span class="p">]</span>
+<span class="w">        </span><span class="n">D3</span><span class="p">[</span><span class="n">Schema</span><span class="o">:</span><span class="w"> </span><span class="n">tenant_1</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">D4</span><span class="p">[</span><span class="s">&quot;Employee, Payroll, etc.&quot;</span><span class="p">]</span>
+<span class="w">        </span><span class="n">D5</span><span class="p">[</span><span class="n">Schema</span><span class="o">:</span><span class="w"> </span><span class="n">tenant_n</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">D6</span><span class="p">[</span><span class="s">&quot;Employee, Payroll, etc.&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="n">end</span>
+
+<span class="w">    </span><span class="n">Frontend</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">Backend</span>
+<span class="w">    </span><span class="n">Backend</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">Database</span>
+</code></pre></div>
+
+<hr />
+<h2 id="recomendaciones-prioritarias">🎯 Recomendaciones Prioritarias</h2>
+<h3 id="fase-1-completar-core-legal-1-2-meses">Fase 1: Completar Core Legal (1-2 meses)</h3>
+<ol>
+<li>✏️ Implementar módulo de <strong>Prestaciones Sociales</strong></li>
+<li>✏️ Implementar cálculo de <strong>Vacaciones</strong></li>
+<li>✏️ Implementar cálculo de <strong>Utilidades</strong></li>
+<li>✏️ Agregar <strong>ISLR, RPE, INCES</strong> como deducciones de ley</li>
+</ol>
+<h3 id="fase-2-mejorar-experiencia-2-3-semanas">Fase 2: Mejorar Experiencia (2-3 semanas)</h3>
+<ol>
+<li>✏️ Terminar <code>TenantWizard</code> para onboarding fluido</li>
+<li>✏️ Agregar módulo de <strong>Reportes</strong> con gráficos</li>
+<li>✏️ Corregir bug de <code>ConceptFormBuilder</code> en edición</li>
+</ol>
+<h3 id="fase-3-infraestructura-1-2-semanas">Fase 3: Infraestructura (1-2 semanas)</h3>
+<ol>
+<li>✏️ Agregar tests automatizados (pytest + React Testing Library)</li>
+<li>✏️ Configurar CI/CD con GitHub Actions</li>
+<li>✏️ Implementar Swagger/OpenAPI para documentación de API</li>
+</ol>
+<hr />
+<h2 id="archivos-clave-para-referencia">📁 Archivos Clave para Referencia</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Propósito</th>
+<th style="text-align: left;">Archivo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">Configuración Django</td>
+<td style="text-align: left;"><a href="file:///c:/Desarrollo/RRHH/rrhh_saas/settings.py">settings.py</a></td>
+</tr>
+<tr>
+<td style="text-align: left;">Motor de Nómina</td>
+<td style="text-align: left;"><a href="file:///c:/Desarrollo/RRHH/payroll_core/engine.py">engine.py</a></td>
+</tr>
+<tr>
+<td style="text-align: left;">Modelos Empleado</td>
+<td style="text-align: left;"><a href="file:///c:/Desarrollo/RRHH/payroll_core/models/employee.py">employee.py</a></td>
+</tr>
+<tr>
+<td style="text-align: left;">API Principal</td>
+<td style="text-align: left;"><a href="file:///c:/Desarrollo/RRHH/payroll_core/views.py">views.py</a></td>
+</tr>
+<tr>
+<td style="text-align: left;">Frontend Principal</td>
+<td style="text-align: left;"><a href="file:///c:/Desarrollo/RRHH/nominix-web/src/App.jsx">App.jsx</a></td>
+</tr>
+<tr>
+<td style="text-align: left;">Documentación Técnica</td>
+<td style="text-align: left;"><a href="file:///c:/Desarrollo/RRHH/PROJECT_DOCUMENTATION.md">PROJECT_DOCUMENTATION.md</a></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<p><em>Análisis generado por análisis automatizado del código fuente.</em></p>
+    
+    <hr>
+    <footer style="text-align: center; color: #9ca3af; font-size: 0.85em; margin-top: 40px;">
+        <p>Generado automáticamente el 16 de Enero, 2026</p>
+        <p>© Nominix - Sistema de Gestión de Nómina</p>
+    </footer>
+</body>
+</html>

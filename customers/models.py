@@ -8,6 +8,8 @@ Define los modelos para gestión de multi-tenancy:
 from django.db import models
 from django.core.validators import RegexValidator
 from django_tenants.models import TenantMixin, DomainMixin
+from django.core.validators import RegexValidator, MinValueValidator, MaxValueValidator
+from decimal import Decimal
 from typing import Optional
 
 
@@ -139,3 +141,111 @@ class Domain(DomainMixin):
     def __str__(self) -> str:
         """Representación en string del dominio."""
         return self.domain
+
+
+# =============================================================================
+# MONETARY MODELS (SHARED GLOBALLY)
+# =============================================================================
+
+class Currency(models.Model):
+    """
+    Modelo de Moneda (Esquema Público).
+    """
+    code = models.CharField(
+        max_length=3,
+        primary_key=True,
+        verbose_name='Código',
+        help_text='Código ISO de 3 letras (ej: USD, VES, EUR)'
+    )
+    name = models.CharField(max_length=50, verbose_name='Nombre')
+    symbol = models.CharField(max_length=5, default='$', verbose_name='Símbolo')
+    is_base_currency = models.BooleanField(default=False, verbose_name='Es Moneda Base')
+    is_active = models.BooleanField(default=True, verbose_name='Activa')
+    decimal_places = models.PositiveSmallIntegerField(default=2, verbose_name='Decimales')
+
+    class Meta:
+        verbose_name = 'Moneda'
+        verbose_name_plural = 'Monedas'
+        ordering = ['code']
+
+    def __str__(self) -> str:
+        return f"{self.code} - {self.name}"
+
+    def save(self, *args, **kwargs) -> None:
+        if self.is_base_currency:
+            Currency.objects.filter(is_base_currency=True).update(is_base_currency=False)
+        super().save(*args, **kwargs)
+
+
+class ExchangeRate(models.Model):
+    """
+    Modelo de Tasa de Cambio (Esquema Público).
+    """
+    class RateSource(models.TextChoices):
+        BCV = 'BCV', 'Banco Central de Venezuela'
+        MONITOR = 'MONITOR', 'Monitor Dólar'
+        PARALELO = 'PARALELO', 'Mercado Paralelo'
+        PROMEDIO = 'PROMEDIO', 'Promedio de Mercado'
+
+    currency = models.ForeignKey(
+        Currency,
+        on_delete=models.PROTECT,
+        related_name='exchange_rates',
+        verbose_name='Moneda'
+    )
+    rate = models.DecimalField(
+        max_digits=18,
+        decimal_places=6,
+        validators=[MinValueValidator(Decimal('0.000001'))],
+        verbose_name='Tasa'
+    )
+    date_valid = models.DateTimeField(verbose_name='Fecha de Validez')
+    source = models.CharField(
+        max_length=20,
+        choices=RateSource.choices,
+        default=RateSource.BCV,
+        verbose_name='Fuente'
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Fecha de Registro')
+    notes = models.TextField(blank=True, verbose_name='Notas')
+
+    class Meta:
+        verbose_name = 'Tasa de Cambio'
+        verbose_name_plural = 'Tasas de Cambio'
+        ordering = ['-date_valid']
+        unique_together = ['currency', 'date_valid', 'source']
+        indexes = [
+            models.Index(fields=['currency', '-date_valid']),
+            models.Index(fields=['source', '-date_valid']),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.currency.code}: {self.rate} VES ({self.source} - {self.date_valid.strftime('%d/%m/%Y %H:%M')})"
+
+
+class InterestRateBCV(models.Model):
+    """
+    Tasa de interés mensual publicada por el BCV para Prestaciones Sociales (Esquema Público).
+    """
+    year = models.PositiveIntegerField(verbose_name='Año')
+    month = models.PositiveIntegerField(
+        verbose_name='Mes',
+        validators=[MinValueValidator(1), MaxValueValidator(12)]
+    )
+    rate = models.DecimalField(
+        max_digits=6,
+        decimal_places=4,
+        verbose_name='Tasa (%)'
+    )
+    source_url = models.URLField(blank=True, verbose_name='URL Fuente BCV')
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.CharField(max_length=100, verbose_name='Creado por')
+
+    class Meta:
+        verbose_name = 'Tasa BCV'
+        verbose_name_plural = 'Tasas BCV'
+        unique_together = ['year', 'month']
+        ordering = ['-year', '-month']
+
+    def __str__(self):
+        return f"{self.year}-{self.month:02d}: {self.rate}%"

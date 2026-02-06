@@ -1,6 +1,8 @@
 import React from 'react';
-import { Briefcase, Calendar, DollarSign, Clock, Building2, CheckCircle2, History } from 'lucide-react';
+import { Briefcase, Calendar, DollarSign, Clock, Building2, CheckCircle2, History, Pencil, Percent } from 'lucide-react';
 import { cn } from '../../../utils/cn';
+import Card from '../../../components/ui/Card';
+import Button from '../../../components/ui/Button';
 
 const ContractCard = ({ contract, isActive, onEdit }) => {
     // Formatear fechas
@@ -33,12 +35,16 @@ const ContractCard = ({ contract, isActive, onEdit }) => {
     };
 
     return (
-        <div className={cn(
-            "relative p-6 rounded-3xl transition-all duration-300 border group",
-            isActive
-                ? "bg-gradient-to-br from-nominix-dark to-slate-900 text-white shadow-xl shadow-slate-900/20 border-transparent"
-                : "bg-white text-slate-600 hover:border-nominix-electric/30 hover:shadow-lg hover:shadow-nominix-electric/5 border-gray-100"
-        )}>
+        <Card
+            className={cn(
+                "group relative border transition-all duration-300",
+                isActive
+                    ? "bg-gradient-to-br from-nominix-dark to-slate-900 text-white shadow-xl shadow-slate-900/20 border-transparent"
+                    : "bg-white text-slate-600 hover:border-nominix-electric/30 hover:shadow-lg hover:shadow-nominix-electric/5 border-gray-100"
+            )}
+            size="md"
+            rounded="2xl"
+        >
             {/* Etiqueta de Estado */}
             <div className="absolute top-6 right-6">
                 {isActive ? (
@@ -101,6 +107,17 @@ const ContractCard = ({ contract, isActive, onEdit }) => {
                     </div>
                     <p className="font-bold">{frequencyMap[contract.payment_frequency] || contract.payment_frequency}</p>
                 </div>
+
+                {/* ISLR Retention (solo si > 0) */}
+                {parseFloat(contract.islr_retention_percentage) > 0 && (
+                    <div className="col-span-2 flex flex-col gap-1 p-3 rounded-2xl bg-white/5 border border-white/5">
+                        <div className="flex items-center gap-2 mb-1">
+                            <Percent size={16} className={isActive ? "text-yellow-400" : "text-slate-400"} />
+                            <span className="text-[10px] font-bold uppercase tracking-widest opacity-60">Retención ISLR</span>
+                        </div>
+                        <p className="font-bold">{contract.islr_retention_percentage}%</p>
+                    </div>
+                )}
             </div>
 
             {/* Footer: Sede y Dept (Snapshot) */}
@@ -118,19 +135,17 @@ const ContractCard = ({ contract, isActive, onEdit }) => {
                 </div>
             )}
 
-            {/* Botón Editar (Solo aparece en hover o si es active) */}
-            <button
-                onClick={(e) => { e.stopPropagation(); onEdit(contract); }}
-                className={cn(
-                    "absolute bottom-6 right-6 p-2 rounded-xl transition-all opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100",
-                    isActive
-                        ? "bg-white/10 hover:bg-white/20 text-white"
-                        : "bg-slate-100 hover:bg-nominix-electric hover:text-white text-slate-400"
-                )}
-            >
-                <Briefcase size={16} /> {/* Icono de editar o detalle */}
-            </button>
-        </div>
+            {/* Botón Editar */}
+            <div className="absolute bottom-6 right-6 opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100 transition-all">
+                <Button
+                    onClick={(e) => { e.stopPropagation(); onEdit(contract); }}
+                    variant={isActive ? "ghost" : "secondary"}
+                    className={isActive ? "text-white hover:bg-white/20" : ""}
+                    size="sm"
+                    icon={Pencil}
+                />
+            </div>
+        </Card>
     );
 };
 

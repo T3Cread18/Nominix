@@ -7,16 +7,20 @@ Este paquete contiene los modelos divididos por dominio:
 - employee: Employee, LaborContract
 - concepts: PayrollConcept, EmployeeConcept
 - payroll: PayrollPeriod, Payslip, PayslipDetail, PayrollNovelty
+- social_benefits: InterestRateBCV, SocialBenefitsLedger, SocialBenefitsSettlement
 """
 
 # Importar desde módulos individuales
 from .base import tenant_upload_path
-from .currency import Currency, ExchangeRate
-from .organization import Branch, Department, Company, JobPosition
+from customers.models import Currency, ExchangeRate, InterestRateBCV
+from .organization import Branch, Department, Company, JobPosition, PayrollPolicy
 from .employee import Employee, LaborContract
 from .concepts import PayrollConcept, EmployeeConcept
-from .payroll import PayrollPeriod, Payslip, PayslipDetail, PayrollNovelty
+from .payroll import PayrollPeriod, PayrollReceipt, PayrollReceiptLine, PayrollNovelty
 from .loans import Loan, LoanPayment
+from .payroll import PayrollPeriod, PayrollReceipt, PayrollReceiptLine, PayrollNovelty
+from .loans import Loan, LoanPayment
+from .social_benefits import SocialBenefitsLedger, SocialBenefitsSettlement
 
 # Exponer todos los modelos a nivel de paquete para compatibilidad
 __all__ = [
@@ -30,6 +34,7 @@ __all__ = [
     'Department',
     'JobPosition',
     'Company',
+    'PayrollPolicy',
     # Employee
     'Employee',
     'LaborContract',
@@ -38,10 +43,15 @@ __all__ = [
     'EmployeeConcept',
     # Payroll
     'PayrollPeriod',
-    'Payslip',
-    'PayslipDetail',
+    'PayrollReceipt',
+    'PayrollReceiptLine',
     'PayrollNovelty',
     # Loans
     'Loan',
     'LoanPayment',
+    # Social Benefits (Prestaciones Sociales)
+    'InterestRateBCV',
+    'SocialBenefitsLedger',
+    'SocialBenefitsSettlement',
 ]
+
