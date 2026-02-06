@@ -13,7 +13,7 @@ import axios from 'axios';
 
 // ============ CONFIGURACIÓN ============
 
-const API_BASE_URL = '/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 const MAX_RETRIES = 2;
 const RETRY_DELAY = 1000; // ms
 
