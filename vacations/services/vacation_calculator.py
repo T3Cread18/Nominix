@@ -113,14 +113,66 @@ class VacationEngine:
     """
     
     @staticmethod
+    def get_policy(company=None):
+        """
+        Obtiene la política de vacaciones activa de la empresa.
+        
+        Si no existe una política configurada, retorna un objeto con
+        los valores por defecto según LOTTT.
+        
+        Args:
+            company: Instancia de Company (opcional). Si no se provee,
+                     usa la empresa principal.
+        
+        Returns:
+            PayrollPolicy o DefaultPolicy con valores LOTTT.
+        """
+        from payroll_core.models import Company, PayrollPolicy
+        
+        if company is None:
+            company = Company.objects.first()
+        
+        if company is None:
+            # Retornar defaults LOTTT si no hay empresa
+            return type('DefaultPolicy', (), {
+                'vacation_days_base': DIAS_VACACIONES_BASE,
+                'vacation_days_per_year': 1,
+                'vacation_days_max': MAX_DIAS_ADICIONALES_VACACIONES,
+                'vacation_bonus_days_base': DIAS_BONO_VACACIONAL_BASE,
+                'vacation_bonus_days_max': MAX_DIAS_BONO_VACACIONAL,
+                'min_service_months': 12,
+                'pay_rest_days': True,
+                'pay_holidays': True,
+            })()
+        
+        try:
+            return company.policy
+        except PayrollPolicy.DoesNotExist:
+            # Retornar defaults LOTTT si no hay política
+            return type('DefaultPolicy', (), {
+                'vacation_days_base': DIAS_VACACIONES_BASE,
+                'vacation_days_per_year': 1,
+                'vacation_days_max': MAX_DIAS_ADICIONALES_VACACIONES,
+                'vacation_bonus_days_base': DIAS_BONO_VACACIONAL_BASE,
+                'vacation_bonus_days_max': MAX_DIAS_BONO_VACACIONAL,
+                'min_service_months': 12,
+                'pay_rest_days': True,
+                'pay_holidays': True,
+            })()
+
+    @staticmethod
     def calculate_entitlement(
         contract: LaborContract,
-        calculation_date: Optional[date] = None
+        calculation_date: Optional[date] = None,
+        policy=None
     ) -> VacationEntitlementResult:
         """
         Calcula los días de vacaciones correspondientes según antigüedad.
         
-        LOTTT Art. 190:
+        Utiliza los parámetros configurados en PayrollPolicy. Si no existe
+        política, usa valores LOTTT por defecto.
+        
+        LOTTT Art. 190 (valores por defecto):
         - Año 1: 15 días hábiles
         - Años siguientes: +1 día por año de servicio
         - Máximo adicional: 15 días (Total máximo: 30 días)
@@ -128,11 +180,13 @@ class VacationEngine:
         Args:
             contract: Contrato laboral del empleado.
             calculation_date: Fecha para el cálculo (default: hoy).
+            policy: Política de vacaciones (opcional). Si no se provee,
+                    se obtiene de la empresa.
         
         Returns:
             VacationEntitlementResult con el desglose de días.
         
-        Ejemplo:
+        Ejemplo con LOTTT defaults:
             - 1 año de servicio: 15 días
             - 5 años de servicio: 15 + 4 = 19 días
             - 10 años de servicio: 15 + 9 = 24 días
@@ -141,21 +195,30 @@ class VacationEngine:
         if calculation_date is None:
             calculation_date = timezone.now().date()
         
+        # Obtener política de vacaciones
+        if policy is None:
+            policy = VacationEngine.get_policy()
+        
+        # Leer parámetros de la política
+        base_days_config = getattr(policy, 'vacation_days_base', DIAS_VACACIONES_BASE)
+        days_per_year = getattr(policy, 'vacation_days_per_year', 1)
+        max_additional = getattr(policy, 'vacation_days_max', MAX_DIAS_ADICIONALES_VACACIONES)
+        
         # Obtener años de servicio del empleado
         employee = contract.employee
         years_of_service = employee.seniority_years
         
-        # Base: 15 días (solo si tiene al menos 1 año cumplido)
-        base_days = DIAS_VACACIONES_BASE if years_of_service >= 1 else 0
+        # Base: días configurados (solo si tiene al menos 1 año cumplido)
+        base_days = base_days_config if years_of_service >= 1 else 0
         
         # Días adicionales por antigüedad (a partir del segundo año)
         if years_of_service <= 1:
             additional_days = 0
         else:
-            # 1 día por cada año después del primero
+            # Días adicionales = días_por_año × (años - 1), hasta el máximo
             additional_days = min(
-                years_of_service - 1,
-                MAX_DIAS_ADICIONALES_VACACIONES
+                (years_of_service - 1) * days_per_year,
+                max_additional
             )
         
         total_days = base_days + additional_days
@@ -171,15 +234,19 @@ class VacationEngine:
     def calculate_monetary_values(
         contract: LaborContract,
         days_to_enjoy: int,
-        calculation_date: Optional[date] = None
+        calculation_date: Optional[date] = None,
+        policy=None
     ) -> VacationMonetaryResult:
         """
         Calcula los montos de vacaciones y bono vacacional.
         
+        Utiliza los parámetros configurados en PayrollPolicy. Si no existe
+        política, usa valores LOTTT por defecto.
+        
         LOTTT Art. 190 - Salario de Vacaciones:
             Se paga con base en el salario normal del mes anterior.
         
-        LOTTT Art. 192 - Bono Vacacional:
+        LOTTT Art. 192 - Bono Vacacional (valores por defecto):
             Fórmula: (15 + (años_servicio - 1)) días de salario normal
             Mínimo: 15 días
             Máximo: 30 días
@@ -188,6 +255,8 @@ class VacationEngine:
             contract: Contrato laboral del empleado.
             days_to_enjoy: Días de vacaciones a disfrutar.
             calculation_date: Fecha para el cálculo (default: hoy).
+            policy: Política de vacaciones (opcional). Si no se provee,
+                    se obtiene de la empresa.
         
         Returns:
             VacationMonetaryResult con salarios, bonos y totales.
@@ -199,6 +268,14 @@ class VacationEngine:
         """
         if calculation_date is None:
             calculation_date = timezone.now().date()
+        
+        # Obtener política de vacaciones
+        if policy is None:
+            policy = VacationEngine.get_policy()
+        
+        # Leer parámetros del bono desde la política
+        bonus_days_base = getattr(policy, 'vacation_bonus_days_base', DIAS_BONO_VACACIONAL_BASE)
+        bonus_days_max = getattr(policy, 'vacation_bonus_days_max', MAX_DIAS_BONO_VACACIONAL)
         
         employee = contract.employee
         years_of_service = employee.seniority_years
@@ -225,15 +302,15 @@ class VacationEngine:
         )
         
         # =================================================================
-        # 3. CALCULAR BONO VACACIONAL (Art. 192)
+        # 3. CALCULAR BONO VACACIONAL (Art. 192) - CONFIGURABLE
         # =================================================================
-        # Fórmula: 15 + (años_servicio - 1), mínimo 15, máximo 30
+        # Fórmula: bonus_base + (años_servicio - 1), hasta bonus_max
         if years_of_service <= 1:
-            bonus_days = DIAS_BONO_VACACIONAL_BASE if years_of_service >= 1 else 0
+            bonus_days = bonus_days_base if years_of_service >= 1 else 0
         else:
             bonus_days = min(
-                DIAS_BONO_VACACIONAL_BASE + (years_of_service - 1),
-                MAX_DIAS_BONO_VACACIONAL
+                bonus_days_base + (years_of_service - 1),
+                bonus_days_max
             )
         
         bonus_amount = (daily_salary * Decimal(str(bonus_days))).quantize(

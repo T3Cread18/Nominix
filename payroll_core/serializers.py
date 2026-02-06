@@ -288,19 +288,32 @@ class CompanySerializer(serializers.ModelSerializer):
 
 class PayrollPolicySerializer(serializers.ModelSerializer):
     """
-    Serializer para Políticas de Nómina (factores de recargo).
+    Serializer para Políticas de Nómina.
+    
+    Incluye factores de recargo y configuración completa de vacaciones
+    para permitir configuración No-Code.
     """
     company_name = serializers.CharField(source='company.name', read_only=True)
+    accrual_mode_display = serializers.CharField(source='get_accrual_mode_display', read_only=True)
     
     class Meta:
         model = PayrollPolicy
         fields = [
             'id', 'company', 'company_name',
+            # Factores de recargo
             'holiday_payout_factor', 'rest_day_payout_factor',
             'overtime_day_factor', 'overtime_night_factor',
-            'night_bonus_rate', 'updated_at'
+            'night_bonus_rate',
+            # Configuración de Vacaciones LOTTT
+            'vacation_days_base', 'vacation_days_per_year', 'vacation_days_max',
+            'vacation_bonus_days_base', 'vacation_bonus_days_per_year', 'vacation_bonus_days_max',
+            # Configuración adicional No-Code
+            'min_service_months', 'pay_rest_days', 'pay_holidays',
+            'accrual_mode', 'accrual_mode_display',
+            # Meta
+            'updated_at'
         ]
-        read_only_fields = ['company', 'updated_at']
+        read_only_fields = ['company', 'updated_at', 'accrual_mode_display']
 
 
 class LoanPaymentSerializer(serializers.ModelSerializer):

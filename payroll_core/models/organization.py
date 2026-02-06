@@ -458,10 +458,49 @@ class PayrollPolicy(models.Model):
         help_text="Días de bono para el primer año (Art. 192)"
     )
     
+    vacation_bonus_days_per_year = models.PositiveSmallIntegerField(
+        default=1,
+        verbose_name="Días Adicionales Bono por Año",
+        help_text="Días adicionales de bono por cada año de servicio"
+    )
+    
     vacation_bonus_days_max = models.PositiveSmallIntegerField(
         default=30,
         verbose_name="Máximo Días Bono Vacacional",
         help_text="Tope máximo de días de bono vacacional"
+    )
+    
+    # Campos adicionales para configuración No-Code
+    min_service_months = models.PositiveSmallIntegerField(
+        default=12,
+        verbose_name="Meses Mínimos para Derecho",
+        help_text="Antigüedad mínima en meses para generar derecho a vacaciones (LOTTT: 12)"
+    )
+    
+    pay_rest_days = models.BooleanField(
+        default=True,
+        verbose_name="Pagar Días de Descanso",
+        help_text="Incluir sábados/domingos del período vacacional en el pago"
+    )
+    
+    pay_holidays = models.BooleanField(
+        default=True,
+        verbose_name="Pagar Feriados",
+        help_text="Incluir feriados nacionales del período vacacional en el pago"
+    )
+    
+    class AccrualMode(models.TextChoices):
+        """Modo de acumulación de días de vacaciones."""
+        ANNUAL = 'ANNUAL', 'Anual (Al cumplir cada año)'
+        MONTHLY = 'MONTHLY', 'Mensual Proporcional'
+        PROPORTIONAL = 'PROPORTIONAL', 'Proporcional a Días Trabajados'
+    
+    accrual_mode = models.CharField(
+        max_length=15,
+        choices=AccrualMode.choices,
+        default=AccrualMode.ANNUAL,
+        verbose_name="Modo de Acumulación",
+        help_text="Cómo se acumulan los días de vacaciones"
     )
 
     updated_at = models.DateTimeField(auto_now=True)
