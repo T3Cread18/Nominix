@@ -5,7 +5,7 @@ import axios from 'axios';
  * Maneja la baseURL y la configuración de multi-tenancy.
  */
 const axiosClient = axios.create({
-    baseURL: '/api',
+    baseURL: import.meta.env.VITE_API_URL || '/api',
     withCredentials: true,
     xsrfCookieName: 'csrftoken',
     xsrfHeaderName: 'X-CSRFToken',
