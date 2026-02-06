@@ -25,6 +25,7 @@ NOTA IMPORTANTE:
     Todos los cálculos monetarios usan Decimal para precisión exacta.
     NUNCA usar float para cálculos de nómina.
 """
+import logging
 from datetime import date
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Dict, Optional, TypedDict
@@ -32,6 +33,8 @@ from typing import Dict, Optional, TypedDict
 from django.utils import timezone
 
 from payroll_core.models import LaborContract, Employee
+
+logger = logging.getLogger(__name__)
 
 
 # =============================================================================
@@ -517,8 +520,7 @@ TOTAL A PAGAR: {total:,.2f}
             if exchange_rate and exchange_rate > 0:
                 deduction_base_ves = (deduction_base * exchange_rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
             else:
-                 print("WARNING: Calculando Deducciones en USD sin tasa de cambio explícita")
-                 pass
+                 logger.warning("Calculando deducciones en USD sin tasa de cambio explícita")
 
         # Aplicar tope en VES para IVSS/RPE
         base_mensual_ivss_ves = min(deduction_base_ves, tope_ivss)
@@ -526,35 +528,35 @@ TOTAL A PAGAR: {total:,.2f}
         
         mondays_count = count_mondays_in_range(start_date, end_date)
         
-        print(f"\n--- CÁLCULO DEDUCCIONES DEBUG ---")
-        print(f"Tope IVSS (5 salarios) [VES]: {tope_ivss}")
-        print(f"Base Deducciones (Original): {deduction_base}")
-        print(f"Base Deducciones (VES): {deduction_base_ves}")
-        print(f"Base Mensual IVSS (Topeado) [VES]: {base_mensual_ivss_ves}")
-        print(f"Base Semanal IVSS [VES]: {base_semanal_ivss_ves}")
-        print(f"Lunes en el período: {mondays_count}")
-        print(f"MODO VES NATIVO: {is_ves_salary}")
+        logger.debug(
+            "CÁLCULO DEDUCCIONES - Tope IVSS: %s, Base Original: %s, Base VES: %s, "
+            "Base Mensual IVSS (Topeado): %s, Base Semanal IVSS: %s, Lunes: %d, VES Nativo: %s",
+            tope_ivss, deduction_base, deduction_base_ves,
+            base_mensual_ivss_ves, base_semanal_ivss_ves, mondays_count, is_ves_salary
+        )
 
         # IVSS: 4% (Siempre en VES)
         ivss_rate = Decimal('0.04')
         ivss_amount = (base_semanal_ivss_ves * ivss_rate * mondays_count).quantize(
             Decimal('0.01'), rounding=ROUND_HALF_UP
         )
-        print(f"IVSS Calculado [VES]: {ivss_amount}")
         
         # FAOV: 1% (Siempre en VES)
         faov_rate = Decimal('0.01')
         faov_amount = (deduction_base_ves * faov_rate).quantize(
             Decimal('0.01'), rounding=ROUND_HALF_UP
         )
-        print(f"FAOV Calculado [VES]: {faov_amount}")
         
         # RPE: 0.5% (Siempre en VES)
         rpe_rate = Decimal('0.005')
         rpe_amount = (base_semanal_ivss_ves * rpe_rate * mondays_count).quantize(
             Decimal('0.01'), rounding=ROUND_HALF_UP
         )
-        print(f"RPE Calculado [VES]: {rpe_amount}")
+        
+        logger.debug(
+            "DEDUCCIONES CALCULADAS [VES] - IVSS: %s, FAOV: %s, RPE: %s",
+            ivss_amount, faov_amount, rpe_amount
+        )
         
         total_deductions_ves = ivss_amount + faov_amount + rpe_amount
         

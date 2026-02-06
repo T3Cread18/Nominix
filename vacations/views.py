@@ -8,8 +8,11 @@ Implementa:
 - Simulación de cálculo monetario (simulate)
 - Consulta de saldo vacacional
 """
+import logging
 from decimal import Decimal
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 from django.db import transaction
 from django.utils import timezone
@@ -776,7 +779,7 @@ class VacationRequestViewSet(viewsets.ModelViewSet):
                         return_date=vacation_request.return_date
                     )
                 except Exception as e:
-                    print(f"Error generating vacation novelties: {e}")
+                    logger.exception("Error generando novedades de vacaciones: %s", e)
 
                 serializer = VacationPaymentSerializer(payment)
                 
@@ -917,9 +920,7 @@ class VacationRequestViewSet(viewsets.ModelViewSet):
             return response
             
         except Exception as e:
-            import traceback
-            print(f"ERROR GENERATING PDF: {str(e)}")
-            traceback.print_exc()
+            logger.exception("Error generando PDF de vacaciones: %s", e)
             return Response(
                 {'error': f'Error generando PDF: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR

@@ -1,9 +1,12 @@
+import logging
 from datetime import date, timedelta
 import calendar
 from decimal import Decimal
 from django.db import transaction
 from django.utils import timezone
 from payroll_core.models import PayrollPeriod, PayrollNovelty, Company
+
+logger = logging.getLogger(__name__)
 
 def count_mondays_in_range(start_date: date, end_date: date) -> int:
     """Calcula cuántos lunes hay en un rango de fechas (inclusivo)."""
@@ -125,10 +128,10 @@ def generate_vacation_novelties(contract, start_date: date, end_date: date, retu
                     }
                 )
                 
-            print(f"Generated novelties for period {period.name}: {days_in_chunk} days, {mondays} mondays.")
+            logger.info("Novedades generadas para período %s: %d días, %d lunes.", period.name, days_in_chunk, mondays)
             
         else:
-            print(f"Warning: Period {period.name} is CLOSED. Skipping novelty generation.")
+            logger.warning("Período %s está CERRADO. Omitiendo generación de novedades.", period.name)
 
         # Avanzar al siguiente chunk (día siguiente al fin de este periodo)
         current_date = p_end + timedelta(days=1)

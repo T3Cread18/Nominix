@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { CheckCircle2, Loader2, AlertCircle, Calendar, RefreshCw } from 'lucide-react';
 import { Modal, ModalFooter } from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
@@ -31,24 +31,14 @@ const VacationApprovalModal = ({
     const [approving, setApproving] = useState(false);
     const [viewCurrency, setViewCurrency] = useState('USD');
 
-    // Cargar simulación al abrir
-    useEffect(() => {
-        if (isOpen && vacationRequest?.id) {
-            loadSimulation();
-            // Reset currency to USD by default when opening
-            setViewCurrency('USD');
-        } else {
-            setSimulation(null);
-            setError(null);
-        }
-    }, [isOpen, vacationRequest?.id]);
+    // Memoizar loadSimulation para evitar problemas de dependencias
+    const loadSimulation = useCallback(async () => {
+        if (!vacationRequest?.id) return;
 
-    const loadSimulation = async () => {
         try {
             setLoading(true);
             setError(null);
             // Usamos simulateCompletePayment para tener el desglose completo
-            // No pasamos fecha de pago específica, usa la fecha actual por defecto en el backend
             const data = await vacationService.simulateCompletePayment(vacationRequest.id);
             setSimulation(data);
         } catch (err) {
@@ -57,7 +47,18 @@ const VacationApprovalModal = ({
         } finally {
             setLoading(false);
         }
-    };
+    }, [vacationRequest?.id]);
+
+    // Cargar simulación al abrir
+    useEffect(() => {
+        if (isOpen && vacationRequest?.id) {
+            loadSimulation();
+            setViewCurrency('USD');
+        } else {
+            setSimulation(null);
+            setError(null);
+        }
+    }, [isOpen, vacationRequest?.id, loadSimulation]);
 
     const handleApprove = async () => {
         try {

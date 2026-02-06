@@ -427,7 +427,18 @@ class VacationBalance(models.Model):
         from django.utils import timezone
         from django.db import transaction as db_transaction
         
-        years_of_service = employee.seniority_years or 1
+        years_of_service = employee.seniority_years
+        
+        # Validación: empleados con menos de 1 año no pueden acumular vacaciones
+        if years_of_service is None or years_of_service < 1:
+            return {
+                'accruals': [],
+                'total_days_added': 0,
+                'new_balance': cls.get_balance(employee),
+                'years_processed': 0,
+                'years_of_service': years_of_service or 0,
+                'message': 'Empleado con menos de 1 año de servicio. No se acumularon días.'
+            }
         
         accruals = []
         total_days = 0
