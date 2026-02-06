@@ -1,0 +1,12 @@
+Columns for customers_client:
+  - price_per_employee (numeric)
+  - created_on (timestamp with time zone)
+  - paid_until (date)
+  - on_trial (boolean)
+  - id (bigint)
+  - phone (character varying)
+  - address (text)
+  - schema_name (character varying)
+  - name (character varying)
+  - rif (character varying)
+  - email (character varying)

@@ -17,46 +17,47 @@ class SalarySplitter:
     """
 
     @staticmethod
-    def get_salary_breakdown(contract: LaborContract) -> Dict[str, Decimal]:
+    def get_salary_breakdown(contract: LaborContract, exchange_rate: Decimal = None) -> Dict[str, Decimal]:
         """
         Calcula el desglose del salario para un contrato dado.
 
         Args:
             contract: Instancia de LaborContract.
+            exchange_rate: Tasa de cambio USD->VES (opcional, para convertir montos fijos en VES)
 
         Returns:
             Dict con claves:
-                - 'base': Sueldo Base (Impacto Salarial)
-                - 'complement': Bono/Complemento (No Salarial)
-                - 'total': Total calculado
+                - 'base': Sueldo Base (Impacto Salarial) en USD
+                - 'complement': Bono/Complemento (No Salarial) en USD
+                - 'total': Total calculado en USD
         """
-        # 1. Obtener Sueldo Total Efectivo
+        # 1. Obtener Sueldo Total Efectivo (en USD)
         total_salary = SalarySplitter._get_effective_total_salary(contract)
         
         # 2. Obtener Configuración de la Empresa
         try:
-            # Asumimos que estamos en el contexto del tenant correcto
             company = Company.objects.first()
             if not company:
-                # Fallback seguro si no hay config
                 return {
                     'base': total_salary,
                     'complement': Decimal('0.00'),
                     'total': total_salary
                 }
         except Exception:
-            # Error defensivo
             return {
                 'base': total_salary,
                 'complement': Decimal('0.00'),
                 'total': total_salary
             }
 
-        # 3. Aplicar Estrategia
+        # 3. Obtener datos del cargo
+        job_position = contract.job_position
+        
+        # 4. Aplicar Estrategia
         base_salary = Decimal('0.00')
         complement = Decimal('0.00')
-        
         mode = company.salary_split_mode
+        print(f"DEBUG SPLIT: Mode={mode}, Total={total_salary}")
         
         if mode == Company.SalarySplitMode.PERCENTAGE:
             # Calcular base como porcentaje del total
@@ -65,9 +66,54 @@ class SalarySplitter:
             complement = total_salary - base_salary
             
         elif mode == Company.SalarySplitMode.FIXED_BASE:
-            # Base fija, resto complemento
-            fixed_base = company.split_fixed_amount
-            
+            # Base fija (viene del cargo), resto complemento
+            fixed_base = Decimal('0.00')
+            if job_position and job_position.split_fixed_amount:
+                fixed_base = job_position.split_fixed_amount
+                
+                # Obtener código de moneda de forma segura
+                curr_code = 'USD'
+                try:
+                    if job_position.split_fixed_currency:
+                        curr_code = job_position.split_fixed_currency.code
+                except Exception:
+                    pass
+                
+                print(f"DEBUG SPLIT: Fixed={fixed_base}, Currency={curr_code}, Rate={exchange_rate}")
+
+                # Si está en VES, convertir a USD SOLO para la comparación lógica
+                if curr_code == 'VES':
+                    if exchange_rate and exchange_rate > 0:
+                        fixed_base_usd = fixed_base / exchange_rate
+                        
+                        # * PROTECCIÓN DE PRECISIÓN *
+                        # Si el Cargo (JobPosition) define la base en VES, protegemos ese valor
+                        # independientemente de si el contrato es USD o VES.
+                        result = {
+                            'base': fixed_base, # Retornar valor en Bs (User Request)
+                            'complement': (total_salary - fixed_base_usd).quantize(Decimal('0.01')),
+                            'total': total_salary.quantize(Decimal('0.01')),
+                            'base_ves_protected': fixed_base # Valor exacto del cargo
+                        }
+
+                        # Obtener código de moneda del contrato de forma segura
+                        contract_curr_code = 'USD'
+                        try:
+                            if hasattr(contract.salary_currency, 'code'):
+                                contract_curr_code = contract.salary_currency.code
+                            else:
+                                contract_curr_code = str(contract.salary_currency)
+                        except Exception:
+                            pass
+
+                        # Si el contrato TAMBIÉN está en VES, protegemos el total
+                        if contract_curr_code == 'VES':
+                            result['total_ves_protected'] = contract.monthly_salary
+
+                        return result
+                        
+                        fixed_base = fixed_base_usd
+
             if total_salary <= fixed_base:
                 base_salary = total_salary
                 complement = Decimal('0.00')
@@ -76,8 +122,23 @@ class SalarySplitter:
                 complement = total_salary - base_salary
                 
         elif mode == Company.SalarySplitMode.FIXED_BONUS:
-            # Complemento fijo, resto base
-            fixed_bonus = company.split_fixed_amount
+            # Complemento fijo (viene del cargo), resto base
+            fixed_bonus = Decimal('0.00')
+            if job_position and job_position.split_fixed_amount:
+                fixed_bonus = job_position.split_fixed_amount
+                
+                # Obtener código de moneda de forma segura
+                curr_code = 'USD'
+                try:
+                    if job_position.split_fixed_currency:
+                        curr_code = job_position.split_fixed_currency.code
+                except Exception:
+                    pass
+
+                # Si está en VES, convertir a USD
+                if curr_code == 'VES':
+                    if exchange_rate and exchange_rate > 0:
+                        fixed_bonus = fixed_bonus / exchange_rate
             
             if total_salary <= fixed_bonus:
                 complement = total_salary
@@ -92,11 +153,27 @@ class SalarySplitter:
             complement = Decimal('0.00')
 
         # Redondear a 2 decimales
-        return {
+        result = {
             'base': base_salary.quantize(Decimal('0.01')),
             'complement': complement.quantize(Decimal('0.01')),
             'total': total_salary.quantize(Decimal('0.01'))
         }
+
+        # Si el contrato está en VES, protegemos el total
+        try:
+            contract_curr_code = 'USD'
+            if hasattr(contract.salary_currency, 'code'):
+                contract_curr_code = contract.salary_currency.code
+            else:
+                contract_curr_code = str(contract.salary_currency)
+                
+            if contract_curr_code == 'VES':
+                result['total_ves_protected'] = total_salary
+        except Exception:
+            pass
+            
+        return result
+
 
     @staticmethod
     def _get_effective_total_salary(contract: LaborContract) -> Decimal:

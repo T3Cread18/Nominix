@@ -1,6 +1,9 @@
 
 import React from 'react';
-import { UserPlus, Search, Building2, X, ChevronDown } from 'lucide-react';
+import { UserPlus, Search, Building2, X } from 'lucide-react';
+import Button from '../../../components/ui/Button';
+import InputField from '../../../components/ui/InputField';
+import SelectField from '../../../components/ui/SelectField';
 
 const HeaderToolbar = ({
     searchTerm,
@@ -23,50 +26,37 @@ const HeaderToolbar = ({
                 <div className="flex flex-col sm:flex-row items-center gap-3 w-full xl:w-auto">
 
                     {/* SELECTOR DE SEDE */}
-                    <div className="relative group w-full sm:w-48">
-                        <select
-                            className="w-full pl-10 pr-10 p-4 bg-slate-50 border border-gray-100/50 rounded-2xl font-bold text-xs text-nominix-dark appearance-none cursor-pointer focus:bg-white focus:border-nominix-electric focus:ring-4 focus:ring-nominix-electric/5 outline-none transition-all duration-300"
+                    <div className="w-full sm:w-48">
+                        <SelectField
                             value={selectedBranch}
                             onChange={(e) => setSelectedBranch(e.target.value)}
-                        >
-                            <option value="">Todas las Sedes</option>
-                            {branches.map(b => (
-                                <option key={b.id} value={b.id}>{b.name}</option>
-                            ))}
-                        </select>
-                        <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={16} />
-                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
-                            <ChevronDown size={14} strokeWidth={3} />
-                        </div>
+                            options={[
+                                { value: '', label: 'Todas las Sedes' },
+                                ...branches.map(b => ({ value: b.id, label: b.name }))
+                            ]}
+                            icon={Building2}
+                            placeholder="Filtrar Sede"
+                        />
                     </div>
 
                     {/* BUSCADOR */}
-                    <div className="relative group w-full sm:w-64">
-                        <input
-                            type="text"
-                            placeholder="Buscar por nombre, cédula..."
-                            className="w-full pl-10 pr-10 p-4 bg-slate-50 border border-gray-100/50 rounded-2xl font-bold text-xs text-nominix-dark placeholder:text-gray-300 focus:bg-white focus:border-nominix-electric focus:ring-4 focus:ring-nominix-electric/5 outline-none transition-all duration-300"
+                    <div className="w-full sm:w-64 relative">
+                        <InputField
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
+                            placeholder="Buscar..."
+                            icon={Search}
                         />
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-nominix-electric transition-colors" size={16} />
-                        {searchTerm && (
-                            <button
-                                onClick={() => setSearchTerm('')}
-                                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500 transition-colors"
-                            >
-                                <X size={14} />
-                            </button>
-                        )}
                     </div>
 
                     {/* BOTÓN NUEVO */}
-                    <button
+                    <Button
                         onClick={onNewClick}
-                        className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-4 bg-nominix-dark text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all shadow-xl shadow-slate-200 active:scale-95 whitespace-nowrap"
+                        icon={UserPlus}
+                        className="w-full sm:w-auto shadow-xl shadow-slate-200"
                     >
-                        <UserPlus size={16} /> <span className="hidden sm:inline">Nuevo</span>
-                    </button>
+                        <span className="hidden sm:inline">Nuevo</span>
+                    </Button>
                 </div>
             </div>
         </div>
@@ -74,3 +64,4 @@ const HeaderToolbar = ({
 };
 
 export default HeaderToolbar;
+

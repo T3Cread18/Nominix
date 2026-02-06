@@ -1,555 +1,569 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { X, Save, Loader2, Calendar, DollarSign, Briefcase, Building2, Info, Calculator, RefreshCw } from 'lucide-react';
-import axiosClient from '../../../api/axiosClient';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useForm, Controller, useWatch } from 'react-hook-form';
+import { Briefcase, Calendar, DollarSign, Building2, Calculator, Save, Info, Loader2, Percent } from 'lucide-react';
 import { toast } from 'sonner';
+
+// Hooks
+import { useCompanyConfig, useBranches, useJobPositions } from '../../../hooks/useOrganization';
+import { useCreateContract, useUpdateContract, useExchangeRate } from '../../../hooks/useLabor';
+
+// UI Components
+import Modal from '../../../components/ui/Modal';
+import Button from '../../../components/ui/Button';
+import InputField from '../../../components/ui/InputField';
+import SelectField from '../../../components/ui/SelectField';
 import DepartmentSelector from '../../../components/DepartmentSelector';
 import { cn } from '../../../utils/cn';
 
-const UpsertContractModal = ({ isOpen, onClose, onSuccess, employeeId, employeeData, contractToEdit = null }) => {
-    const [loading, setLoading] = useState(false);
+// --- CUSTOM HOOKS ---
 
-    // --- NUEVO: ESTADO PARA TASA DE CAMBIO ---
-    const [tasaCambio, setTasaCambio] = useState(0);
-    const [companyConfig, setCompanyConfig] = useState(null);
-    const [branches, setBranches] = useState([]);
-    // jobPositions ahora almacenará solo los cargos del departamento seleccionado
-    const [jobPositions, setJobPositions] = useState([]);
-    const [loadingTasa, setLoadingTasa] = useState(true);
+/**
+ * Hook to handle real-time salary simulation logic.
+ * Encapsulates all currency conversion, bonus calculations, and Salary Split Strategy.
+ */
+const useSalarySimulation = (control, bcvRate, companyConfig, setValue) => {
+    const salaryAmount = useWatch({ control, name: 'salary_amount' });
+    const baseSalaryBs = useWatch({ control, name: 'base_salary_bs' });
 
-    // Constante fija solo para el Cestaticket (Valor de Ley)
-    const MONTO_CESTATICKET_USD = 40.00;
+    // Explicit helper to calculate Base Salary based on Strategy
+    // usage: call this when salary_amount input changes
+    const calculateBaseFromTotal = (totalValue) => {
+        if (companyConfig && totalValue && !isNaN(parseFloat(totalValue))) {
+            const totalSalary = parseFloat(totalValue);
+            const currentRate = bcvRate || 1;
+            const splitMode = companyConfig.salary_split_mode || 'PERCENTAGE';
+            let calculatedBaseBs = 130;
 
-    // Estado inicial del formulario
-    const initialForm = {
-        contract_type: 'INDEFINITE',
-        start_date: new Date().toISOString().split('T')[0],
-        end_date: '',
-        salary_amount: '',
-        base_salary_bs: '130',
-        salary_currency: 'USD',
-        payment_frequency: 'BIWEEKLY',
-        position: '',
-        branch: '',
-        department: '',
-        job_position: '',
-        work_schedule: 'Lunes a Viernes 8:00 AM - 5:00 PM',
-        notes: ''
+            if (totalSalary > 0) {
+                if (splitMode === 'PERCENTAGE') {
+                    const pct = parseFloat(companyConfig.split_percentage_base) || 30;
+                    calculatedBaseBs = (totalSalary * currentRate * (pct / 100));
+                }
+                // Nota: Para FIXED_BASE y FIXED_BONUS, se calcula en handleJobPositionChange
+                // ya que depende del cargo seleccionado
+
+                setValue('base_salary_bs', calculatedBaseBs.toFixed(2), { shouldDirty: true });
+            }
+        }
     };
 
-    const [formData, setFormData] = useState(initialForm);
+    return {
+        ...useMemo(() => {
+            const totalPackageUsd = parseFloat(salaryAmount) || 0;
+            const baseBs = parseFloat(baseSalaryBs) || 0;
+            const currentRate = bcvRate || 1;
+            const MONTO_CESTATICKET_USD = 40.00;
 
-    // --- 1. CARGAR DATOS INICIALES (TASA, CONFIG, SEDES) ---
-    useEffect(() => {
-        const fetchInitialData = async () => {
-            if (!isOpen) return;
-            setLoadingTasa(true);
-            try {
-                const [rateRes, configRes, branchesRes] = await Promise.all([
-                    axiosClient.get('/exchange-rates/latest/?currency=USD'),
-                    axiosClient.get('/company/config/'),
-                    axiosClient.get('/branches/')
-                ]);
+            const totalPackageBs = totalPackageUsd * currentRate;
+            const cestaTicketBs = MONTO_CESTATICKET_USD * currentRate;
 
-                // Tasa
-                const rate = rateRes.data.rate || rateRes.data.value || 60.00;
-                setTasaCambio(parseFloat(rate));
+            let complementoBs = totalPackageBs - baseBs - cestaTicketBs;
+            if (complementoBs < 0) complementoBs = 0;
 
-                // Config
-                setCompanyConfig(configRes.data);
+            return {
+                totalPackageBs,
+                cestaTicketBs,
+                complementoBs,
+                baseBs,
+                isValid: totalPackageUsd > 0
+            };
+        }, [salaryAmount, baseSalaryBs, bcvRate]), calculateBaseFromTotal
+    };
+};
 
-                // Sedes Globales
-                setBranches(branchesRes.data.results || branchesRes.data);
 
-            } catch (error) {
-                console.error("Error cargando datos iniciales:", error);
-                toast.error("Error conexión inicial.");
-                setTasaCambio(60.00);
-            } finally {
-                setLoadingTasa(false);
-            }
-        };
 
-        fetchInitialData();
-    }, [isOpen]);
 
-    // EFECTO: Cargar Cargos cuando cambia Departamento
-    useEffect(() => {
-        const fetchJobs = async () => {
-            if (formData.department) {
-                try {
-                    // Si es objeto, usas .id, si no, directo
-                    const deptId = typeof formData.department === 'object' ? formData.department.id : formData.department;
-                    const res = await axiosClient.get(`/job-positions/?department=${deptId}`);
-                    setJobPositions(res.data.results || res.data);
-                } catch (e) { console.error(e); }
-            } else {
-                setJobPositions([]);
-            }
-        };
-        fetchJobs();
-    }, [formData.department]);
+// --- SUB-COMPONENTS ---
 
-    // Inicializar Formulario
+const SalarySimulator = ({ simulation, bcvRate, isLoadingRate, isSubmitting }) => {
+    return (
+        <div className="w-full md:w-[320px] bg-slate-50/80 backdrop-blur-sm p-6 rounded-[2rem] border border-gray-100/50 flex flex-col h-full sticky top-0 shadow-sm">
+            <h4 className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-6 flex items-center gap-2">
+                <Calculator size={14} className="text-nominix-electric" />
+                Simulación en Tiempo Real
+            </h4>
+
+            {isLoadingRate ? (
+                <div className="flex-1 flex flex-col items-center justify-center text-gray-400 min-h-[200px]">
+                    <Loader2 className="animate-spin text-nominix-electric" size={32} />
+                    <p className="text-[10px] mt-4 font-bold uppercase tracking-widest">Sincronizando BCV...</p>
+                </div>
+            ) : (
+                <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-500">
+                    <SummaryCard
+                        label="Sueldo Base"
+                        amount={simulation.baseBs}
+                        note="Incide en Prestaciones / Utilidades"
+                        noteColor="text-green-600"
+                        icon={<Building2 size={12} className="text-green-600" />}
+                    />
+                    <SummaryCard
+                        label="Cestaticket (Ley)"
+                        amount={simulation.cestaTicketBs}
+                        note="Beneficio de Alimentación ($40 Ref)"
+                        icon={<Info size={12} className="text-gray-400" />}
+                    />
+                    <SummaryCard
+                        label="Complemento (Bono)"
+                        amount={simulation.complementoBs}
+                        note="No Salarial / Sin Incidencia"
+                        highlight
+                        icon={<DollarSign size={12} className="text-nominix-electric" />}
+                    />
+
+                    <div className="border-t border-gray-200/50 my-4"></div>
+
+                    {/* Footer Info */}
+                    <div className="p-4 bg-white rounded-2xl border border-gray-100 shadow-sm flex gap-3 items-center group hover:border-nominix-electric/20 transition-colors">
+                        <div className="p-2 bg-blue-50 rounded-xl text-blue-500 group-hover:bg-nominix-electric group-hover:text-white transition-colors">
+                            <Info size={16} />
+                        </div>
+                        <div>
+                            <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Tasa de Cambio</p>
+                            <p className="text-xs font-bold text-slate-700">BCV: <span className="font-mono">Bs. {bcvRate.toFixed(2)}</span></p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <div className="mt-auto pt-8 flex flex-col gap-3">
+                <Button
+                    type="submit"
+                    form="contract-form"
+                    variant="electric"
+                    className="w-full justify-center py-4 text-xs font-black tracking-widest uppercase rounded-2xl shadow-lg shadow-nominix-electric/20 text-white"
+                    isLoading={isSubmitting}
+                    icon={Save}
+                >
+                    Guardar Contrato
+                </Button>
+                <Button
+                    variant="ghost"
+                    onClick={() => document.getElementById('close-modal-btn')?.click()}
+                    className="w-full justify-center py-4 text-xs font-bold text-gray-400 hover:text-slate-700"
+                >
+                    Cancelar Operación
+                </Button>
+            </div>
+        </div>
+    );
+};
+
+const SummaryCard = ({ label, amount, note, noteColor = "text-gray-400", highlight = false, icon }) => (
+    <div className={cn(
+        "p-4 rounded-2xl border transition-all duration-300",
+        highlight
+            ? 'bg-gradient-to-br from-nominix-electric/5 to-transparent border-nominix-electric/20 shadow-lg shadow-nominix-electric/5'
+            : 'bg-white border-gray-100 hover:border-gray-200'
+    )}>
+        <div className="flex justify-between items-start mb-2">
+            <div className="flex items-center gap-2">
+                {icon && <div className={cn("p-1 rounded-lg", highlight ? "bg-white/50" : "bg-gray-50")}>{icon}</div>}
+                <span className={cn(
+                    "text-[10px] font-black uppercase tracking-widest",
+                    highlight ? 'text-nominix-electric' : 'text-slate-500'
+                )}>{label}</span>
+            </div>
+            <span className={cn(
+                "text-sm font-black font-mono tracking-tight",
+                highlight ? 'text-nominix-electric' : 'text-slate-800'
+            )}>Bs. {amount.toLocaleString('es-VE', { minimumFractionDigits: 2 })}</span>
+        </div>
+        <p className={cn("text-[9px] font-medium pl-1", noteColor)}>{note}</p>
+    </div>
+);
+
+const ContractForm = ({ register, control, errors, watchedValues, jobPositions, branches, employeeData, handleJobPositionChange, formState, calculateBaseFromTotal, handleSubmit, onSubmit }) => {
+    const isJobSelected = !!watchedValues.job_position;
+
+    return (
+        <form id="contract-form" className="flex-1 space-y-8 pr-2" onSubmit={handleSubmit(onSubmit)}>
+
+            {/* 1. INFORMACIÓN GENERAL */}
+            <section>
+                <SectionHeader icon={Calendar} title="Vigencia y Tipo" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <SelectField
+                        label="Tipo de Contrato"
+                        {...register('contract_type')}
+                        options={[
+                            { value: 'INDEFINITE', label: 'Tiempo Indeterminado' },
+                            { value: 'FIXED_TERM', label: 'Tiempo Determinado' },
+                            { value: 'PROJECT', label: 'Por Obra Determinada' }
+                        ]}
+                    />
+                    <div className="grid grid-cols-2 gap-4">
+                        <InputField
+                            label="Fecha Inicio"
+                            type="date"
+                            {...register('start_date', { required: 'Requerido' })}
+                            error={errors.start_date?.message}
+                        />
+                        {watchedValues.contract_type !== 'INDEFINITE' && (
+                            <div className="animate-in fade-in zoom-in-95">
+                                <InputField
+                                    label="Fecha Fin"
+                                    type="date"
+                                    {...register('end_date')}
+                                    className="bg-blue-50/30 border-blue-100"
+                                />
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </section>
+
+            {/* 2. ESQUEMA SALARIAL */}
+            <section className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm relative overflow-hidden group hover:shadow-md transition-all duration-500">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-nominix-electric/5 rounded-full -mr-10 -mt-10 group-hover:scale-110 transition-transform duration-700"></div>
+
+                <div className="flex justify-between items-center mb-6 relative z-10">
+                    <SectionHeader icon={DollarSign} title="Compensación" className="mb-0" />
+                    {isJobSelected && (
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-nominix-electric bg-nominix-electric/10 px-2 py-1 rounded-lg flex items-center gap-1">
+                            <Briefcase size={10} /> Definido por Cargo
+                        </span>
+                    )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 relative z-10">
+                    <InputField
+                        label="Total Paquete Mensual"
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                        icon={DollarSign}
+                        {...register('salary_amount', {
+                            required: 'Requerido',
+                            onChange: (e) => !isJobSelected && calculateBaseFromTotal(e.target.value)
+                        })}
+                        error={errors.salary_amount?.message}
+                        className={cn("text-lg font-black text-nominix-dark", isJobSelected && "bg-gray-50 text-gray-400 cursor-not-allowed")}
+                        disabled={isJobSelected}
+                    />
+                    <InputField
+                        label="Sueldo Base (Declarado)"
+                        type="number"
+                        step="0.01"
+                        placeholder="130.00"
+                        {...register('base_salary_bs', { required: 'Requerido' })}
+                        helperText="Monto en Bolívares para recibos de ley"
+                        className={cn(isJobSelected && "bg-gray-50 text-gray-400 cursor-not-allowed")}
+                        disabled={isJobSelected}
+                    />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mt-5 relative z-10">
+                    <SelectField
+                        label="Moneda Referencia"
+                        {...register('salary_currency')}
+                        options={[
+                            { value: 'USD', label: 'USD (Dólar)' },
+                            { value: 'VES', label: 'VES (Bolívar)' }
+                        ]}
+                        disabled={isJobSelected}
+                    />
+                    <SelectField
+                        label="Frecuencia de Pago"
+                        {...register('payment_frequency')}
+                        options={[
+                            { value: 'BIWEEKLY', label: 'Quincenal' },
+                            { value: 'WEEKLY', label: 'Semanal' },
+                            { value: 'MONTHLY', label: 'Mensual' }
+                        ]}
+                    />
+                    <InputField
+                        label="Retención ISLR (%)"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="100"
+                        placeholder="0.00"
+                        icon={Percent}
+                        {...register('islr_retention_percentage')}
+                        className="font-bold text-amber-600"
+                    />
+                </div>
+            </section>
+
+            {/* 3. UBICACIÓN ORGANIZACIONAL */}
+            <section>
+                <SectionHeader icon={Building2} title="Ubicación Organizacional" />
+                <div className="space-y-4">
+                    <SelectField
+                        label="Sede / Sucursal"
+                        {...register('branch')}
+                        disabled={!!employeeData?.branch}
+                        options={[
+                            { value: '', label: '-- Seleccionar Sede --' },
+                            ...branches.map(b => ({ value: b.id, label: b.name }))
+                        ]}
+                    />
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide ml-1">Departamento</label>
+                            <Controller
+                                name="department"
+                                control={control}
+                                render={({ field }) => (
+                                    <DepartmentSelector
+                                        branchId={watchedValues.branch}
+                                        value={field.value}
+                                        onChange={(val) => {
+                                            field.onChange(val);
+                                            // Reset dependents
+                                        }}
+                                        disabled={!!employeeData?.department || !watchedValues.branch}
+                                    />
+                                )}
+                            />
+                        </div>
+
+                        <div className="space-y-1">
+                            <Controller
+                                name="job_position"
+                                control={control}
+                                render={({ field }) => (
+                                    <SelectField
+                                        label="Cargo Estructurado"
+                                        icon={Briefcase}
+                                        {...field}
+                                        disabled={!watchedValues.department}
+                                        options={[
+                                            { value: '', label: watchedValues.department ? '-- Seleccionar Cargo --' : 'Seleccione Dpto.' },
+                                            ...jobPositions.map(pos => ({ value: pos.id, label: pos.name }))
+                                        ]}
+                                        onChange={(e) => {
+                                            field.onChange(e);
+                                            handleJobPositionChange(e);
+                                        }}
+                                    />
+                                )}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <InputField
+                            label="Cargo (Título en Recibo)"
+                            placeholder="Ej. Gerente General"
+                            {...register('position')}
+                        />
+                        <InputField
+                            label="Horario de Trabajo"
+                            placeholder="Lunes a Viernes..."
+                            {...register('work_schedule')}
+                        />
+                    </div>
+                </div>
+            </section>
+        </form>
+    );
+};
+
+const SectionHeader = ({ icon: Icon, title, className }) => (
+    <h4 className={cn("text-[10px] font-black uppercase text-gray-400 tracking-widest flex items-center gap-2 mb-4", className)}>
+        {Icon && <Icon size={14} className="text-nominix-electric opacity-60" />}
+        {title}
+    </h4>
+);
+
+// --- MAIN COMPONENT ---
+
+const UpsertContractModal = ({ isOpen, onClose, onSuccess, employeeId, employeeData, contractToEdit = null }) => {
+    // Hooks Globales
+    const { data: companyConfig } = useCompanyConfig({ enabled: isOpen });
+    const { data: branches = [] } = useBranches({ enabled: isOpen });
+    const { data: bcvRate = 60.00, isLoading: isLoadingRate } = useExchangeRate({ enabled: isOpen });
+
+    // React Hook Form
+    const { register, control, handleSubmit, watch, setValue, reset, formState } = useForm({
+        defaultValues: {
+            contract_type: 'INDEFINITE',
+            start_date: new Date().toISOString().split('T')[0],
+            end_date: '',
+            salary_amount: '',
+            base_salary_bs: '130',
+            salary_currency: 'USD',
+            payment_frequency: 'BIWEEKLY',
+            position: '',
+            branch: '',
+            department: '',
+            job_position: '',
+            work_schedule: 'Lunes a Viernes 8:00 AM - 5:00 PM',
+            notes: '',
+            islr_retention_percentage: '0'
+        }
+    });
+
+    const watchedValues = watch();
+    const selectedDepartment = watchedValues.department;
+
+    // Hooks Dependientes
+    const { data: jobPositions = [] } = useJobPositions(
+        typeof selectedDepartment === 'object' ? selectedDepartment.id : selectedDepartment,
+        { enabled: !!selectedDepartment }
+    );
+
+    // Mutations
+    const createContractMutation = useCreateContract();
+    const updateContractMutation = useUpdateContract();
+
+    // Custom Logic Hook
+    const simulation = useSalarySimulation(control, bcvRate, companyConfig, setValue, !!watchedValues.job_position);
+
+    // --- EFFECTS & HANDLERS ---
+
     useEffect(() => {
         if (isOpen) {
             if (contractToEdit) {
-                setFormData({
+                reset({
                     ...contractToEdit,
                     end_date: contractToEdit.end_date || '',
                     branch: contractToEdit.branch?.id || contractToEdit.branch || '',
                     department: contractToEdit.department?.id || contractToEdit.department || '',
                     job_position: contractToEdit.job_position?.id || contractToEdit.job_position || '',
                     notes: contractToEdit.notes || '',
-                    base_salary_bs: contractToEdit.base_salary_bs || '130'
+                    base_salary_bs: contractToEdit.base_salary_bs || '130',
+                    islr_retention_percentage: contractToEdit.islr_retention_percentage || '0'
                 });
             } else {
-                setFormData(initialForm);
-                // Pre-llenar con datos del empleado si existen
-                if (employeeData) {
-                    setFormData(prev => ({
-                        ...prev,
-                        branch: employeeData.branch?.id || employeeData.branch || '',
-                        department: employeeData.department?.id || employeeData.department || ''
-                    }));
-                }
+                reset({
+                    contract_type: 'INDEFINITE',
+                    start_date: new Date().toISOString().split('T')[0],
+                    end_date: '',
+                    salary_amount: '',
+                    base_salary_bs: '130',
+                    salary_currency: 'USD',
+                    payment_frequency: 'BIWEEKLY',
+                    position: '',
+                    branch: employeeData?.branch?.id || employeeData?.branch || '',
+                    department: employeeData?.department?.id || employeeData?.department || '',
+                    job_position: '',
+                    work_schedule: 'Lunes a Viernes 8:00 AM - 5:00 PM',
+                    notes: '',
+                    islr_retention_percentage: '0'
+                });
             }
         }
-    }, [isOpen, contractToEdit]);
+    }, [isOpen, contractToEdit, employeeData, reset]);
 
-    // --- 2. CÁLCULO DINÁMICO USANDO TASA DEL API ---
-    const calculateBreakdown = useCallback(() => {
-        const totalPackageUsd = parseFloat(formData.salary_amount) || 0;
-        const baseBs = parseFloat(formData.base_salary_bs) || 0;
-
-        // Usamos el estado tasaCambio
-        const currentRate = tasaCambio || 1;
-
-        const totalPackageBs = totalPackageUsd * currentRate;
-        const cestaTicketBs = MONTO_CESTATICKET_USD * currentRate;
-
-        let complementoBs = totalPackageBs - baseBs - cestaTicketBs;
-        if (complementoBs < 0) complementoBs = 0;
-
-        return { totalPackageBs, cestaTicketBs, complementoBs, baseBs };
-    }, [formData.salary_amount, formData.base_salary_bs, tasaCambio]);
-
-    const breakdown = calculateBreakdown();
-
-    if (!isOpen) return null;
-
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
-    };
-
-    const handleJobPositionChange = (e) => {
+    const handleJobPositionChange = useCallback((e) => {
         const val = e.target.value;
         const job = jobPositions.find(j => j.id == val);
 
-        if (!job) {
-            setFormData(prev => ({ ...prev, job_position: '', position: '' }));
-            return;
-        }
+        setValue('job_position', val);
 
-        // --- CÁLCULO INTELIGENTE DE ESTRATEGIA SALARIAL ---
-        const totalSalary = parseFloat(job.default_total_salary || 0);
-        let calculatedBaseBs = 130; // Default mínimo
+        if (job) {
+            setValue('position', job.name);
+            const totalSalary = parseFloat(job.default_total_salary || 0);
+            let calculatedBaseBs = 130;
 
-        if (companyConfig && totalSalary > 0) {
-            const currentRate = tasaCambio || 1;
-            const splitMode = companyConfig.salary_split_mode || 'PERCENTAGE';
+            if (companyConfig && totalSalary > 0) {
+                const currentRate = bcvRate || 1;
+                const splitMode = companyConfig.salary_split_mode || 'PERCENTAGE';
 
-            if (splitMode === 'PERCENTAGE') {
-                const pct = parseFloat(companyConfig.split_percentage_base) || 30; // 30% default
-                calculatedBaseBs = (totalSalary * currentRate * (pct / 100));
-            } else if (splitMode === 'FIXED_BASE') {
-                // Asumimos que split_fixed_amount está en USD para standardizar
-                // Si estuviera en Bs, no multiplicamos por rate. Vamos a asumir USD.
-                const fixedBaseUsd = parseFloat(companyConfig.split_fixed_amount) || 0;
-                calculatedBaseBs = fixedBaseUsd * currentRate;
-            } else if (splitMode === 'FIXED_BONUS') {
-                const fixedBonusUsd = parseFloat(companyConfig.split_fixed_amount) || 0;
-                const baseUsd = totalSalary - fixedBonusUsd;
-                calculatedBaseBs = baseUsd > 0 ? (baseUsd * currentRate) : 130;
+                if (splitMode === 'PERCENTAGE') {
+                    const pct = parseFloat(companyConfig.split_percentage_base) || 30;
+                    calculatedBaseBs = (totalSalary * currentRate * (pct / 100));
+                } else if (splitMode === 'FIXED_BASE') {
+                    // Leer monto fijo del cargo, no de la empresa
+                    const fixedAmt = parseFloat(job.split_fixed_amount) || 0;
+                    const fixedCurrency = job.split_fixed_currency_data?.code || job.split_fixed_currency || 'USD';
+                    // Solo convertir si está en USD
+                    calculatedBaseBs = fixedCurrency === 'USD' ? (fixedAmt * currentRate) : fixedAmt;
+                } else if (splitMode === 'FIXED_BONUS') {
+                    // Leer monto fijo del cargo
+                    const fixedAmt = parseFloat(job.split_fixed_amount) || 0;
+                    const fixedCurrency = job.split_fixed_currency_data?.code || job.split_fixed_currency || 'USD';
+                    const fixedBs = fixedCurrency === 'USD' ? (fixedAmt * currentRate) : fixedAmt;
+                    calculatedBaseBs = Math.max((totalSalary * currentRate) - fixedBs, 130);
+                }
             }
+
+            setValue('salary_amount', totalSalary);
+            setValue('base_salary_bs', calculatedBaseBs.toFixed(2));
+            setValue('salary_currency', job.currency?.code || job.currency || 'USD');
         }
+    }, [jobPositions, companyConfig, bcvRate, setValue]);
 
-        setFormData(prev => ({
-            ...prev,
-            job_position: val,
-            position: job.name, // Auto-sets legacy text
-            salary_amount: totalSalary,
-            base_salary_bs: calculatedBaseBs.toFixed(2),
-            salary_currency: job.currency?.code || job.currency || 'USD'
-        }));
-    };
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setLoading(true);
-
-        if (formData.contract_type !== 'INDEFINITE' && !formData.end_date) {
-            toast.error("La fecha de fin es obligatoria para este tipo de contrato");
-            setLoading(false);
+    const onSubmit = async (data) => {
+        if (data.contract_type !== 'INDEFINITE' && !data.end_date) {
+            toast.error("La fecha de fin es obligatoria para este contracto");
             return;
         }
+
+        // Data Cleaning & Sanitization
+        const payload = {
+            ...data,
+            employee: employeeId,
+            department: data.department || null,
+            branch: data.branch || null,
+            job_position: data.job_position || null,
+            // Ensure numbers
+            salary_amount: parseFloat(data.salary_amount) || 0,
+            base_salary_bs: parseFloat(data.base_salary_bs) || 0,
+            islr_retention_percentage: parseFloat(data.islr_retention_percentage) || 0,
+        };
+
+        if (employeeData?.branch && !payload.branch) {
+            payload.branch = employeeData.branch.id || employeeData.branch;
+        }
+        if (!payload.end_date) payload.end_date = null;
 
         try {
-            const payload = {
-                ...formData,
-                employee: employeeId,
-                department: formData.department
-            };
-
-            if (employeeData?.branch) {
-                payload.branch = employeeData.branch.id || employeeData.branch;
-            }
-            if (!payload.end_date) payload.end_date = null;
-
             if (contractToEdit) {
-                await axiosClient.put(`/contracts/${contractToEdit.id}/`, payload);
-                toast.success("Contrato actualizado");
+                await updateContractMutation.mutateAsync({ id: contractToEdit.id, ...payload });
+                toast.success("Contrato actualizado exitosamente");
             } else {
-                await axiosClient.post('/contracts/', payload);
+                await createContractMutation.mutateAsync(payload);
                 toast.success("Contrato registrado exitosamente");
             }
-            onSuccess();
+            onSuccess?.();
             onClose();
         } catch (error) {
             console.error(error);
-            const msg = error.response?.data ? JSON.stringify(error.response.data) : "Error al guardar contrato";
-            toast.error("Verifique los datos del formulario");
-        } finally {
-            setLoading(false);
+            toast.error("Error guardando el contrato");
         }
     };
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-nominix-dark/40 backdrop-blur-sm transition-opacity" onClick={onClose}></div>
+        <Modal
+            isOpen={isOpen}
+            onClose={onClose}
+            title={contractToEdit ? 'Editar Contrato Laboral' : 'Nuevo Contrato Laboral'}
+            size="5xl"
+        >
+            <div className="flex flex-col lg:flex-row gap-8 p-2">
+                <ContractForm
+                    register={register}
+                    control={control}
+                    errors={formState.errors}
+                    watchedValues={watchedValues}
+                    jobPositions={jobPositions}
+                    branches={branches}
+                    employeeData={employeeData}
 
-            <div className="relative w-full max-w-4xl bg-white rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+                    handleJobPositionChange={handleJobPositionChange}
+                    formState={formState}
+                    handleSubmit={handleSubmit}
+                    onSubmit={onSubmit}
+                    calculateBaseFromTotal={simulation.calculateBaseFromTotal}
+                />
 
-                {/* Header */}
-                <div className="px-8 py-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-                    <div>
-                        <h2 className="text-xl font-black text-nominix-dark">
-                            {contractToEdit ? 'Editar Contrato' : 'Nuevo Contrato'}
-                        </h2>
-                        <div className="flex items-center gap-2 mt-1">
-                            <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">
-                                Definir condiciones laborales
-                            </p>
-                            {/* INDICADOR DE TASA EN EL HEADER */}
-                            <div className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded-md text-[10px] font-black border border-blue-100 flex items-center gap-1">
-                                {loadingTasa ? <Loader2 className="animate-spin" size={10} /> : <RefreshCw size={10} />}
-                                Tasa BCV: {loadingTasa ? '...' : `Bs. ${tasaCambio.toFixed(2)}`}
-                            </div>
-                        </div>
-                    </div>
-                    <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-xl text-gray-400 hover:text-red-500 transition-colors">
-                        <X size={20} />
-                    </button>
-                </div>
+                <SalarySimulator
+                    simulation={simulation}
+                    bcvRate={bcvRate}
+                    isLoadingRate={isLoadingRate}
+                    isSubmitting={createContractMutation.isPending || updateContractMutation.isPending}
+                />
 
-                {/* Body - Layout Flexible */}
-                <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
-
-                    {/* COLUMNA IZQUIERDA: FORMULARIO */}
-                    <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto custom-scrollbar p-8">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-                            {/* Tipo de Contrato */}
-                            <div className="col-span-2 md:col-span-1 space-y-2">
-                                <label className="text-xs font-black text-gray-400 uppercase tracking-wider">Tipo de Contrato</label>
-                                <select
-                                    name="contract_type"
-                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:bg-white focus:border-nominix-electric focus:ring-0 outline-none font-bold text-nominix-dark transition-all"
-                                    value={formData.contract_type}
-                                    onChange={handleChange}
-                                >
-                                    <option value="INDEFINITE">Tiempo Indeterminado</option>
-                                    <option value="FIXED_TERM">Tiempo Determinado</option>
-                                    <option value="PROJECT">Por Obra Determinada</option>
-                                </select>
-                            </div>
-
-                            {/* Fechas */}
-                            <div className="space-y-2">
-                                <label className="text-xs font-black text-gray-400 uppercase tracking-wider">Fecha Inicio</label>
-                                <div className="relative">
-                                    <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-                                    <input
-                                        type="date"
-                                        name="start_date"
-                                        required
-                                        className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:bg-white focus:border-nominix-electric focus:ring-0 outline-none font-bold text-nominix-dark transition-all"
-                                        value={formData.start_date}
-                                        onChange={handleChange}
-                                    />
-                                </div>
-                            </div>
-
-                            {formData.contract_type !== 'INDEFINITE' && (
-                                <div className="col-span-2 space-y-2 animate-in fade-in slide-in-from-top-2">
-                                    <label className="text-xs font-black text-gray-400 uppercase tracking-wider text-nominix-electric">Fecha Fin *</label>
-                                    <div className="relative">
-                                        <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-nominix-electric/50" size={18} />
-                                        <input
-                                            type="date"
-                                            name="end_date"
-                                            required
-                                            className="w-full pl-12 pr-4 py-3 bg-blue-50/50 border border-blue-100 rounded-xl focus:bg-white focus:border-nominix-electric focus:ring-0 outline-none font-bold text-nominix-dark transition-all"
-                                            value={formData.end_date}
-                                            onChange={handleChange}
-                                        />
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* SECCIÓN SALARIAL */}
-                            <div className="col-span-2 border-t border-b border-gray-100 py-4 my-2 space-y-4">
-                                <h4 className="text-xs font-black uppercase text-nominix-electric tracking-widest flex items-center gap-2">
-                                    <DollarSign size={14} /> Esquema Salarial Venezuela
-                                </h4>
-
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase text-gray-400">Total Paquete ($)</label>
-                                        <div className="relative">
-                                            <input
-                                                type="number"
-                                                name="salary_amount"
-                                                step="0.01"
-                                                required
-                                                placeholder="0.00"
-                                                className="w-full pl-8 pr-4 py-3 bg-white border-2 border-nominix-electric/20 rounded-xl focus:border-nominix-electric outline-none font-black text-lg text-slate-800 transition-all"
-                                                value={formData.salary_amount}
-                                                onChange={handleChange}
-                                            />
-                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-nominix-electric font-bold">$</span>
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase text-gray-400">Sueldo Base (Bs)</label>
-                                        <div className="relative">
-                                            <input
-                                                type="number"
-                                                name="base_salary_bs"
-                                                step="0.01"
-                                                required
-                                                placeholder="130.00"
-                                                className="w-full pl-8 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:bg-white outline-none font-bold text-sm text-slate-600 transition-all"
-                                                value={formData.base_salary_bs}
-                                                onChange={handleChange}
-                                            />
-                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold">Bs</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase text-gray-400">Moneda Referencia</label>
-                                        <select
-                                            name="salary_currency"
-                                            className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:bg-white outline-none font-bold text-xs"
-                                            value={formData.salary_currency}
-                                            onChange={handleChange}
-                                        >
-                                            <option value="USD">USD (Dólar)</option>
-                                            <option value="VES">VES (Bolívar)</option>
-                                        </select>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase text-gray-400">Frecuencia</label>
-                                        <select
-                                            name="payment_frequency"
-                                            className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:bg-white outline-none font-bold text-xs"
-                                            value={formData.payment_frequency}
-                                            onChange={handleChange}
-                                        >
-                                            <option value="BIWEEKLY">Quincenal</option>
-                                            <option value="WEEKLY">Semanal</option>
-                                            <option value="MONTHLY">Mensual</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Detalles de Cargo y Depto */}
-                            {/* DETALLES ORGANIZACIONALES (JERARQUÍA) */}
-                            <div className="space-y-4 pt-4 border-t border-gray-50">
-                                <h4 className="text-xs font-black uppercase text-gray-400 tracking-widest flex items-center gap-2">
-                                    <Building2 size={14} /> Estructura Organizativa
-                                </h4>
-
-                                {/* 1. SEDE (BRANCH) */}
-                                <div className="space-y-2 group">
-                                    <label className="text-xs font-black text-gray-400 uppercase tracking-wider">Sede / Sucursal</label>
-                                    <div className="relative">
-                                        <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-                                        <select
-                                            name="branch"
-                                            className={cn(
-                                                "w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:bg-white focus:border-nominix-electric outline-none font-bold text-sm text-nominix-dark transition-all appearance-none cursor-pointer",
-                                                employeeData?.branch && "opacity-60 cursor-not-allowed bg-gray-100"
-                                            )}
-                                            value={formData.branch}
-                                            onChange={(e) => {
-                                                setFormData(prev => ({ ...prev, branch: e.target.value, department: '', job_position: '', position: '' }));
-                                            }}
-                                            disabled={!!employeeData?.branch} // Bloqueado si el empleado ya tiene sede
-                                        >
-                                            <option value="">-- Seleccionar Sede --</option>
-                                            {branches.map(b => (
-                                                <option key={b.id} value={b.id}>{b.name}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                </div>
-
-                                {/* 2. DEPARTAMENTO (DEPARTMENT) */}
-                                <div className="space-y-2 group">
-                                    <label className="text-xs font-black text-gray-400 uppercase tracking-wider">Departamento</label>
-                                    <DepartmentSelector
-                                        branchId={formData.branch}
-                                        value={formData.department}
-                                        onChange={(val) => setFormData(prev => ({ ...prev, department: val, job_position: '', position: '' }))}
-                                        disabled={!!employeeData?.department || !formData.branch} // Bloqueado si el empleado ya tiene depto
-                                    />
-                                </div>
-
-                                {/* 3. CARGO (JOB POSITION) */}
-                                <div className="space-y-2">
-                                    <label className="text-xs font-black text-gray-400 uppercase tracking-wider flex justify-between">
-                                        <span>Cargo Estructurado</span>
-                                        {formData.job_position && <span className="text-[9px] text-green-500 font-bold">Auto-completado</span>}
-                                    </label>
-                                    <div className="relative">
-                                        <Briefcase className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-                                        <select
-                                            name="job_position"
-                                            className={cn(
-                                                "w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:bg-white focus:border-nominix-electric outline-none font-bold text-sm text-nominix-dark transition-all appearance-none cursor-pointer",
-                                                !formData.department && "opacity-50 cursor-not-allowed bg-gray-100"
-                                            )}
-                                            value={formData.job_position}
-                                            onChange={handleJobPositionChange}
-                                            disabled={!formData.department}
-                                        >
-                                            <option value="">
-                                                {formData.department ? "-- Seleccionar Cargo --" : "Departamento Requerido"}
-                                            </option>
-                                            {jobPositions.map(pos => (
-                                                <option key={pos.id} value={pos.id}>{pos.name}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <label className="text-xs font-black text-gray-400 uppercase tracking-wider">Cargo (Texto en Recibo)</label>
-                                    <input
-                                        type="text"
-                                        name="position"
-                                        className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:border-nominix-electric focus:ring-0 outline-none font-bold text-nominix-dark transition-all"
-                                        value={formData.position}
-                                        onChange={handleChange}
-                                        placeholder="Ej. Gerente"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="col-span-2 space-y-2">
-                                <label className="text-xs font-black text-gray-400 uppercase tracking-wider">Horario</label>
-                                <input
-                                    type="text"
-                                    name="work_schedule"
-                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:bg-white focus:border-nominix-electric focus:ring-0 outline-none font-bold text-nominix-dark transition-all"
-                                    value={formData.work_schedule}
-                                    onChange={handleChange}
-                                />
-                            </div>
-
-                        </div>
-                    </form>
-
-                    {/* COLUMNA DERECHA: SIMULADOR DE NOMINA */}
-                    <div className="w-full md:w-[300px] bg-gray-50 p-6 border-l border-gray-100 flex flex-col overflow-y-auto">
-                        <h4 className="text-xs font-black uppercase text-gray-400 tracking-widest mb-6 flex items-center gap-2">
-                            <Calculator size={14} /> Simulación
-                        </h4>
-
-                        {/* Spinner de carga si la tasa no ha llegado */}
-                        {loadingTasa ? (
-                            <div className="flex-1 flex flex-col items-center justify-center text-gray-400 space-y-2">
-                                <Loader2 className="animate-spin" size={24} />
-                                <p className="text-[10px] font-bold uppercase">Consultando BCV...</p>
-                            </div>
-                        ) : (
-                            <div className="space-y-4 animate-in fade-in">
-                                {/* Concepto 1: Sueldo Base */}
-                                <div className="bg-white p-3 rounded-xl border border-gray-100 shadow-sm">
-                                    <div className="flex justify-between items-start mb-1">
-                                        <span className="text-[9px] font-black uppercase text-slate-500">Sueldo Base</span>
-                                        <span className="text-xs font-bold text-slate-800">Bs. {breakdown.baseBs.toLocaleString()}</span>
-                                    </div>
-                                    <p className="text-[8px] text-green-600 font-bold">Incide Prestaciones</p>
-                                </div>
-
-                                {/* Concepto 2: Cestaticket */}
-                                <div className="bg-white p-3 rounded-xl border border-gray-100 shadow-sm">
-                                    <div className="flex justify-between items-start mb-1">
-                                        <span className="text-[9px] font-black uppercase text-slate-500">Cestaticket</span>
-                                        <span className="text-xs font-bold text-slate-800">Bs. {breakdown.cestaTicketBs.toLocaleString()}</span>
-                                    </div>
-                                    <p className="text-[8px] text-gray-400">Ref. ${MONTO_CESTATICKET_USD}</p>
-                                </div>
-
-                                {/* Concepto 3: Complemento */}
-                                <div className="bg-white p-3 rounded-xl border border-nominix-electric/30 bg-nominix-electric/5 shadow-sm relative overflow-hidden">
-                                    <div className="flex justify-between items-start mb-1 relative z-10">
-                                        <span className="text-[9px] font-black uppercase text-nominix-electric">Complemento</span>
-                                        <span className="text-xs font-bold text-nominix-electric">Bs. {breakdown.complementoBs.toLocaleString()}</span>
-                                    </div>
-                                    <p className="text-[8px] text-nominix-electric/70 relative z-10">Bono No Salarial</p>
-                                </div>
-
-                                <div className="border-t border-gray-200 my-2"></div>
-
-                                <div className="mt-4 p-3 bg-blue-50 rounded-xl flex gap-2 items-start">
-                                    <Info size={14} className="text-blue-500 mt-0.5 flex-shrink-0" />
-                                    <p className="text-[9px] text-blue-600 leading-relaxed">
-                                        Cálculo real utilizando Tasa BCV Oficial: <strong>Bs. {tasaCambio.toFixed(2)}</strong>.
-                                    </p>
-                                </div>
-                            </div>
-                        )}
-
-                        <div className="mt-auto pt-6 flex flex-col gap-3">
-                            <button
-                                onClick={handleSubmit}
-                                disabled={loading || loadingTasa} // Deshabilitar si carga la tasa
-                                className="w-full py-3 bg-nominix-electric text-white rounded-xl text-xs font-black uppercase tracking-wider hover:opacity-90 transition-all shadow-lg shadow-nominix-electric/20 active:scale-95 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
-                            >
-                                {loading ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
-                                {loading ? 'Guardando...' : 'Guardar'}
-                            </button>
-                            <button
-                                type="button"
-                                onClick={onClose}
-                                className="w-full py-3 rounded-xl text-xs font-bold text-gray-500 hover:bg-gray-200 transition-colors"
-                            >
-                                Cancelar
-                            </button>
-                        </div>
-                    </div>
-
-                </div>
+                {/* Hidden button to close from simulator */}
+                <button id="close-modal-btn" className="hidden" onClick={onClose}></button>
             </div>
-        </div>
+        </Modal>
     );
 };
 

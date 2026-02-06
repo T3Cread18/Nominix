@@ -1,93 +1,61 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import axiosClient from '../../api/axiosClient';
+import React, { useState, useMemo } from 'react';
+import { useForm } from 'react-hook-form';
 import {
-    Calculator, DollarSign, CheckCircle, AlertCircle,
-    Loader2, RefreshCw, FileText, PlusCircle, Trash2, X, Save
+    Calculator, DollarSign, CheckCircle,
+    Loader2, RefreshCw, FileText, PlusCircle, Trash2, Save, Info
 } from 'lucide-react';
+import { toast } from 'sonner';
 
-/**
- * EmployeeConcepts - Muestra conceptos fijos del contrato Y permite asignar conceptos extra.
- */
-const EmployeeConcepts = ({
-    employeeId,
-    employeeData,
-    initialAssignedConcepts,
-    initialActiveContract = null,
-    initialExchangeRate = 60.00,
-    onRefresh,
-    isLoading: parentLoading
-}) => {
-    const [loading, setLoading] = useState(parentLoading);
-    const [activeContract, setActiveContract] = useState(initialActiveContract);
-    const [tasaCambio, setTasaCambio] = useState(initialExchangeRate);
-    const [loadingTasa, setLoadingTasa] = useState(parentLoading);
+// Hooks
+import {
+    useEmployeeConcepts,
+    useAssignConcept,
+    useDeleteAssignedConcept,
+    useAvailableConcepts,
+    useContracts,
+    useExchangeRate
+} from '../../hooks/useLabor';
 
-    // Estados para Conceptos Asignados (Extra)
-    const [assignedConcepts, setAssignedConcepts] = useState(initialAssignedConcepts || []);
-    const [loadingAssigned, setLoadingAssigned] = useState(parentLoading);
+// UI Components
+import Card from '../../components/ui/Card';
+import Button from '../../components/ui/Button';
+import Modal from '../../components/ui/Modal';
+import SelectField from '../../components/ui/SelectField';
+import InputField from '../../components/ui/InputField';
+import { SkeletonCard } from '../../components/ui/Skeleton';
+
+const EmployeeConcepts = ({ employeeId }) => {
+    // 1. Hooks de Datos
+    const { data: contracts = [] } = useContracts(employeeId);
+    const { data: assignedConcepts = [], isLoading: loadingAssigned } = useEmployeeConcepts(employeeId);
+    const { data: availableConcepts = [] } = useAvailableConcepts(); // Catálogo
+    const { data: exchangeRate = 60.00, isLoading: loadingRate } = useExchangeRate();
+
+    // Mutations
+    const assignMutation = useAssignConcept();
+    const deleteMutation = useDeleteAssignedConcept();
+
+    // Estado Local
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-    const [availableConcepts, setAvailableConcepts] = useState([]);
-    const [newConceptData, setNewConceptData] = useState({ concept: '', override_value: '' });
 
-    // Constante fija para el Cestaticket (Valor de Ley)
+    // Formulario para agregar concepto
+    const { register, handleSubmit, reset, watch, formState: { errors } } = useForm();
+
+    // Derived State
+    const activeContract = contracts.find(c => c.is_active);
+    const tasaCambio = exchangeRate || 60.00;
     const MONTO_CESTATICKET_USD = 40.00;
 
-    // Sync with props
-    useEffect(() => {
-        setAssignedConcepts(initialAssignedConcepts);
-        setActiveContract(initialActiveContract);
-        setTasaCambio(initialExchangeRate);
-        setLoading(parentLoading);
-        setLoadingAssigned(parentLoading);
-        setLoadingTasa(parentLoading);
-    }, [initialAssignedConcepts, initialActiveContract, initialExchangeRate, parentLoading]);
-
-    const loadAvailableConcepts = async () => {
-        try {
-            const res = await axiosClient.get('/payroll-concepts/?active=true');
-            setAvailableConcepts(res.data.results || res.data);
-        } catch (error) {
-            console.error("Error cargando catálogo:", error);
-        }
-    };
-
-    const handleAddConcept = async (e) => {
-        e.preventDefault();
-        try {
-            await axiosClient.post('/employee-concepts/', {
-                employee: employeeId,
-                concept: newConceptData.concept,
-                override_value: newConceptData.override_value || null,
-                active: true
-            });
-            setIsAddModalOpen(false);
-            setNewConceptData({ concept: '', override_value: '' });
-            onRefresh();
-        } catch (error) {
-            alert("Error asignando concepto. Verifique que no esté ya asignado.");
-        }
-    };
-
-    const handleDeleteConcept = async (id) => {
-        if (!window.confirm("¿Eliminar esta asignación?")) return;
-        try {
-            await axiosClient.delete(`/employee-concepts/${id}/`);
-            onRefresh();
-        } catch (error) {
-            alert("Error eliminando concepto.");
-        }
-    };
-
-    // Calcular conceptos desde el contrato (Fijos)
-    const calculateContractConcepts = useCallback(() => {
+    // --- CÁLCULOS (Simulación de Conceptos Fijos) ---
+    const contractConcepts = useMemo(() => {
         if (!activeContract) return [];
 
         const totalPackageUsd = parseFloat(activeContract.salary_amount) || 0;
         const baseBs = parseFloat(activeContract.base_salary_bs) || 0;
-        const currentRate = tasaCambio || 1;
+        const currentRate = tasaCambio;
 
         const totalPackageBs = totalPackageUsd * currentRate;
-        const cestaTicketBs = activeContract.includes_cestaticket ? (MONTO_CESTATICKET_USD * currentRate) : 0;
+        const cestaTicketBs = (MONTO_CESTATICKET_USD * currentRate); // Asumimos siempre aplica ley
 
         let complementoBs = totalPackageBs - baseBs - cestaTicketBs;
         if (complementoBs < 0) complementoBs = 0;
@@ -96,41 +64,67 @@ const EmployeeConcepts = ({
             {
                 code: 'SUELDO_BASE',
                 name: 'Sueldo Base',
-                type: 'EARNING',
                 amountBs: baseBs,
                 amountUsd: baseBs / currentRate,
                 incideSalarial: true,
-                description: 'Base imponible para prestaciones sociales, IVSS, FAOV'
+                description: 'Base imponible para prestaciones sociales, IVSS, FAOV',
+                styleIndex: 0
             },
             {
                 code: 'CESTATICKET',
                 name: 'Cestaticket',
-                type: 'EARNING',
                 amountBs: cestaTicketBs,
                 amountUsd: cestaTicketBs / currentRate,
                 incideSalarial: false,
-                description: 'Beneficio social de alimentación (Ley)'
+                description: 'Beneficio social de alimentación (Ley)',
+                styleIndex: 1
             },
             {
                 code: 'COMPLEMENTO',
                 name: 'Complemento Salarial',
-                type: 'EARNING',
                 amountBs: complementoBs,
                 amountUsd: complementoBs / currentRate,
                 incideSalarial: false,
-                description: 'Bono no salarial para completar paquete acordado'
+                description: 'Bono no salarial para completar paquete acordado',
+                styleIndex: 2
             }
         ];
     }, [activeContract, tasaCambio]);
 
-    const contractConcepts = calculateContractConcepts();
     const totalBs = contractConcepts.reduce((sum, c) => sum + c.amountBs, 0);
     const totalUsd = contractConcepts.reduce((sum, c) => sum + c.amountUsd, 0);
 
-    // Helpers para mostrar conceptos asignados
+
+    // --- HANDLERS ---
+    const onAddConcept = async (data) => {
+        try {
+            await assignMutation.mutateAsync({
+                employee: employeeId,
+                concept: data.concept,
+                override_value: data.override_value || null,
+                active: true
+            });
+            toast.success("Concepto asignado correctamente");
+            setIsAddModalOpen(false);
+            reset();
+        } catch (error) {
+            console.error(error);
+            toast.error("Error asignando concepto. Verifique si ya existe.");
+        }
+    };
+
+    const onDeleteConcept = async (id) => {
+        if (!window.confirm("¿Eliminar esta asignación?")) return;
+        try {
+            await deleteMutation.mutateAsync(id);
+            toast.success("Asignación eliminada");
+        } catch (error) {
+            toast.error("Error al eliminar");
+        }
+    };
+
+    // Helper display value
     const getConceptDisplayValue = (assignment) => {
-        // assignment.concept tiene los datos del catalogo
-        // assignment.override_value es opcional
         const concept = assignment.concept;
         const val = assignment.override_value ? parseFloat(assignment.override_value) : parseFloat(concept.value);
 
@@ -142,23 +136,16 @@ const EmployeeConcepts = ({
         return `Bs. ${bsVal.toLocaleString('es-VE', { minimumFractionDigits: 2 })}`;
     };
 
-    if (loading) {
+    if (!activeContract && !loadingAssigned) {
         return (
-            <div className="flex flex-col items-center justify-center py-16 text-gray-400">
-                <Loader2 className="animate-spin mb-4" size={32} />
-                <p className="text-xs font-black uppercase tracking-widest">Cargando información...</p>
-            </div>
-        );
-    }
-
-    if (!activeContract) {
-        return (
-            <div className="text-center py-16">
-                <div className="w-16 h-16 bg-amber-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                    <AlertCircle className="text-amber-500" size={28} />
+            <div className="flex flex-col items-center justify-center py-12 text-center space-y-4">
+                <div className="p-4 bg-orange-50 text-orange-500 rounded-full">
+                    <FileText size={32} />
                 </div>
-                <h4 className="text-sm font-bold text-slate-800 mb-1">Sin contrato activo</h4>
-                <p className="text-xs text-gray-500">Cree un contrato para gestionar la nómina.</p>
+                <div>
+                    <h3 className="text-lg font-bold text-slate-800">Sin Contrato Activo</h3>
+                    <p className="text-sm text-gray-500">Debe registrar un contrato vigente para ver la estructura salarial.</p>
+                </div>
             </div>
         );
     }
@@ -178,8 +165,8 @@ const EmployeeConcepts = ({
                 </div>
                 {/* Tasa Badge */}
                 <div className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-xl text-[10px] font-black border border-blue-100 flex items-center gap-1.5">
-                    {loadingTasa ? <Loader2 className="animate-spin" size={12} /> : <RefreshCw size={12} />}
-                    Tasa BCV: {loadingTasa ? '...' : `Bs. ${tasaCambio.toFixed(2)}`}
+                    {loadingRate ? <Loader2 className="animate-spin" size={12} /> : <RefreshCw size={12} />}
+                    Tasa BCV: {loadingRate ? '...' : `Bs. ${tasaCambio.toFixed(2)}`}
                 </div>
             </div>
 
@@ -198,7 +185,7 @@ const EmployeeConcepts = ({
                 </div>
 
                 {/* Resumen Total */}
-                <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-6 text-white relative overflow-hidden">
+                <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-6 text-white relative overflow-hidden shadow-xl shadow-slate-900/10">
                     <div className="absolute right-0 top-0 p-32 bg-white/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
                     <div className="flex items-center justify-between relative z-10">
                         <div>
@@ -225,19 +212,22 @@ const EmployeeConcepts = ({
                             <p className="text-[10px] text-gray-400 font-bold">Conceptos extra fijos (Bonos, Préstamos, etc.)</p>
                         </div>
                     </div>
-                    <button
-                        onClick={() => {
-                            loadAvailableConcepts();
-                            setIsAddModalOpen(true);
-                        }}
-                        className="flex items-center gap-2 px-4 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-colors"
+                    <Button
+                        onClick={() => setIsAddModalOpen(true)}
+                        variant="secondary"
+                        size="sm"
+                        icon={PlusCircle}
+                        className="text-[10px] uppercase tracking-widest"
                     >
-                        <PlusCircle size={14} /> Agregar Concepto
-                    </button>
+                        Agregar Concepto
+                    </Button>
                 </div>
 
                 {loadingAssigned ? (
-                    <div className="text-center py-8"><Loader2 className="animate-spin mx-auto text-gray-300" /></div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <SkeletonCard />
+                        <SkeletonCard />
+                    </div>
                 ) : assignedConcepts.length === 0 ? (
                     <div className="text-center py-8 border-2 border-dashed border-gray-100 rounded-2xl">
                         <p className="text-xs text-gray-400 font-medium">No hay conceptos adicionales asignados.</p>
@@ -245,7 +235,7 @@ const EmployeeConcepts = ({
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {assignedConcepts.map((assignment) => (
-                            <div key={assignment.id} className="bg-white border border-gray-100 rounded-2xl p-5 flex justify-between items-center group hover:shadow-lg transition-all">
+                            <Card key={assignment.id} className="flex justify-between items-center group hover:border-purple-200 transition-all">
                                 <div>
                                     <div className="flex items-center gap-2 mb-1">
                                         <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase ${assignment.active ? 'bg-green-50 text-green-600' : 'bg-gray-50 text-gray-400'}`}>
@@ -258,82 +248,79 @@ const EmployeeConcepts = ({
                                         {getConceptDisplayValue(assignment)}
                                     </p>
                                     {assignment.override_value && (
-                                        <p className="text-[9px] text-gray-400 mt-0.5 italic">
-                                            (Valor personalizado: {assignment.override_value})
+                                        <p className="text-[9px] text-gray-400 mt-0.5 italic flex items-center gap-1">
+                                            <Info size={10} /> Valor personalizado: {assignment.override_value}
                                         </p>
                                     )}
                                 </div>
-                                <button
-                                    onClick={() => handleDeleteConcept(assignment.id)}
-                                    className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all opacity-0 group-hover:opacity-100"
+                                <Button
+                                    onClick={() => onDeleteConcept(assignment.id)}
+                                    variant="ghost"
+                                    size="icon"
+                                    className="text-gray-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
                                 >
                                     <Trash2 size={16} />
-                                </button>
-                            </div>
+                                </Button>
+                            </Card>
                         ))}
                     </div>
                 )}
             </div>
 
             {/* MODAL AGREGAR */}
-            {isAddModalOpen && (
-                <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-[2rem] max-w-md w-full p-8 shadow-2xl animate-in zoom-in-95">
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="font-black text-lg text-slate-800">Asignar Concepto</h3>
-                            <button onClick={() => setIsAddModalOpen(false)}><X className="text-gray-400" /></button>
-                        </div>
-                        <form onSubmit={handleAddConcept} className="space-y-4">
-                            <div>
-                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Concepto</label>
-                                <select
-                                    required
-                                    className="w-full px-4 py-3 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-purple-100 text-sm font-bold text-slate-700"
-                                    value={newConceptData.concept}
-                                    onChange={e => setNewConceptData({ ...newConceptData, concept: e.target.value })}
-                                >
-                                    <option value="">Seleccione...</option>
-                                    {availableConcepts.map(c => (
-                                        <option key={c.id} value={c.id}>[{c.code}] {c.name}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">
-                                    Valor Personalizado (Opcional)
-                                </label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    placeholder="Dejar vacío para usar valor global"
-                                    className="w-full px-4 py-3 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-purple-100 text-sm font-bold text-slate-700"
-                                    value={newConceptData.override_value}
-                                    onChange={e => setNewConceptData({ ...newConceptData, override_value: e.target.value })}
-                                />
-                                <p className="text-[10px] text-gray-400 mt-2">
-                                    Si el concepto es porcentaje, ingrese el %. Si es monto fijo, ingrese el monto.
-                                </p>
-                            </div>
-                            <button
-                                type="submit"
-                                className="w-full py-4 bg-nominix-electric text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-nominix-dark transition-colors flex items-center justify-center gap-2"
-                            >
-                                <Save size={16} /> Guardar Asignación
-                            </button>
-                        </form>
+            <Modal
+                isOpen={isAddModalOpen}
+                onClose={() => setIsAddModalOpen(false)}
+                title="Asignar Concepto"
+                size="md"
+            >
+                <form onSubmit={handleSubmit(onAddConcept)} className="p-1 space-y-4">
+                    <SelectField
+                        label="Concepto"
+                        {...register('concept', { required: 'Requerido' })}
+                        options={[
+                            { value: '', label: 'Seleccionar...' },
+                            ...availableConcepts.map(c => ({ value: c.id, label: `[${c.code}] ${c.name}` }))
+                        ]}
+                        error={errors.concept?.message}
+                    />
+
+                    <div>
+                        <InputField
+                            label="Valor Personalizado (Opcional)"
+                            type="number"
+                            step="0.01"
+                            placeholder="Dejar vacío para usar valor global"
+                            {...register('override_value')}
+                        />
+                        <p className="text-[10px] text-gray-400 mt-1 ml-1">
+                            Si el concepto es porcentaje, ingrese el %. Si es monto fijo, ingrese el monto.
+                        </p>
                     </div>
-                </div>
-            )}
+
+                    <div className="pt-4">
+                        <Button
+                            type="submit"
+                            variant="electric"
+                            className="w-full justify-center"
+                            icon={Save}
+                            isLoading={assignMutation.isPending}
+                        >
+                            Guardar Asignación
+                        </Button>
+                    </div>
+                </form>
+            </Modal>
         </div>
     );
 };
 
-// ... (ConceptCard keeps same) ...
+// Subcomponente Visual (lo mantengo simple inline, usando div styled para no complicar Card)
 const ConceptCard = ({ concept, index }) => {
     const colorStyles = [
         { bg: 'bg-green-50', border: 'border-green-100', accent: 'text-green-600', badge: 'bg-green-100 text-green-700' },
         { bg: 'bg-amber-50', border: 'border-amber-100', accent: 'text-amber-600', badge: 'bg-amber-100 text-amber-700' },
-        { bg: 'bg-nominix-electric/5', border: 'border-nominix-electric/20', accent: 'text-nominix-electric', badge: 'bg-nominix-electric/10 text-nominix-electric' },
+        { bg: 'bg-blue-50', border: 'border-blue-100', accent: 'text-blue-600', badge: 'bg-blue-100 text-blue-700' },
     ];
     const style = colorStyles[index % colorStyles.length];
 
@@ -350,7 +337,7 @@ const ConceptCard = ({ concept, index }) => {
                 <p className={`text-xl font-black ${style.accent}`}>
                     Bs. {concept.amountBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
-                <p className="text-[10px] font-bold text-slate-400">≈ ${concept.amountUsd.toFixed(2)} USD</p>
+                <p className="text-[10px] font-bold text-slate-400">≈ ${concept.amountUsd?.toFixed(2)} USD</p>
             </div>
             <div className="mt-4 pt-3 border-t border-black/5 flex items-center gap-2 flex-wrap">
                 {concept.incideSalarial ? (
@@ -363,7 +350,7 @@ const ConceptCard = ({ concept, index }) => {
                     </span>
                 )}
             </div>
-            <p className="text-[9px] text-slate-500 mt-2 leading-relaxed">{concept.description}</p>
+            <p className="text-[9px] text-slate-500 mt-2 leading-relaxed opacity-80">{concept.description}</p>
         </div>
     );
 };

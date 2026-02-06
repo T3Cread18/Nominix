@@ -43,7 +43,8 @@ class PayrollPeriod(models.Model):
         return f"{self.name} ({self.get_status_display()})"
 
 
-class Payslip(models.Model):
+class PayrollReceipt(models.Model):
+
     """
     Cabecera de Recibo de Pago (Inmutable después del cierre).
     Almacena el resultado final y un snapshot del contrato.
@@ -51,17 +52,20 @@ class Payslip(models.Model):
     period = models.ForeignKey(
         PayrollPeriod,
         on_delete=models.PROTECT,
-        related_name='payslips',
+        related_name='receipts',
+
         verbose_name='Periodo'
     )
     employee = models.ForeignKey(
         Employee,
         on_delete=models.PROTECT,
-        related_name='payslips',
+        related_name='receipts',
+
         verbose_name='Empleado'
     )
     
-    class PayslipStatus(models.TextChoices):
+    class ReceiptStatus(models.TextChoices):
+
         DRAFT = 'DRAFT', 'Borrador'
         PAID = 'PAID', 'Pagado'
 
@@ -70,6 +74,13 @@ class Payslip(models.Model):
         verbose_name='Snapshot del Contrato',
         help_text='Copia de los datos del contrato (salario, cargo, etc.) al cerrar'
     )
+    
+    salary_base_snapshot = models.DecimalField(
+        max_digits=18, decimal_places=2, default=Decimal('0.00'),
+        verbose_name='Salario Base Snapshot',
+        help_text='Sueldo base del empleado al momento del cálculo'
+    )
+
     
     total_income_ves = models.DecimalField(
         max_digits=18, decimal_places=2, default=Decimal('0.00'),
@@ -86,18 +97,20 @@ class Payslip(models.Model):
     
     status = models.CharField(
         max_length=10,
-        choices=PayslipStatus.choices,
-        default=PayslipStatus.DRAFT,
+        choices=ReceiptStatus.choices,
+        default=ReceiptStatus.DRAFT,
         verbose_name='Estado del Recibo'
+
     )
 
     # Datos de Auditoría (Tasa y Moneda usada)
-    exchange_rate_applied = models.DecimalField(
+    exchange_rate_snapshot = models.DecimalField(
         max_digits=18, decimal_places=6,
         default=Decimal('1.000000'),
-        verbose_name='Tasa Aplicada',
+        verbose_name='Tasa Snapshot',
         help_text='Tasa BCV utilizada para este recibo'
     )
+
     currency_code = models.CharField(
         max_length=3,
         default='VES',
@@ -112,14 +125,15 @@ class Payslip(models.Model):
         """
         Calcula el equivalente en USD basado en la tasa aplicada al momento del cierre.
         """
-        if self.exchange_rate_applied > 0:
-            return (self.net_pay_ves / self.exchange_rate_applied).quantize(Decimal('0.01'))
+        if self.exchange_rate_snapshot > 0:
+            return (self.net_pay_ves / self.exchange_rate_snapshot).quantize(Decimal('0.01'))
         return Decimal('0.00')
+
 
     @property
     def total_income_salario(self) -> Decimal:
         """Suma de ingresos del recibo 1 (Salario)"""
-        return sum(d.amount_ves for d in self.details.all() if d.kind == 'EARNING' and d.tipo_recibo == 'salario')
+        return sum(d.amount_ves for d in self.lines.all() if d.kind == 'EARNING' and d.tipo_recibo == 'salario')
 
     @property
     def net_pay_salario(self) -> Decimal:
@@ -131,21 +145,23 @@ class Payslip(models.Model):
     @property
     def complemento_amount(self) -> Decimal:
         """Monto del recibo 2 (Complemento)"""
-        return sum(d.amount_ves for d in self.details.all() if d.tipo_recibo == 'complemento')
+        return sum(d.amount_ves for d in self.lines.all() if d.tipo_recibo == 'complemento')
 
     @property
     def cestaticket_amount(self) -> Decimal:
         """Monto del recibo 3 (Cestaticket)"""
-        return sum(d.amount_ves for d in self.details.all() if d.tipo_recibo == 'cestaticket')
+        return sum(d.amount_ves for d in self.lines.all() if d.tipo_recibo == 'cestaticket')
 
     class Meta:
-        verbose_name = 'Recibo de Pago'
-        verbose_name_plural = 'Recibos de Pago'
+        verbose_name = 'Recibo de Nómina'
+        verbose_name_plural = 'Recibos de Nómina'
+
         unique_together = ['period', 'employee']
         ordering = ['period', 'employee']
 
     def __str__(self):
         return f"Recibo: {self.id} - {self.employee.national_id} - {self.period.name}"
+
 
 
 class PayrollNovelty(models.Model):
@@ -165,6 +181,7 @@ class PayrollNovelty(models.Model):
         related_name='novelties',
         verbose_name='Periodo',
         limit_choices_to={'status': 'OPEN'}
+
     )
     concept_code: models.CharField = models.CharField(
         max_length=20,
@@ -191,17 +208,19 @@ class PayrollNovelty(models.Model):
         return f"{self.employee.full_name} - {self.concept_code}: {self.amount} ({self.period.name})"
 
 
-class PayslipDetail(models.Model):
+class PayrollReceiptLine(models.Model):
+
     """
     Renglones Detallados de un Recibo.
     Contiene la copia de los datos del concepto para evitar pérdida de información histórica.
     """
-    payslip = models.ForeignKey(
-        Payslip,
+    receipt = models.ForeignKey(
+        PayrollReceipt,
         on_delete=models.CASCADE,
-        related_name='details',
+        related_name='lines',
         verbose_name='Recibo'
     )
+
     
     # Des-normalización deliberada para inmutabilidad
     concept_code = models.CharField(max_length=20, verbose_name='Código Concepto')
@@ -243,7 +262,27 @@ class PayslipDetail(models.Model):
         default='días',
         verbose_name='Unidad'
     )
-    calculation_trace = models.TextField(blank=True, null=True, verbose_name='Traza de Cálculo')
+
+    percentage = models.DecimalField(
+        max_digits=5, decimal_places=2,
+        default=Decimal('0.00'),
+        verbose_name='Porcentaje Aplicado'
+    )
+    
+    calculation_log = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name='Log de Cálculo',
+        help_text='Contiene trace, formula y variables del motor'
+    )
+
+    is_salary_incidence = models.BooleanField(
+        default=False,
+        verbose_name='Incidencia Salarial'
+    )
+
+    calculation_trace = models.TextField(blank=True, null=True, verbose_name='Traza de Cálculo (Legacy)')
+
     notes = models.TextField(blank=True, verbose_name='Notas')
 
     class Meta:
@@ -252,3 +291,4 @@ class PayslipDetail(models.Model):
 
     def __str__(self):
         return f"{self.concept_code}: {self.amount_ves}"
+

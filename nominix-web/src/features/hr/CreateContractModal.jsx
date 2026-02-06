@@ -10,7 +10,8 @@ import {
     RefreshCcw,
     Clock,
     Hourglass, // Icono para duración
-    ArrowRight
+    ArrowRight,
+    Percent // Icono para ISLR
 } from 'lucide-react';
 import { clsx } from 'clsx';
 
@@ -30,7 +31,8 @@ const CreateContractModal = ({ isOpen, onClose, onSuccess, employeeId, currencie
         end_date: '',
         is_active: true,
         job_position: '', // Nuevo campo
-        department: ''
+        department: '',
+        islr_retention_percentage: '0' // Porcentaje de retención ISLR
     });
 
     const [jobPositions, setJobPositions] = useState([]);
@@ -112,6 +114,7 @@ const CreateContractModal = ({ isOpen, onClose, onSuccess, employeeId, currencie
             ...formData,
             employee: employeeId,
             salary_amount: parseFloat(formData.salary_amount),
+            islr_retention_percentage: parseFloat(formData.islr_retention_percentage) || 0,
             // Si es indeterminado, enviamos null
             end_date: contractType === 'FIXED' ? formData.end_date : null
         };
@@ -243,6 +246,30 @@ const CreateContractModal = ({ isOpen, onClose, onSuccess, employeeId, currencie
                                     </select>
                                 </div>
                             </div>
+                        </div>
+
+                        {/* SECCIÓN DE RETENCIÓN ISLR */}
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                                Retención ISLR (%)
+                            </label>
+                            <div className="relative">
+                                <Percent className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={16} />
+                                <input
+                                    type="number"
+                                    name="islr_retention_percentage"
+                                    step="0.01"
+                                    min="0"
+                                    max="100"
+                                    className="w-full pl-10 p-3 bg-gray-50 border border-gray-100 rounded-xl font-bold text-sm focus:border-nominix-electric outline-none text-nominix-dark"
+                                    placeholder="0.00"
+                                    value={formData.islr_retention_percentage}
+                                    onChange={handleChange}
+                                />
+                            </div>
+                            <p className="text-[10px] text-gray-400 font-medium pl-1">
+                                Porcentaje según declaración ARI del empleado. Dejar en 0 si no aplica.
+                            </p>
                         </div>
 
                         {/* SECCIÓN DE FECHAS Y DURACIÓN */}

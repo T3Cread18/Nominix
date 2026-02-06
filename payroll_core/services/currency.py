@@ -22,6 +22,58 @@ class ExchangeRateNotFoundError(Exception):
     pass
 
 
+def get_usd_exchange_rate(target_date: Optional[date] = None) -> Optional[Decimal]:
+    """
+    Obtiene la tasa de cambio USD->VES más reciente.
+    
+    Función utilitaria para uso en cualquier módulo (vacaciones, prestaciones, etc.)
+    
+    Args:
+        target_date: Fecha objetivo. Si None, usa la fecha actual.
+        
+    Returns:
+        Decimal con la tasa de cambio, o None si no hay tasa disponible.
+        
+    Example:
+        >>> rate = get_usd_exchange_rate()
+        >>> if rate:
+        ...     amount_ves = amount_usd * rate
+    """
+    if target_date is None:
+        target_date = timezone.now().date()
+    
+    try:
+        # Buscar moneda USD
+        try:
+            currency = Currency.objects.get(code='USD')
+        except Currency.DoesNotExist:
+            return None
+        
+        # Buscar tasa más reciente <= fecha objetivo
+        target_datetime = datetime.combine(
+            target_date, 
+            datetime.max.time()
+        ).replace(tzinfo=timezone.get_current_timezone())
+        
+        rate_obj = ExchangeRate.objects.filter(
+            currency=currency,
+            date_valid__lte=target_datetime
+        ).order_by('-date_valid').first()
+        
+        if rate_obj:
+            return rate_obj.rate
+        
+        # Fallback: buscar cualquier tasa USD (la más antigua)
+        rate_obj = ExchangeRate.objects.filter(
+            currency=currency
+        ).order_by('date_valid').first()
+        
+        return rate_obj.rate if rate_obj else None
+        
+    except Exception:
+        return None
+
+
 class SalaryConverter:
     """
     Servicio para conversión de salarios entre monedas.

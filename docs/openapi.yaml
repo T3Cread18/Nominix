@@ -1,0 +1,217 @@
+openapi: 3.0.0
+info:
+  title: Nóminix API
+  description: API funcional para la gestión de RRHH y Nómina Multi-tenant en Venezuela. Soporta contratos multimoneda, integración BCV y motor de reglas dinámicas.
+  version: 1.3.1
+  contact:
+    name: Soporte Técnico Nóminix
+    url: https://nominix.com.ve
+    email: api@nominix.com.ve
+
+servers:
+  - url: https://{tenant}.nominix.com.ve/api
+    description: Servidor de Producción (Tenant Variable)
+    variables:
+      tenant:
+        default: demo
+        description: Subdominio correspondiente a la empresa (slug)
+
+components:
+  securitySchemes:
+    sessionAuth:
+      type: apiKey
+      in: cookie
+      name: sessionid
+      description: Autenticación nativa de Django mediante cookies de sesión. Requiere protección CSRF para métodos de escritura.
+  
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "Credenciales inválidas"
+    
+    TenantInfo:
+      type: object
+      properties:
+        schema:
+          type: string
+          example: "empresa_demo"
+        tenant:
+          $ref: '#/components/schemas/Tenant'
+
+    Tenant:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        rif:
+          type: string
+          example: "J-12345678-9"
+        domain_url:
+          type: string
+
+    Employee:
+      type: object
+      required:
+        - first_name
+        - last_name
+        - national_id
+        - hire_date
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        first_name:
+          type: string
+        last_name:
+          type: string
+        national_id:
+          type: string
+          pattern: '^[VE]-\d{7,8}$'
+          example: "V-12345678"
+        email:
+          type: string
+          format: email
+        is_active:
+          type: boolean
+          default: true
+        hire_date:
+          type: string
+          format: date
+
+    SimulationResult:
+      type: object
+      properties:
+        totals:
+          type: object
+          properties:
+            total_earnings:
+              type: number
+            total_deductions:
+              type: number
+            net_pay:
+              type: number
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/PayslipLine'
+
+    PayslipLine:
+      type: object
+      properties:
+        code:
+          type: string
+        name:
+          type: string
+        amount_ves:
+          type: number
+        kind:
+          type: string
+          enum: [EARNING, DEDUCTION]
+        trace:
+          type: string
+          description: "La fórmula expandida con valores reales para auditoría."
+
+paths:
+  /auth/login/:
+    post:
+      summary: Iniciar sesión
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string }
+                password: { type: string }
+      responses:
+        200:
+          description: Login exitoso. Devuelve el perfil del usuario y establece cookie.
+        401:
+          description: Credenciales incorrectas.
+  
+  /tenant-info/:
+    get:
+      summary: Obtener info del tenant actual
+      description: Vital para el frontend para identificar la marca y esquema antes del login.
+      tags: [System]
+      responses:
+        200:
+          description: Datos del tenant detectado por dominio.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TenantInfo'
+
+  /employees/:
+    get:
+      summary: Listar empleados
+      tags: [HR]
+      parameters:
+        - name: search
+          in: query
+          schema: { type: string }
+          description: Búsqueda por nombre o cédula.
+        - name: is_active
+          in: query
+          schema: { type: boolean }
+      responses:
+        200:
+          description: Lista de empleados.
+    
+    post:
+      summary: Crear empleado
+      tags: [HR]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Employee'
+      responses:
+        201:
+          description: Empleado creado.
+
+  /employees/{id}/simulate-payslip/:
+    post:
+      summary: Simulador de Nómina (Real-time)
+      description: Calcula los montos exactos de pago proyectados.
+      tags: [Payroll]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        description: Variables manuales (horas extra, faltas).
+        content:
+          application/json:
+            schema:
+              type: object
+              example: { "OVERTIME_HOURS": 5, "FALTAS": 1 }
+      responses:
+        200:
+          description: Resultado detallado del cálculo.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimulationResult'
+
+  /exchange-rates/latest/:
+    get:
+      summary: Obtener tasa BCV
+      parameters:
+        - name: currency
+          in: query
+          schema: { type: string, default: USD }
+      tags: [Economy]
+      responses:
+        200:
+          description: Tasa vigente o última registrada.

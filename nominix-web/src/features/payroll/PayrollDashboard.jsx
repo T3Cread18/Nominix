@@ -22,7 +22,7 @@ import { cn } from '../../utils/cn';
  * Integra: Novedades, Simulación, Cierre de Periodos
  */
 const PayrollDashboard = () => {
-    const [activeTab, setActiveTab] = useState('novelties');
+    const [activeTab, setActiveTab] = useState('detail');
     const [periods, setPeriods] = useState([]);
     const [employees, setEmployees] = useState([]); // <--- Lista completa compartida
     const [selectedPeriod, setSelectedPeriod] = useState(null);
@@ -90,8 +90,8 @@ const PayrollDashboard = () => {
     };
 
     const tabs = [
-        { id: 'novelties', label: 'Novedades', icon: FileText, description: 'Carga masiva de incidencias' },
         { id: 'detail', label: 'Detalle de Nómina', icon: Calculator, description: 'Modificar y previsualizar recibos' },
+        { id: 'novelties', label: 'Novedades', icon: FileText, description: 'Carga masiva de incidencias' },
         { id: 'closure', label: 'Cierre', icon: Lock, description: 'Gestión de periodos' },
     ];
 
@@ -180,21 +180,45 @@ const PayrollDashboard = () => {
             {/* === PERIOD SELECTOR (Para Novedades y Detalle) === */}
             {(activeTab === 'novelties' || activeTab === 'detail') && selectedPeriod && (
                 <div className="max-w-7xl mx-auto px-6 lg:px-10 py-4">
-                    <div className="bg-gradient-to-r from-nominix-dark to-slate-800 rounded-2xl p-5 flex items-center justify-between text-white">
+                    <div className="bg-gradient-to-r from-nominix-dark to-slate-800 rounded-2xl p-5 flex items-center justify-between text-white transition-all shadow-lg hover:shadow-nominix-electric/20">
                         <div className="flex items-center gap-4">
-                            <div className="p-3 bg-white/10 rounded-xl">
-                                <Calendar size={20} />
+                            <div className="p-3 bg-white/10 rounded-xl backdrop-blur-sm">
+                                <Calendar size={20} className="text-nominix-electric" />
                             </div>
                             <div>
-                                <p className="text-[9px] text-white/60 font-bold uppercase tracking-widest">Periodo Activo</p>
-                                <h3 className="text-lg font-black">{selectedPeriod.name}</h3>
+                                <p className="text-[9px] text-white/60 font-bold uppercase tracking-widest mb-1">Periodo Activo</p>
+                                <div className="relative group">
+                                    <select
+                                        value={selectedPeriod.id}
+                                        onChange={(e) => {
+                                            const p = periods.find(p => p.id === parseInt(e.target.value));
+                                            if (p) setSelectedPeriod(p);
+                                        }}
+                                        className="appearance-none bg-transparent text-lg font-black text-white focus:outline-none focus:ring-0 cursor-pointer pr-8 border-b border-transparent hover:border-white/20 transition-all w-full min-w-[200px]"
+                                    >
+                                        {periods.filter(p => p.status === 'OPEN').map(p => (
+                                            <option key={p.id} value={p.id} className="text-slate-900 font-bold">
+                                                {p.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <ChevronRight
+                                        size={16}
+                                        className="absolute right-0 top-1/2 -translate-y-1/2 text-white/40 group-hover:text-white transition-colors rotate-90 pointer-events-none"
+                                    />
+                                </div>
                             </div>
                         </div>
                         <div className="flex items-center gap-3 text-sm">
-                            <span className="text-white/60">{selectedPeriod.start_date}</span>
-                            <ChevronRight size={14} className="text-white/40" />
-                            <span className="text-white/60">{selectedPeriod.end_date}</span>
-                            <span className="ml-4 px-3 py-1 bg-green-500/20 text-green-300 rounded-full text-[10px] font-black uppercase">
+                            <div className="flex flex-col items-end sm:flex-row sm:items-center sm:gap-3">
+                                <span className="text-white/60 font-mono">{selectedPeriod.start_date}</span>
+                                <ChevronRight size={14} className="text-white/40 hidden sm:block" />
+                                <span className="text-white/60 font-mono">{selectedPeriod.end_date}</span>
+                            </div>
+                            <span className={cn(
+                                "ml-4 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
+                                selectedPeriod.status === 'OPEN' ? "bg-green-500/20 text-green-300" : "bg-gray-500/20 text-gray-300"
+                            )}>
                                 {selectedPeriod.status === 'OPEN' ? 'Abierto' : 'Cerrado'}
                             </span>
                         </div>

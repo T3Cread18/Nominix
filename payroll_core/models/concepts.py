@@ -5,7 +5,7 @@ from django.db import models
 from django.core.validators import MinValueValidator
 from decimal import Decimal
 
-from .currency import Currency
+from customers.models import Currency
 from .employee import Employee
 
 
@@ -78,6 +78,14 @@ class PayrollConcept(models.Model):
         verbose_name='Activo'
     )
     
+    incidences = models.JSONField(
+        default=list,
+        blank=True,
+        verbose_name='Incidencias (Tags)',
+        help_text='Lista de etiquetas de incidencia (ej: ["FAOV_BASE", "ISLR_BASE"])'
+    )
+
+    
     show_on_payslip: models.BooleanField = models.BooleanField(
         default=True,
         verbose_name='Mostrar en Recibo (Legacy)',
@@ -116,10 +124,75 @@ class PayrollConcept(models.Model):
     formula: models.TextField = models.TextField(
         blank=True, 
         null=True, 
-        verbose_name='Fórmula Python',
-        help_text='Variables disponibles: SALARIO, DIAS, LUNES, TASA, ANTIGUEDAD. Ej: (SALARIO / 30) * DIAS'
+        verbose_name='Fórmula',
+        help_text='''Para DYNAMIC_FORMULA: Fórmula completa (ej: SALARIO_DIARIO * DIAS).
+Para FIXED_AMOUNT: Fórmula de AJUSTE que se SUMA al monto fijo (ej: OTRO_CONCEPTO - DESCUENTO).
+Variables especiales para ajuste: VALOR_BASE, CANTIDAD, MONTO_CALCULADO, y todos los conceptos calculados previamente.'''
     )
-    
+
+    tipo_recibo = models.CharField(
+        max_length=20,
+        choices=[
+            ('salario', 'Salario Base'),
+            ('complemento', 'Complemento'),
+            ('cestaticket', 'Cestaticket'),
+        ],
+        default='salario',
+        verbose_name='Tipo de Recibo',
+        help_text='Determina en qué recibo se agrupa este concepto (Salario, Complemento o Cestaticket)'
+    )
+
+    class ConceptBehavior(models.TextChoices):
+        """Comportamiento del concepto (determina qué Handler usar)."""
+        SALARY_BASE = 'SALARY_BASE', 'Sueldo Base (Desglosable)'
+        CESTATICKET = 'CESTATICKET', 'Cestaticket'
+        COMPLEMENT = 'COMPLEMENT', 'Complemento Salarial'
+        LAW_DEDUCTION = 'LAW_DEDUCTION', 'Deducción de Ley (IVSS, FAOV, RPE)'
+        LOAN = 'LOAN', 'Préstamo / Anticipo'
+        DYNAMIC = 'DYNAMIC', 'Fórmula Dinámica'
+        FIXED = 'FIXED', 'Monto Fijo'
+
+    class CalculationBase(models.TextChoices):
+        """Base de cálculo para el concepto (Total Paquete vs Sueldo Base)."""
+        TOTAL = 'TOTAL', 'Salario Total (Base + Complemento)'
+        BASE = 'BASE', 'Sueldo Base Únicamente'
+
+    calculation_base: models.CharField = models.CharField(
+        max_length=10,
+        choices=CalculationBase.choices,
+        default=CalculationBase.TOTAL,
+        verbose_name='Base de Cálculo',
+        help_text='Indica si el cálculo se basa en el total del contrato o solo en el sueldo base'
+    )
+
+    behavior: models.CharField = models.CharField(
+        max_length=20,
+        choices=ConceptBehavior.choices,
+        default=ConceptBehavior.DYNAMIC,
+        verbose_name='Comportamiento',
+        help_text='Define cómo el motor procesa este concepto'
+    )
+
+    system_params: models.JSONField = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name='Parámetros de Sistema',
+        help_text='Configuración del Handler (rate, base_source, cap_multiplier, etc.)'
+    )
+
+    deducts_from_base_salary: models.BooleanField = models.BooleanField(
+        default=False,
+        verbose_name='Resta Días del Sueldo Base',
+        help_text='Si es True, la cantidad reportada en novedades se resta de los días y valor del Sueldo Base.'
+    )
+
+    adds_to_complement: models.BooleanField = models.BooleanField(
+        default=False,
+        verbose_name='Suma al Complemento/Bono',
+        help_text='Si es True, el monto resultante se suma a la variable COMPLEMENTO_MENSUAL/PERIOD en el cálculo.'
+    )
+
+
     class Meta:
         verbose_name = 'Concepto de Nómina'
         verbose_name_plural = 'Conceptos de Nómina'

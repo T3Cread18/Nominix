@@ -1,0 +1,5 @@
+ID: 1 | Name: 1era quincena de enero | Dates: 2026-01-01 -> 2026-01-15 | Delta: 15
+ID: 2 | Name: Test Period 15 days | Dates: 2026-01-01 -> 2026-01-15 | Delta: 15
+ID: 4 | Name: Test Period 15 days | Dates: 2026-01-01 -> 2026-01-15 | Delta: 15
+ID: 3 | Name: Test Period 7 days | Dates: 2026-01-01 -> 2026-01-07 | Delta: 7
+ID: 5 | Name: Test Period 7 days | Dates: 2026-01-01 -> 2026-01-07 | Delta: 7

@@ -1,13 +1,13 @@
+import os
+import django
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'rrhh_saas.settings')
+django.setup()
+
 from django_tenants.utils import schema_context
 from payroll_core.models import PayrollConcept
 
-def run():
-    schema = 'gfo'
-    with schema_context(schema):
-        concepts = PayrollConcept.objects.all()
-        print(f"--- CONCEPTS VISIBILITY ({schema}) ---")
-        for c in concepts:
-            print(f"[{c.code}] {c.name}: show={c.show_on_payslip}, active={c.active}")
-
-if __name__ == "__main__":
-    run()
+with schema_context('grupo_farmacias_ospino'):
+    concepts = PayrollConcept.objects.all()
+    print("ID | CODE | NAME | BEHAVIOR | FORMULA")
+    for c in concepts:
+        print(f"{c.id} | {c.code} | {c.name} | {c.behavior} | {c.formula}")
