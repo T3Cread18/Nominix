@@ -509,46 +509,76 @@ TOTAL A PAGAR: {total:,.2f}
         # Base para deducciones: salario de vacaciones + días de descanso
         # (No se deducen sobre el bono vacacional)
         deduction_base = vacation_amount + rest_amount + holiday_amount
-        base_mensual_ivss = min(deduction_base, tope_ivss)
-        base_semanal_ivss = (base_mensual_ivss * 12) / 52
+        
+        # --- FIX: Calcular IVSS/RPE/FAOV SIEMPRE en VES ---
+        # La norma exige que las deducciones de ley se calculen y reporten en Bolívares.
+        deduction_base_ves = deduction_base
+        if not is_ves_salary:
+            if exchange_rate and exchange_rate > 0:
+                deduction_base_ves = (deduction_base * exchange_rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            else:
+                 print("WARNING: Calculando Deducciones en USD sin tasa de cambio explícita")
+                 pass
+
+        # Aplicar tope en VES para IVSS/RPE
+        base_mensual_ivss_ves = min(deduction_base_ves, tope_ivss)
+        base_semanal_ivss_ves = (base_mensual_ivss_ves * Decimal('12')) / Decimal('52')
+        
         mondays_count = count_mondays_in_range(start_date, end_date)
         
         print(f"\n--- CÁLCULO DEDUCCIONES DEBUG ---")
-        print(f"Salario Mensual Usado (Monthly Salary): {monthly_salary}")
-        print(f"Salario Diario Usado: {daily_salary}")
-        print(f"Salario Mínimo Nacional: {minimum_salary}")
-        print(f"Tope IVSS (5 salarios): {tope_ivss}")
-        print(f"Base Deducciones (Vac+Desc+Fer): {deduction_base}")
-        print(f"Base Mensual IVSS Utilizada: {base_mensual_ivss}")
-        print(f"Base Semanal IVSS: {base_semanal_ivss}")
+        print(f"Tope IVSS (5 salarios) [VES]: {tope_ivss}")
+        print(f"Base Deducciones (Original): {deduction_base}")
+        print(f"Base Deducciones (VES): {deduction_base_ves}")
+        print(f"Base Mensual IVSS (Topeado) [VES]: {base_mensual_ivss_ves}")
+        print(f"Base Semanal IVSS [VES]: {base_semanal_ivss_ves}")
         print(f"Lunes en el período: {mondays_count}")
         print(f"MODO VES NATIVO: {is_ves_salary}")
 
-        # IVSS: 4% (aporte del trabajador)
+        # IVSS: 4% (Siempre en VES)
         ivss_rate = Decimal('0.04')
-        ivss_amount = (base_semanal_ivss * ivss_rate * mondays_count).quantize(
+        ivss_amount = (base_semanal_ivss_ves * ivss_rate * mondays_count).quantize(
             Decimal('0.01'), rounding=ROUND_HALF_UP
         )
-        print(f"IVSS Calculado: {base_semanal_ivss} * {ivss_rate} * {mondays_count} = {ivss_amount}")
+        print(f"IVSS Calculado [VES]: {ivss_amount}")
         
-        # FAOV (BANAVIH): 1%
+        # FAOV: 1% (Siempre en VES)
         faov_rate = Decimal('0.01')
-        faov_amount = (deduction_base * faov_rate).quantize(
+        faov_amount = (deduction_base_ves * faov_rate).quantize(
             Decimal('0.01'), rounding=ROUND_HALF_UP
         )
-        print(f"FAOV Calculado: {deduction_base} * {faov_rate} = {faov_amount}")
+        print(f"FAOV Calculado [VES]: {faov_amount}")
         
-        # RPE (Régimen Prestacional de Empleo): 0.5%
+        # RPE: 0.5% (Siempre en VES)
         rpe_rate = Decimal('0.005')
-        rpe_amount = (base_semanal_ivss * rpe_rate * mondays_count).quantize(
+        rpe_amount = (base_semanal_ivss_ves * rpe_rate * mondays_count).quantize(
             Decimal('0.01'), rounding=ROUND_HALF_UP
         )
-        print(f"RPE Calculado: {base_semanal_ivss} * {rpe_rate} * {mondays_count} = {rpe_amount}")
-        print(f"-------------------------------\n")
+        print(f"RPE Calculado [VES]: {rpe_amount}")
         
-        total_deductions = ivss_amount + faov_amount + rpe_amount
-        net_total = gross_total - total_deductions
+        total_deductions_ves = ivss_amount + faov_amount + rpe_amount
         
+        # CÁLCULO DEL NETO
+        # Debemos restar las deducciones (que están en VES) del Bruto (que puede estar en USD)
+        if is_ves_salary:
+            # Todo es VES
+            gross_total_ves = gross_total
+            net_total = gross_total - total_deductions_ves
+            # Para consistencia en output
+            total_deductions = total_deductions_ves 
+        else:
+            # Nómina en USD: Convertir deducciones a USD solo para la resta
+            deduction_impact_usd = Decimal('0.00')
+            if exchange_rate and exchange_rate > 0:
+                deduction_impact_usd = (total_deductions_ves / exchange_rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            
+            net_total = gross_total - deduction_impact_usd
+            
+            # En el objeto de respuesta, 'total_deductions' será el valor en VES (mixed currency display)
+            # Ojo: esto puede causar confusión si se suman las columnas visualmente, 
+            # pero cumple "No conversiones en deducciones".
+            total_deductions = total_deductions_ves
+
         # =====================================================================
         # 7. GENERAR TRAZA DE CÁLCULO
         # =====================================================================
@@ -576,89 +606,100 @@ DEVENGADOS:
 - Bono Vacacional: {bonus_days} × {daily_salary:,.2f} = {bonus_amount:,.2f}
 - TOTAL BRUTO: {gross_total:,.2f}
 
-DEDUCCIONES (Base: {deduction_base:,.2f}):
-- IVSS (4%): {ivss_amount:,.2f}
-- FAOV (1%): {faov_amount:,.2f}
-- RPE (0.5%): {rpe_amount:,.2f}
-- TOTAL DEDUCCIONES: {total_deductions:,.2f}
+DEDUCCIONES (En Bolívares - VES):
+- Base Deducciones: {deduction_base_ves:,.2f} Bs.
+- Tope IVSS Aplicado: {min(deduction_base_ves, tope_ivss):,.2f} Bs.
+- IVSS (4%): {ivss_amount:,.2f} Bs.
+- FAOV (1%): {faov_amount:,.2f} Bs.
+- RPE (0.5%): {rpe_amount:,.2f} Bs.
+- TOTAL DEDUCCIONES: {total_deductions_ves:,.2f} Bs.
 
-NETO A PAGAR: {net_total:,.2f}
+NETO A PAGAR: {net_total:,.2f} {'(USD)' if not is_ves_salary else '(VES)'}
+(Deducciones convertidas a divisa para el neto si aplica)
 """.strip()
         
         # =====================================================================
         # 8. GENERAR TRAZAS ESTRUCTURADAS
         # =====================================================================
-        # Helper para formatear montos
-        def fmt(val):
-             return f"{val:,.2f}"
+        # Helper para estructurar valores monetarios para que el frontend los convierta/formatee
+        def money(val, force_currency=None):
+            return {
+                'type': 'money',
+                'amount': float(val),
+                'currency': force_currency # Si es None, frontend usa moneda de la vista (con conversión)
+            }
+            
+        def val(v):
+            return str(v)
 
         traces = {
             'daily_salary': {
                 'formula': 'Salario Mensual / 30',
                 'values': {
-                    'Salario Mensual': fmt(monthly_salary),
-                    'Divisor': '30'
+                    'Salario Mensual': money(monthly_salary),
+                    'Divisor': val(30)
                 },
-                'result': fmt(daily_salary)
+                'result': money(daily_salary)
             },
             'vacation_amount': {
                 'formula': f'{vacation_days} días * Salario Diario',
                 'values': {
-                    'Días': str(vacation_days),
-                    'Salario Diario': fmt(daily_salary)
+                    'Días': val(vacation_days),
+                    'Salario Diario': money(daily_salary)
                 },
-                'result': fmt(vacation_amount)
+                'result': money(vacation_amount)
             },
             'rest_amount': {
                 'formula': f'{rest_days} días * Salario Diario',
                 'values': {
-                    'Días': str(rest_days),
-                    'Salario Diario': fmt(daily_salary)
+                    'Días': val(rest_days),
+                    'Salario Diario': money(daily_salary)
                 },
-                'result': fmt(rest_amount)
+                'result': money(rest_amount)
             },
             'holiday_amount': {
                 'formula': f'{holiday_days} días * Salario Diario',
                 'values': {
-                    'Días': str(holiday_days),
-                    'Salario Diario': fmt(daily_salary)
+                    'Días': val(holiday_days),
+                    'Salario Diario': money(daily_salary)
                 },
-                'result': fmt(holiday_amount)
+                'result': money(holiday_amount)
             },
             'bonus_amount': {
                 'formula': f'{bonus_days} días * Salario Diario',
                 'values': {
-                    'Días': str(bonus_days),
-                    'Salario Diario': fmt(daily_salary)
+                    'Días': val(bonus_days),
+                    'Salario Diario': money(daily_salary)
                 },
-                'result': fmt(bonus_amount)
+                'result': money(bonus_amount)
             },
+            # Para deducciones, forzamos moneda VES porque el cálculo fue estricto en Bs.
             'ivss_amount': {
-                'formula': '((Base Mensual * 12) / 52) * 4% * Lunes',
+                'formula': '((Base Mensual VES * 12) / 52) * 4% * Lunes',
                 'values': {
-                    'Base Mensual': fmt(min(deduction_base, tope_ivss)),
-                    'Tope IVSS': fmt(tope_ivss),
-                    'Lunes': str(mondays_count),
-                    'Porcentaje': '4%'
+                    'Base Mensual VES': money(base_mensual_ivss_ves, 'VES'),
+                    'Tope IVSS': money(tope_ivss, 'VES'),
+                    'Lunes': val(mondays_count),
+                    'Porcentaje': val('4%')
                 },
-                'result': fmt(ivss_amount)
+                'result': money(ivss_amount, 'VES')
             },
             'faov_amount': {
-                'formula': 'Base Deducciones * 1%',
+                'formula': 'Base Deducciones VES * 1%',
                 'values': {
-                    'Base Deducciones': fmt(deduction_base),
-                    'Porcentaje': '1%'
+                    'Base Deducciones VES': money(deduction_base_ves, 'VES'),
+                    'Porcentaje': val('1%')
                 },
-                'result': fmt(faov_amount)
+                'result': money(faov_amount, 'VES')
             },
             'rpe_amount': {
-                'formula': '((Base Mensual * 12) / 52) * 0.5% * Lunes',
+                'formula': '((Base Mensual VES * 12) / 52) * 0.5% * Lunes',
                 'values': {
-                    'Base Mensual': fmt(min(deduction_base, tope_ivss)),
-                    'Lunes': str(mondays_count),
-                    'Porcentaje': '0.5%'
+                    'Base Mensual VES': money(base_mensual_ivss_ves, 'VES'),
+                    'Lunes': val(mondays_count),
+                    'Porcentaje': val('0.5%')
                 },
-                'result': fmt(rpe_amount)
+                'result': money(rpe_amount, 'VES')
             }
         }
         
@@ -689,8 +730,8 @@ NETO A PAGAR: {net_total:,.2f}
             'bonus_amount': bonus_amount,
             'gross_total': gross_total,
             
-            # Deducciones
-            'deduction_base': deduction_base,
+            # Deducciones (ESTAS ESTÁN EN VES AHORA)
+            'deduction_base': deduction_base, 
             'ivss_amount': ivss_amount,
             'faov_amount': faov_amount,
             'rpe_amount': rpe_amount,
@@ -712,59 +753,78 @@ NETO A PAGAR: {net_total:,.2f}
         # =====================================================================
         # 8. AGREGAR CONVERSIÓN O MAPE DIRECTO
         # =====================================================================
+        # =====================================================================
+        # 9. RESULTADO FINAL
+        # =====================================================================
+        
+        # 1. Asignar valores base según moneda salarial
+        if is_ves_salary:
+            # Origen VES: Llenar campos _ves (Siempre)
+            result['daily_salary_ves'] = daily_salary
+            result['monthly_salary_ves'] = monthly_salary
+            result['base_total_salary_ves'] = base_total_salary
+            
+            result['gross_total_ves'] = gross_total
+            # result['total_deductions_ves'] = total_deductions_ves # Ya calculado arriba explícitamente
+            result['net_total_ves'] = net_total
+            
+            result['vacation_amount_ves'] = vacation_amount
+            result['rest_amount_ves'] = rest_amount
+            result['holiday_amount_ves'] = holiday_amount
+            result['bonus_amount_ves'] = bonus_amount
+            
+            # Deducciones ya vienen en VES por defecto en la lógica anterior
+            result['ivss_amount_ves'] = ivss_amount
+            result['faov_amount_ves'] = faov_amount
+            result['rpe_amount_ves'] = rpe_amount
+            result['total_deductions_ves'] = total_deductions_ves
+            
+        else:
+            # Origen USD: Llenar campos _usd (Siempre)
+            # Nota: 'daily_salary' etc están en USD
+            result['daily_salary_usd'] = daily_salary
+            result['monthly_salary_usd'] = monthly_salary
+            result['base_total_salary_usd'] = base_total_salary
+            
+            result['gross_total_usd'] = gross_total
+            result['net_total_usd'] = net_total
+            
+            result['vacation_amount_usd'] = vacation_amount
+            result['rest_amount_usd'] = rest_amount
+            result['holiday_amount_usd'] = holiday_amount
+            result['bonus_amount_usd'] = bonus_amount
+
+            # Las deducciones siempre se calcularon en VES, así que asignamos _ves directamente
+            result['ivss_amount_ves'] = ivss_amount
+            result['faov_amount_ves'] = faov_amount
+            result['rpe_amount_ves'] = rpe_amount
+            result['total_deductions_ves'] = total_deductions_ves
+
+
+        # 2. Conversiones (Si hay tasa)
         if exchange_rate and exchange_rate > 0:
             result['exchange_rate'] = exchange_rate
             
             if is_ves_salary:
-                # Caso ESPECIAL: El origen ya es VES, no multiplicar.
-                # Asignar los valores calculados (que ya son Bs) a los campos _ves
-                result['daily_salary_ves'] = daily_salary
-                result['monthly_salary_ves'] = monthly_salary
-                result['base_total_salary_ves'] = base_total_salary
+                # VES -> USD
+                result['daily_salary_usd'] = (daily_salary / exchange_rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                result['monthly_salary_usd'] = (monthly_salary / exchange_rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                result['base_total_salary_usd'] = (base_total_salary / exchange_rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
                 
-                result['gross_total_ves'] = gross_total
-                result['total_deductions_ves'] = total_deductions
-                result['net_total_ves'] = net_total
+                result['gross_total_usd'] = (gross_total / exchange_rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                result['net_total_usd'] = (net_total / exchange_rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
                 
-                result['vacation_amount_ves'] = vacation_amount
-                result['rest_amount_ves'] = rest_amount
-                result['holiday_amount_ves'] = holiday_amount
-                result['bonus_amount_ves'] = bonus_amount
-                
-                result['ivss_amount_ves'] = ivss_amount
-                result['faov_amount_ves'] = faov_amount
-                result['rpe_amount_ves'] = rpe_amount
-                
-                # Opcional: Calcular equivalente en USD para referencia
-                # (Se invierte la operación: VES / Tasa)
-                result['daily_salary'] = (daily_salary / exchange_rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-                result['monthly_salary'] = (monthly_salary / exchange_rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-                result['base_total_salary'] = (base_total_salary / exchange_rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-                
-                result['gross_total'] = (gross_total / exchange_rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-                result['net_total'] = (net_total / exchange_rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                # Desglose en USD (referencial)
+                # Deducciones en USD (referencial)
+                deduction_impact_usd = (total_deductions_ves / exchange_rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
                 
             else:
-                # Caso ESTÁNDAR: El origen es USD, multiplicar por tasa
-                result['daily_salary_ves'] = (daily_salary * exchange_rate).quantize(
-                    Decimal('0.01'), rounding=ROUND_HALF_UP
-                )
-                result['monthly_salary_ves'] = (monthly_salary * exchange_rate).quantize(
-                    Decimal('0.01'), rounding=ROUND_HALF_UP
-                )
-                result['base_total_salary_ves'] = (base_total_salary * exchange_rate).quantize(
-                    Decimal('0.01'), rounding=ROUND_HALF_UP
-                )
+                # USD -> VES
+                result['daily_salary_ves'] = (daily_salary * exchange_rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                result['monthly_salary_ves'] = (monthly_salary * exchange_rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                result['base_total_salary_ves'] = (base_total_salary * exchange_rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
                 
-                result['gross_total_ves'] = (gross_total * exchange_rate).quantize(
-                    Decimal('0.01'), rounding=ROUND_HALF_UP
-                )
-                result['total_deductions_ves'] = (total_deductions * exchange_rate).quantize(
-                    Decimal('0.01'), rounding=ROUND_HALF_UP
-                )
-                result['net_total_ves'] = (net_total * exchange_rate).quantize(
-                    Decimal('0.01'), rounding=ROUND_HALF_UP
-                )
+                result['gross_total_ves'] = (gross_total * exchange_rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
                 
                 # Desglose VES
                 result['vacation_amount_ves'] = (vacation_amount * exchange_rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
@@ -772,8 +832,8 @@ NETO A PAGAR: {net_total:,.2f}
                 result['holiday_amount_ves'] = (holiday_amount * exchange_rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
                 result['bonus_amount_ves'] = (bonus_amount * exchange_rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
                 
-                result['ivss_amount_ves'] = (ivss_amount * exchange_rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-                result['faov_amount_ves'] = (faov_amount * exchange_rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-                result['rpe_amount_ves'] = (rpe_amount * exchange_rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                # NETO Total en VES = Gross(VES) - Deductions(VES)
+                result['net_total_ves'] = result['gross_total_ves'] - result['total_deductions_ves']
+
         
         return result

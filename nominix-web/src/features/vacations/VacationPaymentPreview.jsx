@@ -18,10 +18,23 @@ const formatCurrency = (amount, currency = 'USD') => {
 /**
  * TraceTooltip - Muestra un tooltip con los detalles del cálculo.
  */
-const TraceTooltip = ({ trace }) => {
+const TraceTooltip = ({ trace, convert, viewCurrency }) => {
     if (!trace) return null;
 
     const [show, setShow] = useState(false);
+
+    // Helper para renderizar valores (strings o objetos {type: 'money'})
+    const renderValue = (val) => {
+        if (val && typeof val === 'object' && val.type === 'money') {
+            // Si trae moneda forzada (ej: VES para deducciones), usarla directa sin convertir
+            if (val.currency) {
+                return formatCurrency(val.amount, val.currency);
+            }
+            // Si no, convertir a moneda de vista
+            return formatCurrency(convert(val.amount), viewCurrency);
+        }
+        return val;
+    };
 
     return (
         <div className="relative inline-block ml-2">
@@ -38,7 +51,7 @@ const TraceTooltip = ({ trace }) => {
             </button>
 
             {show && (
-                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-64 p-3 bg-white rounded-lg shadow-xl border border-gray-100 text-xs z-50">
+                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-64 p-3 bg-white rounded-lg shadow-xl border-gray-100 text-xs z-50">
                     <div className="font-bold text-gray-700 mb-2 border-b border-gray-100 pb-1">
                         Fórmula: <span className="text-nominix-electric">{trace.formula}</span>
                     </div>
@@ -46,7 +59,7 @@ const TraceTooltip = ({ trace }) => {
                         {trace.values && Object.entries(trace.values).map(([key, value]) => (
                             <div key={key} className="flex justify-between">
                                 <span className="text-gray-500">{key}:</span>
-                                <span className="font-medium text-gray-800">{value}</span>
+                                <span className="font-medium text-gray-800">{renderValue(value)}</span>
                             </div>
                         ))}
                     </div>
@@ -121,10 +134,11 @@ const VacationPaymentPreview = ({
     const gross_total = convert(simulation.gross_total);
 
     // Deducciones
-    const ivss_amount = convert(simulation.ivss_amount);
-    const faov_amount = convert(simulation.faov_amount);
-    const rpe_amount = convert(simulation.rpe_amount);
-    const total_deductions = convert(simulation.total_deductions);
+    // FIX: NO CONVERTIR. Siempre usar el valor base (que ya viene en VES).
+    const ivss_amount = simulation.ivss_amount;
+    const faov_amount = simulation.faov_amount;
+    const rpe_amount = simulation.rpe_amount;
+    const total_deductions = simulation.total_deductions;
 
     // Neto
     const net_total = convert(simulation.net_total);
@@ -145,10 +159,11 @@ const VacationPaymentPreview = ({
     ];
 
     // Filas de deducciones
+    // FIX: Las deducciones de ley SIEMPRE se muestran en VES (Bolívares), por norma legal y petición del usuario.
     const deductions = [
-        { label: 'IVSS (4%)', amount: ivss_amount, trace: traces.ivss_amount },
-        { label: 'FAOV (1%)', amount: faov_amount, trace: traces.faov_amount },
-        { label: 'RPE (0.5%)', amount: rpe_amount, trace: traces.rpe_amount },
+        { label: 'IVSS (4%)', amount: ivss_amount, trace: traces.ivss_amount, currency: 'VES' },
+        { label: 'FAOV (1%)', amount: faov_amount, trace: traces.faov_amount, currency: 'VES' },
+        { label: 'RPE (0.5%)', amount: rpe_amount, trace: traces.rpe_amount, currency: 'VES' },
     ];
 
     return (
@@ -165,7 +180,7 @@ const VacationPaymentPreview = ({
                     <div className="flex items-center justify-center gap-2 mt-2">
                         <Badge variant="secondary" className="flex items-center gap-1">
                             Salario Diario: {formatCurrency(daily_salary, viewCurrency)}
-                            <TraceTooltip trace={traces.daily_salary} />
+                            <TraceTooltip trace={traces.daily_salary} convert={convert} viewCurrency={viewCurrency} />
                         </Badge>
                         {viewCurrency === 'VES' && exchangeRate > 0 && (
                             <Badge variant="outline" className="opacity-75">
@@ -195,7 +210,7 @@ const VacationPaymentPreview = ({
                                 <Badge variant="outline" size="sm">
                                     {item.days} días
                                 </Badge>
-                                <TraceTooltip trace={item.trace} />
+                                <TraceTooltip trace={item.trace} convert={convert} viewCurrency={viewCurrency} />
                             </div>
                             <span className="font-bold text-right">
                                 {formatCurrency(item.amount, viewCurrency)}
@@ -230,10 +245,10 @@ const VacationPaymentPreview = ({
                             <div className="flex items-center gap-2">
                                 <Minus size={14} className="text-red-500" />
                                 <span className="text-sm text-red-700">{item.label}</span>
-                                <TraceTooltip trace={item.trace} />
+                                <TraceTooltip trace={item.trace} convert={convert} viewCurrency={viewCurrency} />
                             </div>
                             <span className="font-bold text-red-600">
-                                -{formatCurrency(item.amount, viewCurrency)}
+                                -{formatCurrency(item.amount, 'VES')}
                             </span>
                         </div>
                     ))}
@@ -242,7 +257,7 @@ const VacationPaymentPreview = ({
                     <div className="flex items-center justify-between p-3 border-t border-red-200 pt-4">
                         <span className="text-sm font-bold text-red-700">Total Deducciones</span>
                         <span className="font-bold text-red-600">
-                            -{formatCurrency(total_deductions, viewCurrency)}
+                            -{formatCurrency(total_deductions, 'VES')}
                         </span>
                     </div>
                 </div>

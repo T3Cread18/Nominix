@@ -433,6 +433,37 @@ class PayrollPolicy(models.Model):
         help_text="Porcentaje de recargo por bono nocturno (ej: 0.30 = 30%)"
     )
 
+    # Configuración de Vacaciones (LOTTT)
+    vacation_days_base = models.PositiveSmallIntegerField(
+        default=15,
+        verbose_name="Días Base Vacaciones",
+        help_text="Días correspondientes al primer año (Art. 190)"
+    )
+    
+    vacation_days_per_year = models.PositiveSmallIntegerField(
+        default=1,
+        verbose_name="Días Adicionales por Año",
+        help_text="Días adicionales por cada año de servicio"
+    )
+    
+    vacation_days_max = models.PositiveSmallIntegerField(
+        default=15,
+        verbose_name="Máximo Días Adicionales",
+        help_text="Tope de días adicionales acumulables (Total máx = Base + Máx)"
+    )
+    
+    vacation_bonus_days_base = models.PositiveSmallIntegerField(
+        default=15,
+        verbose_name="Días Base Bono Vacacional",
+        help_text="Días de bono para el primer año (Art. 192)"
+    )
+    
+    vacation_bonus_days_max = models.PositiveSmallIntegerField(
+        default=30,
+        verbose_name="Máximo Días Bono Vacacional",
+        help_text="Tope máximo de días de bono vacacional"
+    )
+
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
