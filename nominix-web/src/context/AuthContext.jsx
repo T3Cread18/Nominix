@@ -52,8 +52,15 @@ export const AuthProvider = ({ children }) => {
 
     const login = async (username, password) => {
         const response = await axiosClient.post('/auth/login/', { username, password });
-        setUser(response.data);
-        setUser(response.data);
+
+        // Actualizar el token CSRF con el nuevo generado por el backend
+        if (response.data.csrfToken) {
+            axiosClient.defaults.headers.common['X-CSRFToken'] = response.data.csrfToken;
+            if (import.meta.env.DEV) console.log('🔄 CSRF Token rotated after login');
+        }
+
+        const userData = response.data.user || response.data; // Compatibilidad con estructura anterior
+        setUser(userData);
 
         // Intentar obtener info del tenant, pero no bloquear el login si falla
         try {

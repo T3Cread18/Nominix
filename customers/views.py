@@ -452,7 +452,15 @@ class AuthView(viewsets.ViewSet):
         
         if user:
             login(request, user)
-            return Response(UserSerializer(user).data)
+            
+            # Obtener el nuevo token CSRF generado tras el login
+            from django.middleware.csrf import get_token
+            csrf_token = get_token(request)
+            
+            return Response({
+                'user': UserSerializer(user).data,
+                'csrfToken': csrf_token
+            })
         
         return Response(
             {'error': 'Credenciales inválidas'}, 
