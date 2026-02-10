@@ -13,18 +13,14 @@ import axios from 'axios';
 
 // ============ CONFIGURACIÓN ============
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 const MAX_RETRIES = 2;
 const RETRY_DELAY = 1000; // ms
 
 // ============ INSTANCIA PRINCIPAL ============
 
 const axiosClient = axios.create({
-<<<<<<< HEAD
-    baseURL: import.meta.env.VITE_API_URL || '/api',
-=======
     baseURL: API_BASE_URL,
->>>>>>> 79cb2a790520d5aa45329144fa669ea853b6003b
     withCredentials: true,
     xsrfCookieName: 'csrftoken',
     xsrfHeaderName: 'X-CSRFToken',
