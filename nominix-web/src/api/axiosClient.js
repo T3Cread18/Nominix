@@ -31,6 +31,26 @@ const axiosClient = axios.create({
     timeout: 30000, // 30 segundos
 });
 
+// ============ CSRF TOKEN FETCHING ============
+
+// Función para obtener el token CSRF manualmente (necesario para Cross-Domain)
+const fetchCsrfToken = async () => {
+    try {
+        const response = await axios.get(`${API_BASE_URL}/auth/csrf/`, {
+            withCredentials: true
+        });
+        if (response.data && response.data.csrfToken) {
+            axiosClient.defaults.headers.common['X-CSRFToken'] = response.data.csrfToken;
+            if (import.meta.env.DEV) console.log('✅ CSRF Token set manually');
+        }
+    } catch (error) {
+        console.warn('⚠️ Could not fetch CSRF token', error);
+    }
+};
+
+// Intentar obtener el token al cargar
+fetchCsrfToken();
+
 // ============ ESTADO DE REFRESH ============
 
 let isRefreshing = false;

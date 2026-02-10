@@ -459,6 +459,15 @@ class AuthView(viewsets.ViewSet):
             status=status.HTTP_401_UNAUTHORIZED
         )
 
+    @action(detail=False, methods=['get'])
+    def csrf(self, request):
+        """
+        Retorna el token CSRF para clientes que no pueden leer la cookie.
+        GET /api/auth/csrf/
+        """
+        from django.middleware.csrf import get_token
+        return Response({'csrfToken': get_token(request)})
+
     @action(detail=False, methods=['post'])
     def logout(self, request):
         """
