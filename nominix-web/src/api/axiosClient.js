@@ -115,7 +115,9 @@ axiosClient.interceptors.response.use(
 
                 // Limpiar estado de auth y redirigir
                 // Nota: En producción, esto debería llamar a logout del AuthContext
-                if (window.location.pathname !== '/login') {
+                // Limpiar estado de auth y redirigir
+                // Nota: En producción, esto debería llamar a logout del AuthContext
+                if (!window.location.pathname.startsWith('/login')) {
                     window.location.href = '/login';
                 }
 

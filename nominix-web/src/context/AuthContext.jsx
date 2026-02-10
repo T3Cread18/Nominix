@@ -53,8 +53,16 @@ export const AuthProvider = ({ children }) => {
     const login = async (username, password) => {
         const response = await axiosClient.post('/auth/login/', { username, password });
         setUser(response.data);
-        // Al loguear, refrescamos info del tenant por si acaso
-        await initAuth();
+        setUser(response.data);
+
+        // Intentar obtener info del tenant, pero no bloquear el login si falla
+        try {
+            const tenantRes = await axiosClient.get('/tenant-info/');
+            setTenant(tenantRes.data.tenant);
+        } catch (error) {
+            console.warn("No se pudo obtener info del tenant al hacer login", error);
+        }
+
         return response.data;
     };
 
