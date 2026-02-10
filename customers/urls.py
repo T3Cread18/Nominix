@@ -23,5 +23,6 @@ urlpatterns = [
     # Endpoints de Autenticación
     path('auth/login/', AuthView.as_view({'post': 'login'}), name='auth-login'),
     path('auth/logout/', AuthView.as_view({'post': 'logout'}), name='auth-logout'),
+    path('auth/refresh/', AuthView.as_view({'post': 'refresh'}), name='auth-refresh'),
     path('auth/me/', AuthView.as_view({'get': 'me'}), name='auth-me'),
 ]

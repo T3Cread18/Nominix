@@ -468,6 +468,21 @@ class AuthView(viewsets.ViewSet):
         logout(request)
         return Response({'message': 'Sesión cerrada exitosamente'})
 
+    @action(detail=False, methods=['post'])
+    def refresh(self, request):
+        """
+        Refresca la sesión actual (extiende la expiración de la cookie).
+        POST /api/auth/refresh/
+        """
+        # El middleware de sesión actualiza la expiración automáticamente
+        # al recibir cualquier request autenticado.
+        if request.user.is_authenticated:
+            return Response({'message': 'Sesión refrescada'})
+        return Response(
+            {'error': 'No autenticado'}, 
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+
     @action(detail=False, methods=['get'])
     def me(self, request):
         """
