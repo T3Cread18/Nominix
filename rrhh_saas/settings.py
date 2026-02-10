@@ -69,6 +69,7 @@ TENANT_APPS: List[str] = [
     # Apps de nómina y RRHH
     'payroll_core',
     'vacations',  # Módulo de Gestión de Vacaciones
+    'biometrics',  # Módulo de Control Biométrico
 ]
 
 # Combinación de todas las apps instaladas
