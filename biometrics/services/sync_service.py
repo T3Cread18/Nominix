@@ -103,6 +103,38 @@ class BiometricSyncService:
                 'error_type': 'unknown',
                 'message': f"Error inesperado: {str(e)}",
             }
+        
+    @classmethod
+    def get_device_events(
+        cls,
+        device: BiometricDevice,
+        start_time: Optional[datetime] = None,
+        end_time: Optional[datetime] = None,
+        page_no: int = 0,
+        page_size: int = 50,
+    ) -> Dict[str, Any]:
+        """
+        Obtener eventos directamente del dispositivo (sin guardar en BD).
+        Useful para visualizar la data cruda.
+        """
+        if end_time is None:
+            end_time = timezone.now()
+        
+        if start_time is None:
+            # Default: última semana
+            start_time = end_time - timedelta(days=7)
+            
+        try:
+            client = cls.get_client(device)
+            return client.search_events(
+                start_time=start_time,
+                end_time=end_time,
+                page_no=page_no,
+                page_size=page_size
+            )
+        except Exception as e:
+            logger.error(f"Error getting device events: {e}")
+            raise
     
     @classmethod
     def sync_device_events(

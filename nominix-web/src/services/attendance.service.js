@@ -82,9 +82,20 @@ const attendanceService = {
 
     // ==================== EVENTOS ====================
 
+    /**
+     * Obtener eventos directamente del dispositivo (sin guardar).
+     * @param {number} id - ID del dispositivo
+     * @param {object} params - { page, page_size, start_time, end_time }
+     */
+    getDeviceEvents: async (id, params = {}) => {
+        const response = await axiosClient.get(`/biometric/devices/${id}/get_events/`, { params });
+        return response.data;
+    },
+
     /** 
-     * Obtiene eventos de asistencia con filtros opcionales.
-     * @param {object} filters - { date_from, date_to, employee, event_type, device }
+     * Obtiene eventos de asistencia con filtros opcionales y paginación.
+     * @param {object} filters - { date_from, date_to, employee, event_type, device, page, page_size }
+     * @returns {{ count: number, next: string|null, previous: string|null, results: Array }}
      */
     getEvents: async (filters = {}) => {
         const params = new URLSearchParams();
@@ -96,7 +107,24 @@ const attendanceService = {
         const query = params.toString();
         const url = query ? `/biometric/events/?${query}` : '/biometric/events/';
         const response = await axiosClient.get(url);
-        return response.data.results || response.data;
+        // DRF paginated response: { count, next, previous, results }
+        if (response.data && response.data.results !== undefined) {
+            return response.data;
+        }
+        // Fallback for non-paginated response
+        return { count: response.data.length, results: response.data, next: null, previous: null };
+    },
+
+    // ==================== ASISTENCIA DIARIA ====================
+
+    /**
+     * Obtiene el resumen diario de asistencia (agregado).
+     * @param {string} date - Fecha en formato YYYY-MM-DD
+     */
+    getDailyAttendance: async (date) => {
+        const params = date ? { date } : {};
+        const response = await axiosClient.get('/biometric/daily-attendance/', { params });
+        return response.data;
     },
 
     // ==================== MAPEOS ====================

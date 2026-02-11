@@ -109,7 +109,7 @@ class AttendanceEventSerializer(serializers.ModelSerializer):
     
     def get_employee_cedula(self, obj):
         if obj.employee:
-            return obj.employee.cedula
+            return obj.employee.national_id
         return None
 
 
@@ -136,7 +136,7 @@ class EmployeeDeviceMappingSerializer(serializers.ModelSerializer):
         return f"{obj.employee.first_name} {obj.employee.last_name}"
     
     def get_employee_cedula(self, obj):
-        return obj.employee.cedula
+        return obj.employee.national_id
 
 
 class SyncResultSerializer(serializers.Serializer):

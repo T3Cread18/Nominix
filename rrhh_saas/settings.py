@@ -19,7 +19,7 @@ SECRET_KEY: str = os.environ.get('SECRET_KEY', 'django-insecure-cambiar-en-produ
 
 DEBUG: bool = os.environ.get('DEBUG', 'True').lower() in ('true', '1', 'yes')
 
-ALLOWED_HOSTS: List[str] = ['localhost', '127.0.0.1', '.localhost']
+ALLOWED_HOSTS: List[str] = ['localhost', '127.0.0.1', '.localhost', 'gfo.lan', 'rrhh.gfo.lan', '*.gfo.lan', '[IP_ADDRESS]', '*.192.168.1.100', '[IP_ADDRESS]', '[IP_ADDRESS]']
 
 # Dominio base para la creación automática de subdominios
 TENANT_BASE_DOMAIN: str = os.environ.get('TENANT_BASE_DOMAIN', 'localhost')
@@ -50,6 +50,7 @@ SHARED_APPS: List[str] = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.admin',
+    'corsheaders',
     
     # Apps de terceros
     'rest_framework',
@@ -90,6 +91,7 @@ TENANT_DOMAIN_MODEL: str = 'customers.Domain'
 MIDDLEWARE: List[str] = [
     'django_tenants.middleware.main.TenantMainMiddleware',  # Debe estar primero
     'django.middleware.security.SecurityMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',

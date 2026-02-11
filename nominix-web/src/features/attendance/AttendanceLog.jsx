@@ -1,17 +1,20 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui';
-import { Search, Filter, Calendar, Download } from 'lucide-react';
+import { Search, Filter, Calendar, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import attendanceService from '../../services/attendance.service';
 import EventsTable from './components/EventsTable';
 
 /**
  * AttendanceLog - Registro completo de eventos de asistencia.
- * 
- * Tabla con filtros: rango de fechas, ID empleado, tipo de evento.
- * Paginación y búsqueda.
+ * Paginación server-side por lotes de 50 eventos.
+ * Palette: Nominix light theme.
  */
+const PAGE_SIZE = 50;
+
 const AttendanceLog = () => {
     const [events, setEvents] = useState([]);
+    const [totalCount, setTotalCount] = useState(0);
+    const [page, setPage] = useState(1);
     const [loading, setLoading] = useState(true);
     const [filters, setFilters] = useState({
         date_from: getTodayStr(),
@@ -20,33 +23,59 @@ const AttendanceLog = () => {
         event_type: '',
     });
 
-    const loadEvents = useCallback(async () => {
+    const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+
+    const loadEvents = useCallback(async (targetPage = 1) => {
         setLoading(true);
         try {
-            const data = await attendanceService.getEvents(filters);
-            setEvents(Array.isArray(data) ? data : []);
+            const data = await attendanceService.getEvents({
+                ...filters,
+                page: targetPage,
+                page_size: PAGE_SIZE,
+            });
+            setEvents(data.results || []);
+            setTotalCount(data.count || 0);
+            setPage(targetPage);
         } catch (err) {
             console.error('Error loading events:', err);
             setEvents([]);
+            setTotalCount(0);
         } finally {
             setLoading(false);
         }
     }, [filters]);
 
     useEffect(() => {
-        loadEvents();
-    }, []); // Load on mount only; user triggers reload via search button
+        loadEvents(1);
+    }, []);
 
     const handleFilterChange = (field, value) => {
         setFilters(f => ({ ...f, [field]: value }));
     };
 
     const handleSearch = () => {
-        loadEvents();
+        loadEvents(1);
     };
 
     const handleKeyDown = (e) => {
         if (e.key === 'Enter') handleSearch();
+    };
+
+    const goToPage = (p) => {
+        if (p >= 1 && p <= totalPages) loadEvents(p);
+    };
+
+    // Genera botones de paginación visibles
+    const getPageNumbers = () => {
+        const pages = [];
+        const maxVisible = 5;
+        let start = Math.max(1, page - Math.floor(maxVisible / 2));
+        let end = Math.min(totalPages, start + maxVisible - 1);
+        if (end - start < maxVisible - 1) {
+            start = Math.max(1, end - maxVisible + 1);
+        }
+        for (let i = start; i <= end; i++) pages.push(i);
+        return pages;
     };
 
     return (
@@ -67,7 +96,7 @@ const AttendanceLog = () => {
                                     value={filters.date_from}
                                     onChange={(e) => handleFilterChange('date_from', e.target.value)}
                                     onKeyDown={handleKeyDown}
-                                    className="w-full pl-9 pr-3 py-2 bg-[#1a1a2e] border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                                    className="w-full pl-9 pr-3 py-2 bg-nominix-smoke border border-gray-200 rounded-lg text-sm text-nominix-dark focus:outline-none focus:ring-2 focus:ring-nominix-electric/30 focus:border-nominix-electric"
                                 />
                             </div>
                         </div>
@@ -84,7 +113,7 @@ const AttendanceLog = () => {
                                     value={filters.date_to}
                                     onChange={(e) => handleFilterChange('date_to', e.target.value)}
                                     onKeyDown={handleKeyDown}
-                                    className="w-full pl-9 pr-3 py-2 bg-[#1a1a2e] border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                                    className="w-full pl-9 pr-3 py-2 bg-nominix-smoke border border-gray-200 rounded-lg text-sm text-nominix-dark focus:outline-none focus:ring-2 focus:ring-nominix-electric/30 focus:border-nominix-electric"
                                 />
                             </div>
                         </div>
@@ -102,7 +131,7 @@ const AttendanceLog = () => {
                                     onChange={(e) => handleFilterChange('employee', e.target.value)}
                                     onKeyDown={handleKeyDown}
                                     placeholder="Buscar por cédula..."
-                                    className="w-full pl-9 pr-3 py-2 bg-[#1a1a2e] border border-white/10 rounded-lg text-sm text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                                    className="w-full pl-9 pr-3 py-2 bg-nominix-smoke border border-gray-200 rounded-lg text-sm text-nominix-dark placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-nominix-electric/30 focus:border-nominix-electric"
                                 />
                             </div>
                         </div>
@@ -115,7 +144,7 @@ const AttendanceLog = () => {
                             <select
                                 value={filters.event_type}
                                 onChange={(e) => handleFilterChange('event_type', e.target.value)}
-                                className="w-full px-3 py-2 bg-[#1a1a2e] border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 [&>option]:bg-[#1a1a2e] [&>option]:text-white"
+                                className="w-full px-3 py-2 bg-nominix-smoke border border-gray-200 rounded-lg text-sm text-nominix-dark focus:outline-none focus:ring-2 focus:ring-nominix-electric/30 focus:border-nominix-electric"
                             >
                                 <option value="">Todos</option>
                                 <option value="entry">Entrada</option>
@@ -128,7 +157,7 @@ const AttendanceLog = () => {
                         {/* Botón buscar */}
                         <button
                             onClick={handleSearch}
-                            className="flex items-center gap-2 px-5 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold uppercase tracking-wider transition-all"
+                            className="flex items-center gap-2 px-5 py-2 rounded-lg bg-nominix-electric hover:bg-blue-600 text-white text-xs font-bold uppercase tracking-wider transition-all"
                         >
                             <Filter size={14} />
                             Filtrar
@@ -139,13 +168,13 @@ const AttendanceLog = () => {
 
             {/* Resultados */}
             <Card className="border-0">
-                <CardHeader className="border-b border-white/5 pb-3">
+                <CardHeader className="border-b border-gray-100 pb-3">
                     <div className="flex items-center justify-between">
                         <CardTitle className="text-sm">
                             Registro de Marcajes
                             {!loading && (
                                 <span className="ml-2 text-gray-400 font-normal">
-                                    ({events.length} evento{events.length !== 1 ? 's' : ''})
+                                    ({totalCount} evento{totalCount !== 1 ? 's' : ''})
                                 </span>
                             )}
                         </CardTitle>
@@ -153,6 +182,48 @@ const AttendanceLog = () => {
                 </CardHeader>
                 <CardContent className="p-0">
                     <EventsTable events={events} loading={loading} />
+
+                    {/* Pagination Bar */}
+                    {!loading && totalCount > 0 && (
+                        <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
+                            {/* Info */}
+                            <span className="text-xs text-gray-400">
+                                Mostrando {((page - 1) * PAGE_SIZE) + 1}–{Math.min(page * PAGE_SIZE, totalCount)} de {totalCount}
+                            </span>
+
+                            {/* Page Controls */}
+                            <div className="flex items-center gap-1">
+                                <button
+                                    onClick={() => goToPage(page - 1)}
+                                    disabled={page <= 1}
+                                    className="p-1.5 rounded-lg bg-nominix-smoke border border-gray-200 text-gray-500 hover:bg-gray-100 disabled:opacity-30 transition-colors"
+                                >
+                                    <ChevronLeft size={16} />
+                                </button>
+
+                                {getPageNumbers().map(p => (
+                                    <button
+                                        key={p}
+                                        onClick={() => goToPage(p)}
+                                        className={`min-w-[32px] h-8 rounded-lg text-xs font-bold transition-all ${p === page
+                                                ? 'bg-nominix-electric text-white shadow-sm'
+                                                : 'bg-nominix-smoke border border-gray-200 text-gray-500 hover:bg-gray-100'
+                                            }`}
+                                    >
+                                        {p}
+                                    </button>
+                                ))}
+
+                                <button
+                                    onClick={() => goToPage(page + 1)}
+                                    disabled={page >= totalPages}
+                                    className="p-1.5 rounded-lg bg-nominix-smoke border border-gray-200 text-gray-500 hover:bg-gray-100 disabled:opacity-30 transition-colors"
+                                >
+                                    <ChevronRight size={16} />
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </CardContent>
             </Card>
         </div>

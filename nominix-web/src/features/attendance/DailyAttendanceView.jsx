@@ -1,0 +1,271 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { Calendar, RefreshCw, Loader2, Users, Clock, AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, WifiOff, Wifi } from 'lucide-react';
+import { Card, CardContent } from '../../components/ui';
+import attendanceService from '../../services/attendance.service';
+import TimeBlock from './components/TimeBlock';
+
+/**
+ * DailyAttendanceView — Vista de Control Diario de Asistencia
+ * Palette: nominix-dark #1A2B48, nominix-electric #0052FF, nominix-smoke #F8F9FA, surface #FFF
+ */
+const DailyAttendanceView = () => {
+    const [date, setDate] = useState(getTodayStr());
+    const [data, setData] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
+
+    const loadData = useCallback(async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const result = await attendanceService.getDailyAttendance(date);
+            setData(Array.isArray(result) ? result : []);
+        } catch (err) {
+            console.error('Error loading daily attendance:', err);
+            setError('Error al cargar datos de asistencia');
+            setData([]);
+        } finally {
+            setLoading(false);
+        }
+    }, [date]);
+
+    useEffect(() => { loadData(); }, [loadData]);
+
+    const changeDate = (delta) => {
+        const d = new Date(date + 'T12:00:00');
+        d.setDate(d.getDate() + delta);
+        setDate(d.toISOString().split('T')[0]);
+    };
+
+    // KPIs
+    const totalEmployees = data.length;
+    const onTime = data.filter(d => d.blocks?.entry?.status === 'success').length;
+    const late = data.filter(d => ['warning', 'danger'].includes(d.blocks?.entry?.status)).length;
+    const missing = data.filter(d => d.blocks?.entry?.status === 'missing').length;
+
+    const handleCorrect = () => {
+        alert('Funcionalidad de corrección manual en desarrollo.');
+    };
+
+    return (
+        <div className="space-y-5">
+            {/* Header — Date Nav + Refresh */}
+            <div className="flex items-center justify-between flex-wrap gap-3">
+                {/* Date Navigator */}
+                <div className="flex items-center gap-1 bg-white border border-gray-100 rounded-xl p-1 shadow-sm">
+                    <button onClick={() => changeDate(-1)}
+                        className="p-2 rounded-lg hover:bg-nominix-smoke text-gray-400 hover:text-nominix-dark transition-colors">
+                        <ChevronLeft size={18} />
+                    </button>
+                    <div className="flex items-center gap-2 px-3">
+                        <Calendar size={16} className="text-nominix-electric" />
+                        <input
+                            type="date"
+                            value={date}
+                            onChange={(e) => setDate(e.target.value)}
+                            className="bg-transparent border-none text-sm font-bold text-nominix-dark cursor-pointer outline-none"
+                        />
+                    </div>
+                    <button onClick={() => changeDate(1)}
+                        className="p-2 rounded-lg hover:bg-nominix-smoke text-gray-400 hover:text-nominix-dark transition-colors">
+                        <ChevronRight size={18} />
+                    </button>
+                    <button onClick={() => setDate(getTodayStr())}
+                        className="px-3 py-1.5 rounded-lg bg-blue-50 border border-blue-100 text-nominix-electric text-xs font-bold hover:bg-blue-100 transition-colors ml-1">
+                        Hoy
+                    </button>
+                </div>
+
+                {/* Refresh */}
+                <button onClick={loadData} disabled={loading}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white border border-gray-100 text-gray-500 text-sm font-semibold hover:bg-nominix-smoke hover:text-nominix-dark transition-colors shadow-sm disabled:opacity-50">
+                    {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                    Actualizar
+                </button>
+            </div>
+
+            {/* KPI Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <KpiCard icon={Users} label="Total" value={totalEmployees} bgColor="#f0f4ff" borderColor="#dbe4ff" iconColor="#0052FF" />
+                <KpiCard icon={CheckCircle2} label="A Tiempo" value={onTime} bgColor="#ecfdf5" borderColor="#a7f3d0" iconColor="#059669" />
+                <KpiCard icon={Clock} label="Tarde" value={late} bgColor="#fffbeb" borderColor="#fde68a" iconColor="#d97706" />
+                <KpiCard icon={AlertTriangle} label="Sin Marca" value={missing} bgColor="#fef2f2" borderColor="#fecaca" iconColor="#dc2626" />
+            </div>
+
+            {/* Error */}
+            {error && (
+                <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-sm font-medium">
+                    <AlertTriangle size={16} />
+                    {error}
+                </div>
+            )}
+
+            {/* Main Table */}
+            <Card className="border-0">
+                <CardContent className="p-0">
+                    {loading ? (
+                        <div className="flex justify-center items-center py-16 text-gray-400 gap-2.5">
+                            <Loader2 size={24} className="animate-spin" />
+                            <span className="text-sm font-medium">Cargando asistencia...</span>
+                        </div>
+                    ) : data.length === 0 ? (
+                        <div className="flex flex-col justify-center items-center py-16 text-gray-400 gap-3">
+                            <Users size={40} strokeWidth={1} className="text-gray-300" />
+                            <span className="text-sm font-medium text-gray-500">No hay datos de asistencia para esta fecha</span>
+                            <span className="text-xs text-gray-400">Sincronice eventos desde los dispositivos primero</span>
+                        </div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full border-collapse">
+                                <thead>
+                                    <tr className="border-b border-gray-100">
+                                        <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-gray-400">Colaborador</th>
+                                        <th className="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-gray-400">Entrada</th>
+                                        <th className="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-gray-400">Sal. Almuerzo</th>
+                                        <th className="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-gray-400">Ret. Almuerzo</th>
+                                        <th className="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-gray-400">Salida</th>
+                                        <th className="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-gray-400">Hrs. Efectivas</th>
+                                        <th className="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-gray-400 w-12">Sync</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {data.map((row, idx) => (
+                                        <EmployeeRow key={row.employee?.id || idx} row={row} index={idx} onCorrect={handleCorrect} />
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+        </div>
+    );
+};
+
+// ─── Employee Row ──────────────────────────────────
+const EmployeeRow = ({ row, index, onCorrect }) => {
+    const { employee, blocks, effective_hours, schedule_name, is_synced } = row;
+
+    const getInitials = (name) => {
+        if (!name) return '??';
+        return name.split(' ').map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
+    };
+
+    const getAvatarBorder = () => {
+        if (blocks?.entry?.status === 'missing' || blocks?.entry?.status === 'danger') return '#dc2626';
+        if (blocks?.entry?.status === 'warning') return '#d97706';
+        return '#059669';
+    };
+
+    const getHoursColor = () => {
+        if (effective_hours >= 7.5) return '#059669';
+        if (effective_hours >= 6) return '#d97706';
+        if (effective_hours > 0) return '#dc2626';
+        return '#d1d5db';
+    };
+
+    return (
+        <tr className={`border-b border-gray-50 hover:bg-nominix-smoke/60 transition-colors ${index % 2 === 0 ? '' : 'bg-gray-50/40'}`}>
+            {/* Employee Info */}
+            <td className="px-4 py-3" style={{ minWidth: '220px' }}>
+                <div className="flex items-center gap-3">
+                    {employee?.photo_url ? (
+                        <img src={employee.photo_url} alt={employee.name}
+                            className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                            style={{ border: `2px solid ${getAvatarBorder()}` }} />
+                    ) : (
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
+                            style={{
+                                background: '#f0f4ff',
+                                color: '#0052FF',
+                                border: `2px solid ${getAvatarBorder()}`,
+                            }}>
+                            {getInitials(employee?.name)}
+                        </div>
+                    )}
+                    <div className="min-w-0">
+                        <div className="text-sm font-bold text-nominix-dark truncate" style={{ maxWidth: '180px' }}>
+                            {employee?.name || 'Sin nombre'}
+                        </div>
+                        <div className="text-[11px] text-gray-400">
+                            {employee?.department || schedule_name || ''}
+                        </div>
+                    </div>
+                </div>
+            </td>
+
+            {/* Time Blocks */}
+            <td className="px-3 py-3 text-center">
+                <TimeBlock block={blocks?.entry} label="Entrada" expectedTime="08:00" onCorrect={onCorrect} />
+            </td>
+            <td className="px-3 py-3 text-center">
+                <TimeBlock block={blocks?.lunch_out} label="Sal. Almuerzo" expectedTime="12:00" onCorrect={onCorrect} />
+            </td>
+            <td className="px-3 py-3 text-center">
+                <TimeBlock block={blocks?.lunch_in} label="Ret. Almuerzo" expectedTime="13:00" onCorrect={onCorrect} />
+            </td>
+            <td className="px-3 py-3 text-center">
+                <TimeBlock block={blocks?.exit} label="Salida" expectedTime="17:00" onCorrect={onCorrect} />
+            </td>
+
+            {/* Effective Hours */}
+            <td className="px-4 py-3 text-center">
+                <div className="flex flex-col items-center gap-0.5">
+                    <span className="text-xl font-black tracking-tight" style={{ color: getHoursColor(), fontFamily: "'Inter', sans-serif" }}>
+                        {effective_hours > 0 ? effective_hours.toFixed(1) : '—'}
+                    </span>
+                    <span className="text-[10px] text-gray-400 font-medium">horas</span>
+                </div>
+            </td>
+
+            {/* Sync */}
+            <td className="px-4 py-3 text-center">
+                {is_synced ? (
+                    <Wifi size={16} className="text-emerald-500 mx-auto" />
+                ) : (
+                    <WifiOff size={16} className="text-gray-300 mx-auto" />
+                )}
+            </td>
+        </tr>
+    );
+};
+
+// ─── KPI Card ──────────────────────────────────
+const KpiCard = ({ icon: Icon, label, value, bgColor, borderColor, iconColor }) => (
+    <div style={{
+        background: bgColor,
+        border: `1px solid ${borderColor}`,
+        borderRadius: '14px',
+        padding: '16px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+    }}>
+        <div style={{
+            width: 36,
+            height: 36,
+            borderRadius: '10px',
+            background: 'white',
+            border: `1px solid ${borderColor}`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+        }}>
+            <Icon size={18} style={{ color: iconColor }} />
+        </div>
+        <div>
+            <div className="text-xl font-black text-nominix-dark leading-none tracking-tight">
+                {value}
+            </div>
+            <div className="text-[11px] text-gray-500 font-semibold">
+                {label}
+            </div>
+        </div>
+    </div>
+);
+
+function getTodayStr() {
+    return new Date().toISOString().split('T')[0];
+}
+
+export default DailyAttendanceView;

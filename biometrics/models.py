@@ -196,6 +196,8 @@ class AttendanceEvent(models.Model):
     device = models.ForeignKey(
         BiometricDevice,
         on_delete=models.CASCADE,
+        null=True,
+        blank=True,
         related_name='events',
         verbose_name='Dispositivo'
     )

@@ -1,0 +1,93 @@
+﻿Esperando a que la base de datos (PostgreSQL) est├® lista...
+Base de datos disponible.
+Ejecutando migraciones de esquemas compartidos...
+=== Starting migration
+Operations to perform:
+  Apply all migrations: admin, auth, biometrics, contenttypes, customers, payroll_core, sessions, vacations
+Running migrations:
+  Applying biometrics.0003_alter_attendanceevent_verification_mode...
+ OK
+  Applying payroll_core.0053_workschedule_remove_employee_user_and_more...
+ OK
+Recolectando archivos est├íticos...
+
+docker : Connection 
+to db (172.19.0.2) 
+5432 port 
+[tcp/postgresql] 
+succeeded!
+En línea: 1 Carácter: 
+1
++ docker logs 
+nominix_backend 
+--tail 80 2>&1 | 
+Out-File -FilePath 
+c:\De ...
++ ~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo    
+          : NotSpeci  
+  fied: (Connection   
+  to d...sql] succ    
+eeded!:String) []    
+, RemoteException
+    + FullyQualifiedE 
+   rrorId : NativeCo  
+  mmandError
+ 
+0 static files copied to '/app/staticfiles', 161 unmodified.
+[2026-02-11 00:51:41 
++0000] [1] [INFO] 
+Starting gunicorn 
+21.2.0
+[2026-02-11 00:51:41 
++0000] [1] [INFO] 
+Listening at: 
+http://0.0.0.0:8000 
+(1)
+[2026-02-11 00:51:41 
++0000] [1] [INFO] 
+Using worker: sync
+[2026-02-11 00:51:41 
++0000] [107] [INFO] 
+Booting worker with 
+pid: 107
+[2026-02-11 00:51:41 
++0000] [108] [INFO] 
+Booting worker with 
+pid: 108
+[2026-02-11 00:51:41 
++0000] [109] [INFO] 
+Booting worker with 
+pid: 109
+/usr/local/lib/python3
+.11/site-packages/djan
+go/db/models/fields/__
+init__.py:1654: 
+RuntimeWarning: 
+DateTimeField Attendan
+ceEvent.timestamp 
+received a naive 
+datetime (2026-02-11 
+00:00:00) while time 
+zone support is 
+active.
+  warnings.warn(
+Ejecutando script de inicializaci├│n maestra...
+Verificando Tenant P├║blico...
+Verificando Dominio Maestro (localhost)...
+/usr/local/lib/python3
+.11/site-packages/djan
+go/db/models/fields/__
+init__.py:1654: 
+RuntimeWarning: 
+DateTimeField Attendan
+ceEvent.timestamp 
+received a naive 
+datetime (2026-02-11 
+00:00:00) while time 
+zone support is 
+active.
+  warnings.warn(
+El usuario Pablo ya existe. Contrase├▒a actualizada.
+Iniciando servidor Gunicorn...

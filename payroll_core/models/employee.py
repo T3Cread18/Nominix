@@ -8,6 +8,7 @@ from decimal import Decimal
 
 from .base import tenant_upload_path
 from .organization import Branch, Department, JobPosition
+from .work_schedule import WorkSchedule
 from customers.models import Currency
 
 
@@ -204,6 +205,16 @@ class Employee(models.Model):
         related_name='employees',
         verbose_name='Cargo Estructurado',
         help_text='Cargo asociado de la estructura organizacional'
+    )
+
+    work_schedule = models.ForeignKey(
+        WorkSchedule,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='employees',
+        verbose_name='Horario de Trabajo',
+        help_text='Horario asignado para cálculo de asistencia'
     )
     
     # ==========================================================================

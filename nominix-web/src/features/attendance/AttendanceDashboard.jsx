@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Fingerprint, LayoutDashboard, Wifi, Link2 } from 'lucide-react';
+import { Fingerprint, LayoutDashboard, Wifi, Link2, CalendarDays, List } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui';
 import { PageHeader } from '../../components/layout';
 import attendanceService from '../../services/attendance.service';
@@ -10,6 +10,8 @@ import DeviceManager from './DeviceManager';
 import EmployeeMapping from './EmployeeMapping';
 import AttendanceStats from './components/AttendanceStats';
 import EventsTable from './components/EventsTable';
+import DeviceEventsViewer from './DeviceEventsViewer';
+import DailyAttendanceView from './DailyAttendanceView';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui';
 
 /**
@@ -18,7 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui';
  * 3 tabs: Dashboard (resumen + eventos recientes), Dispositivos, Mapeo.
  */
 const AttendanceDashboard = () => {
-    const [activeTab, setActiveTab] = useState('dashboard');
+    const [activeTab, setActiveTab] = useState('daily');
     const [stats, setStats] = useState({});
     const [recentEvents, setRecentEvents] = useState([]);
     const [loadingDashboard, setLoadingDashboard] = useState(true);
@@ -70,9 +72,12 @@ const AttendanceDashboard = () => {
     }, [activeTab]);
 
     const tabs = [
+        { value: 'daily', label: 'Control Diario', icon: CalendarDays },
+        { value: 'log', label: 'Registro', icon: List },
         { value: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
         { value: 'devices', label: 'Dispositivos', icon: Wifi },
         { value: 'mapping', label: 'Mapeo', icon: Link2 },
+        { value: 'device_events', label: 'Eventos (Raw)', icon: Fingerprint },
     ];
 
     return (
@@ -95,6 +100,20 @@ const AttendanceDashboard = () => {
                         </TabsTrigger>
                     ))}
                 </TabsList>
+
+                {/* Tab: Control Diario */}
+                <TabsContent value="daily">
+                    <div className="mt-4">
+                        <DailyAttendanceView />
+                    </div>
+                </TabsContent>
+
+                {/* Tab: Registro de Marcajes (con paginación) */}
+                <TabsContent value="log">
+                    <div className="mt-4">
+                        <AttendanceLog />
+                    </div>
+                </TabsContent>
 
                 {/* Tab: Dashboard */}
                 <TabsContent value="dashboard">
@@ -130,6 +149,13 @@ const AttendanceDashboard = () => {
                 <TabsContent value="mapping">
                     <div className="mt-4">
                         <EmployeeMapping />
+                    </div>
+                </TabsContent>
+
+                {/* Tab: Eventos del Dispositivo */}
+                <TabsContent value="device_events">
+                    <div className="mt-4">
+                        <DeviceEventsViewer />
                     </div>
                 </TabsContent>
             </Tabs>

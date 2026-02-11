@@ -10,6 +10,7 @@ Endpoints:
 - /api/biometric/mappings/             → Mapear empleados ↔ dispositivos
 """
 from datetime import datetime, timedelta
+from rest_framework.pagination import PageNumberPagination
 
 from rest_framework import viewsets, status, permissions, filters
 from rest_framework.decorators import action
@@ -33,6 +34,7 @@ from .serializers import (
     DeviceTestResultSerializer,
 )
 from .services.sync_service import BiometricSyncService
+from .services.daily_attendance import DailyAttendanceService
 
 import logging
 
@@ -146,6 +148,58 @@ class BiometricDeviceViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
     
     @action(detail=True, methods=['get'])
+    def get_events(self, request, pk=None):
+        """
+        Obtener eventos de asistencia directamente del dispositivo (sin guardar).
+        Útil para visualizar data cruda y debugging.
+        
+        GET /api/biometric/devices/{id}/get_events/?page=1&page_size=50&start_time=X&end_time=Y
+        """
+        device = self.get_object()
+        
+        try:
+            page = int(request.query_params.get('page', 1))
+            page_size = int(request.query_params.get('page_size', 50))
+        except ValueError:
+            return Response(
+                {'error': 'Parámetros de paginación inválidos'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        start_time = None
+        end_time = None
+        
+        if request.query_params.get('start_time'):
+            try:
+                start_time = datetime.fromisoformat(request.query_params.get('start_time'))
+            except ValueError:
+                pass
+                
+        if request.query_params.get('end_time'):
+            try:
+                end_time = datetime.fromisoformat(request.query_params.get('end_time'))
+            except ValueError:
+                pass
+                
+        # page is 1-indexed for frontend, but 0-indexed for ISAPI
+        page_no = max(0, page - 1)
+            
+        try:
+            result = BiometricSyncService.get_device_events(
+                device=device,
+                start_time=start_time,
+                end_time=end_time,
+                page_no=page_no,
+                page_size=page_size
+            )
+            return Response(result)
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
+            )
+
+    @action(detail=True, methods=['get'])
     def device_users(self, request, pk=None):
         """
         Consultar los usuarios registrados directamente en el dispositivo.
@@ -165,6 +219,12 @@ class BiometricDeviceViewSet(viewsets.ModelViewSet):
             )
 
 
+class EventPagination(PageNumberPagination):
+    page_size = 50
+    page_size_query_param = 'page_size'
+    max_page_size = 200
+
+
 class AttendanceEventViewSet(viewsets.ReadOnlyModelViewSet):
     """
     ViewSet para consultar eventos de asistencia (solo lectura).
@@ -173,12 +233,15 @@ class AttendanceEventViewSet(viewsets.ReadOnlyModelViewSet):
     GET /api/biometric/events/?employee={id}      → Filtrar por empleado
     GET /api/biometric/events/?device={id}        → Filtrar por dispositivo
     GET /api/biometric/events/?date_from=X&date_to=Y → Filtrar por fecha
+    GET /api/biometric/events/?page=N&page_size=M → Paginación
     """
     serializer_class = AttendanceEventSerializer
     permission_classes = [permissions.IsAuthenticated]
+    pagination_class = EventPagination
     filter_backends = [filters.OrderingFilter]
     ordering_fields = ['timestamp', 'employee', 'event_type']
     ordering = ['-timestamp']
+
     
     def get_queryset(self):
         queryset = AttendanceEvent.objects.select_related(
@@ -275,7 +338,41 @@ class EmployeeDeviceMappingViewSet(viewsets.ModelViewSet):
         if device_id:
             queryset = queryset.filter(device_id=device_id)
         
+        
         if employee_id:
             queryset = queryset.filter(employee_id=employee_id)
         
         return queryset
+
+
+class DailyAttendanceViewSet(viewsets.ViewSet):
+    """
+    ViewSet para consultar la asistencia diaria agregada.
+    
+    GET /api/biometric/daily-attendance/?date=YYYY-MM-DD
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def list(self, request):
+        date_str = request.query_params.get('date')
+        
+        if not date_str:
+            target_date = timezone.now().date()
+        else:
+            try:
+                target_date = datetime.fromisoformat(date_str).date()
+            except ValueError:
+                return Response(
+                    {'error': 'Formato de fecha inválido. Use YYYY-MM-DD.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        try:
+            summary = DailyAttendanceService.get_daily_summary(target_date)
+            return Response(summary)
+        except Exception as e:
+            logger.exception("Error generating daily attendance summary")
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

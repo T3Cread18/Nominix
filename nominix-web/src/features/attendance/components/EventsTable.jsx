@@ -3,17 +3,15 @@ import { Badge } from '../../../components/ui';
 
 /**
  * EventsTable - Tabla de eventos de asistencia.
- * 
- * Columnas: Hora, Empleado, Tipo, Verificación, Dispositivo
- * Badges coloreados por tipo de evento.
+ * Palette: Nominix light theme — white bg, gray-100 borders, nominix-dark text.
  */
 
 const EVENT_TYPE_CONFIG = {
-    entry: { label: 'Entrada', class: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' },
-    exit: { label: 'Salida', class: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
-    break_start: { label: 'Inicio Descanso', class: 'bg-amber-500/10 text-amber-400 border-amber-500/20' },
-    break_end: { label: 'Fin Descanso', class: 'bg-orange-500/10 text-orange-400 border-orange-500/20' },
-    unknown: { label: 'Desconocido', class: 'bg-gray-500/10 text-gray-400 border-gray-500/20' },
+    entry: { label: 'Entrada', class: 'bg-emerald-50 text-emerald-600 border border-emerald-200' },
+    exit: { label: 'Salida', class: 'bg-blue-50 text-blue-600 border border-blue-200' },
+    break_start: { label: 'Inicio Descanso', class: 'bg-amber-50 text-amber-600 border border-amber-200' },
+    break_end: { label: 'Fin Descanso', class: 'bg-orange-50 text-orange-600 border border-orange-200' },
+    unknown: { label: 'Desconocido', class: 'bg-gray-50 text-gray-500 border border-gray-200' },
 };
 
 const VERIFICATION_LABELS = {
@@ -28,9 +26,9 @@ const VERIFICATION_LABELS = {
 const EventsTable = ({ events = [], loading = false, showDevice = true }) => {
     if (loading) {
         return (
-            <div className="space-y-3">
+            <div className="space-y-3 p-4">
                 {[...Array(5)].map((_, i) => (
-                    <div key={i} className="h-12 bg-white/5 rounded-lg animate-pulse" />
+                    <div key={i} className="h-12 bg-gray-50 rounded-lg animate-pulse" />
                 ))}
             </div>
         );
@@ -38,9 +36,9 @@ const EventsTable = ({ events = [], loading = false, showDevice = true }) => {
 
     if (events.length === 0) {
         return (
-            <div className="text-center py-12 text-gray-400">
-                <p className="text-sm">No se encontraron eventos de asistencia</p>
-                <p className="text-xs mt-1 opacity-60">Intenta cambiar los filtros o sincronizar el dispositivo</p>
+            <div className="text-center py-12">
+                <p className="text-sm text-gray-500">No se encontraron eventos de asistencia</p>
+                <p className="text-xs mt-1 text-gray-400">Intenta cambiar los filtros o sincronizar el dispositivo</p>
             </div>
         );
     }
@@ -49,7 +47,7 @@ const EventsTable = ({ events = [], loading = false, showDevice = true }) => {
         <div className="overflow-x-auto">
             <table className="w-full">
                 <thead>
-                    <tr className="border-b border-white/5">
+                    <tr className="border-b border-gray-100">
                         <th className="text-left text-[10px] font-bold uppercase tracking-widest text-gray-400 py-3 px-4">
                             Fecha / Hora
                         </th>
@@ -80,11 +78,11 @@ const EventsTable = ({ events = [], loading = false, showDevice = true }) => {
                         return (
                             <tr
                                 key={event.id || index}
-                                className="border-b border-white/5 hover:bg-white/[0.02] transition-colors"
+                                className={`border-b border-gray-50 hover:bg-nominix-smoke/60 transition-colors ${index % 2 !== 0 ? 'bg-gray-50/40' : ''}`}
                             >
                                 <td className="py-3 px-4">
                                     <div>
-                                        <p className="text-sm font-semibold">
+                                        <p className="text-sm font-semibold text-nominix-dark">
                                             {formatTime(event.timestamp)}
                                         </p>
                                         <p className="text-[10px] text-gray-400">
@@ -93,28 +91,28 @@ const EventsTable = ({ events = [], loading = false, showDevice = true }) => {
                                     </div>
                                 </td>
                                 <td className="py-3 px-4">
-                                    <span className="text-xs font-mono bg-white/5 px-2 py-1 rounded">
+                                    <span className="text-xs font-mono bg-blue-50 text-nominix-electric px-2 py-1 rounded border border-blue-100">
                                         {event.employee_device_id || '—'}
                                     </span>
                                 </td>
                                 <td className="py-3 px-4">
-                                    <span className="text-sm">
+                                    <span className="text-sm text-nominix-dark">
                                         {event.employee_name || event.employee_display || '—'}
                                     </span>
                                 </td>
                                 <td className="py-3 px-4">
-                                    <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider border ${typeConfig.class}`}>
+                                    <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${typeConfig.class}`}>
                                         {typeConfig.label}
                                     </span>
                                 </td>
                                 <td className="py-3 px-4">
-                                    <span className="text-xs text-gray-300">
+                                    <span className="text-xs text-gray-500">
                                         {verifyLabel}
                                     </span>
                                 </td>
                                 {showDevice && (
                                     <td className="py-3 px-4">
-                                        <span className="text-xs text-gray-400">
+                                        <span className="text-xs text-gray-500">
                                             {event.device_name || event.device || '—'}
                                         </span>
                                     </td>
