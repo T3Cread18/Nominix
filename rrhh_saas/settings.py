@@ -19,10 +19,10 @@ SECRET_KEY: str = os.environ.get('SECRET_KEY', 'django-insecure-cambiar-en-produ
 
 DEBUG: bool = os.environ.get('DEBUG', 'True').lower() in ('true', '1', 'yes')
 
-ALLOWED_HOSTS: List[str] = ['localhost', '127.0.0.1', '.localhost']
+ALLOWED_HOSTS: List[str] = ['.nominix.net', 'localhost', '127.0.0.1', '.localhost']
 
 # Dominio base para la creación automática de subdominios
-TENANT_BASE_DOMAIN: str = os.environ.get('TENANT_BASE_DOMAIN', 'localhost')
+TENANT_BASE_DOMAIN: str = os.environ.get('TENANT_BASE_DOMAIN', 'nominix.net')
 
 # Orígenes confiables para CSRF (Necesario para el frontend desacoplado)
 CSRF_TRUSTED_ORIGINS: List[str] = [
@@ -31,9 +31,24 @@ CSRF_TRUSTED_ORIGINS: List[str] = [
     'http://*.localhost:3000',
     'http://localhost:8000',
     'http://*.localhost:8000',
+    'https://nominix.net',
+    'https://www.nominix.net',
+    'https://api.nominix.net',
+    'https://*.nominix.net',
 ]
-CORS_ALLOW_ALL_ORIGINS = True
-CORS_ALLOW_CREDENTIALS = True  # Permitir cookies en cross-origin
+CORS_ALLOWED_ORIGINS = [
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'http://localhost:5173',
+    'http://localhost:5174',
+    'http://localhost:5175',
+    'http://localhost:8000',
+    'http://127.0.0.1:8000',
+    'https://nominix.net',
+    'https://www.nominix.net',
+    'https://app.nominix.net',
+]
+CORS_ALLOW_CREDENTIALS = True
 
 # Configuración de Cookies para Cross-Domain (Vercel <-> API)
 # 'None' es necesario para que las cookies viajen entre dominios diferentes (nominix.vercel.app -> api.nominix.net)
@@ -45,7 +60,8 @@ CSRF_COOKIE_SECURE = True     # Requerido si SameSite='None' (solo HTTPS)
 # Permitir que el frontend lea la cookie CSRF
 CSRF_COOKIE_HTTPONLY = False  
 SESSION_COOKIE_HTTPONLY = True # La session ID sí debe ser oculta
-CSRF_COOKIE_DOMAIN = None      # Dejar que el navegador maneje el dominio automáticamente o fijar si es necesario
+CSRF_COOKIE_DOMAIN = '.nominix.net'
+SESSION_COOKIE_DOMAIN = '.nominix.net'      # Dejar que el navegador maneje el dominio automáticamente o fijar si es necesario
 # =============================================================================
 # CONFIGURACIÓN DE DJANGO-TENANTS
 # =============================================================================
@@ -54,7 +70,8 @@ CSRF_COOKIE_DOMAIN = None      # Dejar que el navegador maneje el dominio autom�
 # Estas apps son accesibles por todos los inquilinos
 SHARED_APPS: List[str] = [
     'django_tenants',  # Debe estar primero
-    'customers',       # Gestión de clientes/inquilinos
+    'customers',
+    'corsheaders',       # Gestión de clientes/inquilinos
     
     # Apps de Django
     'django.contrib.contenttypes',
@@ -100,7 +117,8 @@ TENANT_DOMAIN_MODEL: str = 'customers.Domain'
 # =============================================================================
 
 MIDDLEWARE: List[str] = [
-    'django_tenants.middleware.main.TenantMainMiddleware',  # Debe estar primero
+    'django_tenants.middleware.main.TenantMainMiddleware',
+    'corsheaders.middleware.CorsMiddleware',  # Debe estar primero
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',

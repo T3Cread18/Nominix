@@ -108,7 +108,7 @@ const TenantWizard = ({ onClose, onCreated }) => {
                                 }}
                             />
                             <div className="absolute right-5 top-1/2 -translate-y-1/2 text-gray-500 text-xs font-bold">
-                                .localhost
+                                .nominix.net
                             </div>
                         </div>
                     </div>
@@ -128,7 +128,7 @@ const TenantWizard = ({ onClose, onCreated }) => {
                     ) : (
                         <button
                             onClick={() => {
-                                const finalDomain = form.domain.includes('.localhost') ? form.domain : `${form.domain}.localhost`;
+                                const finalDomain = form.domain.includes('.nominix.net') ? form.domain : `${form.domain}.nominix.net`;
                                 handleCreate({ ...form, domain: finalDomain });
                             }}
                             disabled={loading}
