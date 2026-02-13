@@ -2,7 +2,7 @@ from datetime import datetime, date, time, timedelta
 from typing import List, Dict, Any, Optional
 from django.utils import timezone
 from django.conf import settings
-from payroll_core.models import Employee, WorkSchedule
+from payroll_core.models import Employee, WorkSchedule, EmployeeDailyShift
 from biometrics.models import AttendanceEvent
 
 class DailyAttendanceService:
@@ -47,6 +47,16 @@ class DailyAttendanceService:
             
         employees = queryset.all()
         
+        # 2.1 Obtener turnos dinámicos para este día
+        # Mapa: employee_id -> work_schedule
+        daily_shifts = {
+            ds.employee_id: ds.work_schedule
+            for ds in EmployeeDailyShift.objects.filter(
+                date=target_date,
+                employee__in=employees
+            ).select_related('work_schedule')
+        }
+        
         # 3. Obtener eventos del día en la zona horaria seleccionada
         day_start = timezone.make_aware(datetime.combine(target_date, time.min), calc_tz)
         day_end = timezone.make_aware(datetime.combine(target_date, time.max), calc_tz)
@@ -57,19 +67,77 @@ class DailyAttendanceService:
         
         # 3. Agrupar eventos por empleado (usando employee_id o employee_device_id mapeado)
         events_by_employee = {}
+        unmapped_events = []
         for evt in events:
             if evt.employee_id:
                 if evt.employee_id not in events_by_employee:
                     events_by_employee[evt.employee_id] = []
                 events_by_employee[evt.employee_id].append(evt)
+            else:
+                unmapped_events.append(evt)
+        
+        # Fallback: intentar vincular eventos sin mapear por cédula
+        if unmapped_events:
+            # Construir índice: parte numérica de national_id -> employee.id
+            cedula_to_emp_id = {}
+            for emp in employees:
+                raw_ni = ''.join(c for c in (emp.national_id or '') if c.isdigit())
+                if raw_ni:
+                    cedula_to_emp_id[raw_ni] = emp.id
+            
+            for evt in unmapped_events:
+                raw_dev = ''.join(c for c in (evt.employee_device_id or '') if c.isdigit())
+                emp_id = cedula_to_emp_id.get(raw_dev)
+                if emp_id:
+                    if emp_id not in events_by_employee:
+                        events_by_employee[emp_id] = []
+                    events_by_employee[emp_id].append(evt)
         
         # 4. Procesar cada empleado
         summary = []
         for emp in employees:
             emp_events = events_by_employee.get(emp.id, [])
-            schedule = emp.work_schedule
             
-            # Si no tiene horario, usar uno por defecto virtual
+            # Determinar horario a usar: Prioridad Dinámico > Fijo
+            schedule = daily_shifts.get(emp.id)
+            
+            # Si no hay turno asignado explícitamente, intentar "Best Fit" basado en marcajes
+            if not schedule and emp_events:
+                # Buscar primer marcaje del día
+                first_event = emp_events[0] # Ya están ordenados por timestamp
+                first_time = first_event.timestamp.time() # Convert to naive time for comparison? Warning: timezone aware
+                
+                # Convertir a datetime naive en la zona horaria de cálculo para comparar con horarios simples
+                local_dt = timezone.localtime(first_event.timestamp, calc_tz)
+                check_in_time = local_dt.time()
+                
+                # Obtener candidatos (cachear esto sería ideal para performance)
+                candidates = WorkSchedule.objects.filter(is_active=True)
+                
+                best_fit = None
+                min_delta = float('inf')
+                
+                for cand in candidates:
+                    # Calcular diferencia en minutos entre check_in real y teórico
+                    # Convertir a minutos desde medianoche para facilitar resta
+                    real_minutes = check_in_time.hour * 60 + check_in_time.minute
+                    expected_minutes = cand.check_in_time.hour * 60 + cand.check_in_time.minute
+                    
+                    delta = abs(real_minutes - expected_minutes)
+                    
+                    # Umbral de "enganche": ej. +/- 3 horas (180 min)
+                    if delta < 180 and delta < min_delta:
+                        min_delta = delta
+                        best_fit = cand
+                
+                if best_fit:
+                    schedule = best_fit
+            
+            # Fallback final: horario por defecto del empleado
+            if not schedule:
+                schedule = emp.work_schedule
+            
+            # Si aún no tiene horario, usar uno por defecto virtual
             if not schedule:
                 # Default 8-5 fallback logic handled in UI or here?
                 # Create a dummy schedule for calculation
@@ -188,7 +256,12 @@ class DailyAttendanceService:
     def _build_block(event: Optional[AttendanceEvent], expected: datetime, tolerance: timedelta, is_entry: bool) -> Dict[str, Any]:
         """Construye la data para un bloque de tiempo."""
         if not event:
-            return {'status': 'missing', 'time': None, 'diff_minutes': 0}
+            return {
+                'status': 'missing',
+                'time': None,
+                'diff_minutes': 0,
+                'expected_time': expected.strftime('%H:%M')
+            }
             
         actual = event.timestamp
         diff = (actual - expected).total_seconds() / 60 # Minutos. Positivo = Tarde surante entrada.
@@ -212,5 +285,6 @@ class DailyAttendanceService:
             'status': status,
             'time': actual.isoformat(),
             'diff_minutes': round(diff),
-            'event_id': event.id
+            'event_id': event.id,
+            'expected_time': expected.strftime('%H:%M')
         }

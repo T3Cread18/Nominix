@@ -210,14 +210,40 @@ class BiometricSyncService:
                 ).select_related('employee')
             }
             
+            # Auto-mapeo: construir índice de cédulas para fallback
+            # national_id puede tener prefijos como "V-", "E-", etc.
+            from payroll_core.models import Employee
+            from django.db.models import Q
+            _employee_by_cedula = {}
+            for emp in Employee.objects.filter(is_active=True):
+                # Extraer parte numérica de la cédula (V-15798914 -> 15798914)
+                raw_ni = ''.join(c for c in (emp.national_id or '') if c.isdigit())
+                if raw_ni:
+                    _employee_by_cedula[raw_ni] = emp
+            
             latest_event_time = None
             
             for event_data in events:
                 try:
                     employee_device_id = event_data['employee_device_id']
                     
-                    # Buscar empleado mapeado
+                    # Buscar empleado mapeado (primero por EmployeeDeviceMapping)
                     employee = mappings.get(employee_device_id)
+                    
+                    # Fallback: auto-mapeo por cédula
+                    if not employee:
+                        raw_device_id = ''.join(c for c in employee_device_id if c.isdigit())
+                        employee = _employee_by_cedula.get(raw_device_id)
+                        
+                        # Si encontramos match, crear el mapeo automáticamente para futuros syncs
+                        if employee:
+                            EmployeeDeviceMapping.objects.get_or_create(
+                                device=device,
+                                employee=employee,
+                                defaults={'device_employee_id': employee_device_id, 'is_active': True}
+                            )
+                            mappings[employee_device_id] = employee
+                            logger.info(f"Auto-mapeado: device_id='{employee_device_id}' -> {employee.full_name} (CI: {employee.national_id})")
                     
                     event, created = AttendanceEvent.objects.get_or_create(
                         device=device,

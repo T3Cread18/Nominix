@@ -1,9 +1,0 @@
-Employee: Pablo
-Base Salary (Contract): 1500.03
-Salary Package (Contract USD): 120.00
-Company Min Salary: 130.00
-
---- Calculated Deductions ---
-IVSS: 24.00 (Seguro Social IVSS (4% - 4 Lun))
-PIE: 6.00 (Paro Forzoso RPE (0.5% - 4 Lun))
-FAOV: 182.81 (Bono Vivienda FAOV (1%))

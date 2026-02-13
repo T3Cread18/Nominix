@@ -1,64 +1,109 @@
-IF v_employee_id IS NULL THEN
-                        INSERT INTO payroll_core_employee (
-                            first_name, last_name, national_id, 
-                            hire_date, is_active, 
-                            branch_id, department_id, job_position_id, position,
-                            bank_name, bank_account_number, bank_account_type,
-                            created_at, updated_at
-                        )
-                        VALUES (
-                            v_first_name, v_last_name, v_national_id,
-                            r.fecha_ingreso, TRUE,
-                            v_branch_id, v_dept_id, v_position_id, r.cargo,
-                            r.banco, v_clean_account, r.tipo_cuenta,
-                            NOW(), NOW()
-                        )
-                        RETURNING id INTO v_employee_id;
-                        RAISE NOTICE 'Empleado creado: % (%)', r.nombre_completo, v_national_id;
-                    ELSE
-                        RAISE NOTICE 'Actualizando empleado: % (%)', r.nombre_completo, v_national_id;
-                        UPDATE payroll_core_employee 
-                        SET branch_id = v_branch_id, 
-                            job_position_id = v_position_id, 
-                            position = r.cargo,
-                            hire_date = r.fecha_ingreso,
-                            bank_name = r.banco,
-                            bank_account_number = v_clean_account,
-                            bank_account_type = r.tipo_cuenta
-                        WHERE id = v_employee_id;
-                    END IF;
-                END;
-                
-                -- C. Crear/Actualizar Contrato
-                IF NOT EXISTS (SELECT 1 FROM payroll_core_laborcontract WHERE employee_id = v_employee_id AND is_active = TRUE) THEN
-                    INSERT INTO payroll_core_laborcontract (
-                        employee_id, branch_id, job_position_id, position, department_id,
-                        start_date, is_active, 
-                        contract_type, payment_frequency,
-                        salary_amount, salary_currency_id,
-                        base_salary_bs, includes_cestaticket,
-                        created_at, updated_at,
-                        islr_retention_percentage
-                    )
-                    VALUES (
-                        v_employee_id, v_branch_id, v_position_id, r.cargo, v_dept_id,
-                        r.fecha_ingreso, TRUE,
-                        'INDEFINITE', 'BIWEEKLY',
-                        0, v_currency_id,
-                        0, TRUE,
-                        NOW(), NOW(),
-                        0
-                    );
-                    RAISE NOTICE 'Contrato creado para: %', r.nombre_completo;
-                ELSE
-                    -- Actualizar fecha de inicio del contrato activo si es diferente
-                    UPDATE payroll_core_laborcontract
-                    SET start_date = r.fecha_ingreso
-                    WHERE employee_id = v_employee_id AND is_active = TRUE AND start_date != r.fecha_ingreso;
-                END IF;
-            END;
-        END;
-        
-    END LOOP;
-    
-END $$;
+-- ============================================================
+-- INSERT de Empleados - Nómina Verificada
+-- Ejecutar dentro del schema del tenant correspondiente
+-- ============================================================
+
+INSERT INTO payroll_core_employee (
+    first_name, last_name, national_id, hire_date, position,
+    bank_name, bank_account_number, bank_account_type,
+    is_active, gender, marital_status, address, created_at, updated_at
+) VALUES
+-- ======================== FARMACIA LOS YANEZ DE OSPINO, C.A ========================
+('YEREHIMA', 'CARDENAS JAIME', 'V-15906403', '2024-03-11', 'COORD. ADMINISTRATIVO', 'BANCO PROVINCIAL', '0108-0542-28-0100124898', 'AHORRO', true, '', '', '', NOW(), NOW()),
+('ADRIANA', 'MORENO MARQUEZ', 'V-30329814', '2023-07-29', 'CAJERO (A)', 'BANCO PROVINCIAL', '0108-0201-65-0100281905', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('SKARLETH', 'MATERAN CUMANA', 'V-31272373', '2023-03-13', 'AUX. DE ALMACEN', 'BANCO PROVINCIAL', '0108-0201-65-0100278289', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('YUSMARY', 'MARQUEZ OCANTO', 'V-19031701', '2024-07-01', 'AUX. DE ALMACEN', 'BANCO PROVINCIAL', '0108-0201-61-0100278319', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('EMILIO JOSE', 'VALLADARES MEDINA', 'V-12647713', '2023-06-02', 'SUP. DE VENTA', 'BANCO PROVINCIAL', '0108-2422-26-0100104904', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('NORALYS', 'AZUAJE CONTRERAS', 'V-13329198', '2024-03-27', 'CAJERO (A)', 'BANCO PROVINCIAL', '0108-0542-26-0100080807', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('BIANCA ROSSELA', 'GARCIAS BASTIDAS', 'V-27938750', '2024-07-01', 'CAJERO (A)', 'BANCO PROVINCIAL', '0108-0201-63-0100278343', 'AHORRO', true, '', '', '', NOW(), NOW()),
+('HANIREE', 'UGARTE', 'V-25016178', '2025-02-03', 'CAJERO (A)', 'BANCO PROVINCIAL', '0108-0201-60-0100281875', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('JEFERSSON ALEXANDER', 'PEREZ GORDILLO', 'V-28427378', '2025-02-20', 'SUP. DE ALMACEN', 'BANCO PROVINCIAL', '0108-2422-27-0100074746', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('LEONARDO ENRRIQUE', 'YANEZ FERRER', 'V-29632132', '2025-02-24', 'SUP. DE VENTA', 'BANCO PROVINCIAL', '0108-0064-18-0100331070', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('MOISES SEBASTIAN', 'YANEZ FERRER', 'V-26940897', '2025-02-24', 'GERENTE', 'BANCO PROVINCIAL', '0108-0064-1401-0032-9645', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('JOSE ADEMIR', 'ALDANA AZUAJE', 'V-18251792', '2024-02-01', 'FARMACEUTICO', 'BANCO PROVINCIAL', '0108-0111-7001-0005-2133', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('YENNIFER ALEXANDRA', 'ESPINOZA BOLIVAR', 'V-30240358', '2025-12-08', 'PROMOTOR DE VENTA', 'BANCO VENEZUELA', '0102-0741-0700-0028-4017', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('RAFAELY MARIA', 'SEGURA YEPEZ', 'V-29632180', '2026-01-07', 'CAJERO (A)', 'BANCO VENEZUELA', '0102-0346-5900-0226-3874', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('LUIS ALFONSO', 'QUINTERO LORIN', 'V-12240534', '2026-01-07', 'COORD. ADMINISTRATIVO', 'BANCO PROVINCIAL', '0108-0017-0201-0026-9646', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('ALEXIS FRANCISCO', 'TORREALBA', 'V-28106592', '2026-01-26', 'CAJERO (A)', 'BANCO PROVINCIAL', '0108-0201-66-0100278378', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('MIRIANYILIS KATIUSCA', 'MEDINA MONTILLA', 'V-27277274', '2026-01-26', 'CAJERO (A)', 'BANCO VENEZUELA', '0102-0346-5301-0663-5497', 'AHORRO', true, '', '', '', NOW(), NOW()),
+
+-- ======================== FARMACIA FARMANOSTRA GUANARE, C.A. ========================
+('MARIA MILAGROS', 'YANEZ PUERTA', 'V-15237079', '2024-11-05', 'DIRECTIVO', 'BANCO PROVINCIAL', '0108-0201-65-0100278017', 'AHORRO', true, '', '', '', NOW(), NOW()),
+('CARLA', 'GARCIA', 'V-24616618', '2024-05-29', 'CAJERO (A)', 'BANCO PROVINCIAL', '0108-0201-60-0100278068', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('ARGENIS', 'SOTO NIETO', 'V-15886645', '2025-01-02', 'GERENTE', 'BANCO PROVINCIAL', '0108-0908-8101-0011-2678', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('BRANDO DE JESUS', 'OROPEZA RUIS', 'V-31202590', '2025-05-11', 'CAJERO (A)', 'BANCO PROVINCIAL', '0108-0201-69-0100281867', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('DIGNA SARAI', 'DIAZ PEREZ', 'V-25162417', '2025-07-08', 'CAJERO (A)', 'BANCO PROVINCIAL', '0108-0066-8901-0042-0619', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('EMILI', 'MONTOYA', 'V-20544667', '2025-07-24', 'SUP. DE ALMACEN', 'BANCO VENEZUELA', '01020346510106632231', 'AHORRO', true, '', '', '', NOW(), NOW()),
+('CESAR EDUARDO', 'LADINO PINEDA', 'V-15445083', '2025-09-09', 'COORD. ADMINISTRATIVO', 'BANCO VENEZUELA', '0102-0165-9800-0093-3481', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('KEITER', 'BERRIOS TERAN', 'V-17049673', '2025-11-18', 'AUX. DE ALMACEN', 'BANCO VENEZUELA', '0102-0346-5700-0155-9495', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('OSHMAR SUSJEL', 'UZCATEGUI GIL', 'V-31054058', '2025-08-25', 'CAJERO (A)', 'BANCO MERCANTIL', '01050059150059496282', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('ADELALBA', 'PEREZ', 'V-10052314', '2023-02-22', 'FARMACEUTICO', 'BANCO PROVINCIAL', '0108-0201-68-0100278041', 'AHORRO', true, '', '', '', NOW(), NOW()),
+
+-- ======================== FARMANOSTRA GUANARE / CORPORATIVO ========================
+('DORKA NOHELYN', 'LOPEZ RODRIGUEZ', 'V-18102594', '2024-01-02', 'COORD. DE INVENTARIO', 'BANCO VENEZUELA', '0102-0211-6301-0017-5734', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('YANCARLIS YOLENNY', 'RIVERO GONZALEZ', 'V-30074456', '2024-01-18', 'COORD. FINANCIERO', 'BANCO PROVINCIAL', '0108-0201-67-0100278386', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('GRISBEL VALENTINA', 'ESCALONA COLMENAREZ', 'V-20643419', '2024-01-23', 'COORD. DE COMPRAS', 'BANCO PROVINCIAL', '0108-0064-1601-0027-1213', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('AMELIA MARIA', 'SOTO LISCANO', 'V-14271963', '2025-09-11', 'ESPECIALISTA DE RRHH', 'BANCO VENEZUELA', '0102-0330-9601-0078-6426', 'AHORRO', true, '', '', '', NOW(), NOW()),
+('ANYILUZ', 'SOTO RODRIGUEZ', 'V-20271643', '2025-10-06', 'ESPECIALISTA DE RRHH', 'BANCO PROVINCIAL', '0108-0064-1115-0000-3508', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('EVELYN COROMOTO', 'RODRIGUEZ PEREZ', 'V-13038433', '2025-03-17', 'COORD. CUENTAS POR PAGAR', 'BANCO PROVINCIAL', '0108-0201-68-0100280615', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('ELISA ESTELA', 'DAZA', 'V-19678992', '2025-04-14', 'COORD. CUENTAS POR PAGAR', 'BANCO PROVINCIAL', '0108-0542-20-0100240634', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('ANGELA MARIA', 'PEREZ LEO', 'V-17363079', '2025-08-25', 'ESPECIALISTA DE INVENTARIO', 'BANCO BANESCO', '0134-2166-8500-0100-2124', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('SANDRIANYZ DANIELA', 'PEREIRA RONDON', 'V-29919196', '2025-12-08', 'ANALISTA DE TESORERIA', 'BANCO VENEZUELA', '0102-0742-8100-0061-9284', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('SIMON ALBERTO', 'ORTIZ MEDINA', 'V-25956343', '2025-12-09', 'ANALISTA DE TESORERIA', 'BANCAMIGA', '0172-0601-0760-1472-9310', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+
+-- ======================== FARMACIA LOS LLANOS DE OSPINO C.A ========================
+('JOSE GREGORIO', 'YANEZ RAMONE', 'V-16520363', '2024-01-03', 'GERENTE', 'BANCO PROVINCIAL', '0108-0064-16-0100329661', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('YENIFER COROMOTO', 'GARRIDO GALLARDO', 'V-18224805', '2024-02-20', 'COORD. ADMINISTRATIVO', 'BANCO BANESCO', '0134-0408-9840-8105-2419', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('JUNIOR JOSE', 'SINGER PEREZ', 'V-24807692', '2023-08-01', 'CHOFER', 'BANCO PROVINCIAL', '0108-0201-65-0100272833', 'AHORRO', true, '', '', '', NOW(), NOW()),
+('LAURENTH', 'CANELON', 'V-26705934', '2024-09-23', 'AUX. DE ALMACEN', 'BANCO PROVINCIAL', '0108-0389-6701-0005-4554', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('MARIVI DEL VALLE', 'SEGOVIA RIVERO', 'V-15399781', '2023-12-01', 'CAJERO (A)', 'BANCO PROVINCIAL', '0108-0201-67-0100272698', 'AHORRO', true, '', '', '', NOW(), NOW()),
+('JUNIOR ENRIQUE', 'LEAL ESCALONA', 'V-17616649', '2024-01-22', 'CAJERO (A)', 'BANCO MERCANTIL', '0105-0059-1800-5943-1423', 'AHORRO', true, '', '', '', NOW(), NOW()),
+('ELIZABETH', 'APONTE', 'V-21562526', '2024-01-30', 'CAJERO (A)', 'BANCO PROVINCIAL', '0108-0201-64-0100272744', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('FLORANNA COROMOTO', 'GONZALEZ SIBRIAN', 'V-23485080', '2025-07-09', 'AUX. DE ALMACEN', 'BANCO VENEZUELA', '0102-0741-0700-0009-0104', 'GLOBAL', true, '', '', '', NOW(), NOW()),
+('ROSA MERCEDES', 'HERNANDEZ QUINTERO', 'V-12647918', '2023-08-01', 'FARMACEUTICO', 'BANCO PROVINCIAL', '0108-0201-64-0100272663', 'AHORRO', true, '', '', '', NOW(), NOW()),
+('ALBA CAROLINA', 'BENITEZ', 'V-18101843', '2025-10-28', 'CAJERO (A)', 'BANCO VENEZUELA', '0102-0346-5500-0079-0352', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('LEIDY', 'GUANDA', 'V-13534905', '2025-11-10', 'CAJERO (A)', 'BANCO MERCANTIL', '0105-0059-1400-5945-2579', 'AHORRO', true, '', '', '', NOW(), NOW()),
+('YORMARI', 'PERAZA', 'V-17362211', '2025-11-17', 'CAJERO (A)', 'BANCO PROVINCIAL', '0108-0542-2101-0005-5825', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('MARIEXI', 'BRICEÑO', 'V-18891102', '2025-11-17', 'SUP. DE ALMACEN', 'BANCAMIGA', '0172-0250-2925-0850-5613', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+
+-- ======================== CORPORATIVO ========================
+('KATHERINE', 'PEREZ PARADA', 'V-21135632', '2022-09-01', 'DIRECTIVO', '', '', 'GLOBAL', true, '', '', '', NOW(), NOW()),
+
+-- ======================== FARMACIA MAMANICO OSPINO C.A. ========================
+('YORGELYS K.', 'COHIL DOMINGUEZ', 'V-24320202', '2025-01-02', 'CAJERO (A)', 'BANCO PROVINCIAL', '0108-0201-64-0100271772', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('JEANS CARLOS', 'AGUIAR DEL ROSARIO', 'V-19376483', '2025-01-02', 'CAJERO (A)', 'BANCO PROVINCIAL', '0108-0982-7601-0005-2687', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('SONIA DEL C.', 'GARCIA G.', 'V-10638320', '2025-01-02', 'CAJERO (A)', 'BANCO PROVINCIAL', '0108-0201-62-0100271756', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('ESTEFANIA DILMARY', 'ORELLANA DORANTE', 'V-27277686', '2025-01-02', 'GERENTE', 'BANCO PROVINCIAL', '0108-0201-66-0100277053', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('KATERINE MARIANA', 'URQUIOLA BASTIDAS', 'V-23032373', '2025-03-17', 'CAJERO (A)', 'BANCO PROVINCIAL', '0108-0201-61-0100281883', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('DIONARDO MIGUEL', 'URBINA RIVAS', 'V-22988948', '2025-08-04', 'CAJERO (A)', 'BANCO VENEZUELA', '01020165920000740221', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('DORIS', 'CAMACARO', 'V-10143962', '2025-01-02', 'FARMACEUTICO', 'BANCO PROVINCIAL', '0108-0201-61-0100271748', 'AHORRO', true, '', '', '', NOW(), NOW()),
+('REBECA CAROLINA', 'PERAZA DELGADO', 'V-12265596', '2025-09-09', 'COORD. ADMINISTRATIVO', 'BANCO BANESCO', '0134-0866-1186-6206-1688', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('ELIANNIS YANIRA', 'MARCHAN PALACIOS', 'V-15070132', '2025-09-08', 'CAJERO (A)', 'BANCO NACIONAL DE CREDITO', '0191-0063-4121-6315-0150', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('LISANDRO SIMON', 'ALVARADO CARRASCO', 'V-12264327', '2026-01-02', 'CAJERO (A)', 'BANCO VENEZUELA', '0102-0395-3101-0007-6532', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('YESIKA TISBETH', 'GALINDEZ', 'V-15492244', '2026-01-02', 'CAJERO (A)', 'BANCO PROVINCIAL', '0108-0064-1215-0000-9204', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+
+-- ======================== FARMACIA MAMANICO OSPINO C.A. SUCURSAL ========================
+('LENI MARISELA', 'COLMENAREZ LOYO', 'V-12236585', '2025-09-17', 'COORD. ADMINISTRATIVO', 'BANCO MERCANTIL', '0105-0115-65-1115177176', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('NELIDA YUDITH', 'CARRIZALEZ', 'V-9255941', '2025-09-01', 'CAJERO (A)', 'BANCO PROVINCIAL', '0108-0201-66-0100273228', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('LEANYERLYS', 'ALBARRAN', 'V-29632098', '2025-09-01', 'SUP. DE ALMACEN', 'BANCO PROVINCIAL', '0108-0201-68-0100273244', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('YOSIANNY M.', 'RODRIGUEZ', 'V-26151681', '2025-09-01', 'CAJERO (A)', 'BANCO PROVINCIAL', '0108-0201-60-0100273260', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('DULCE MILAGRO', 'ROSENDO ORTIZ', 'V-13486066', '2025-09-01', 'AUX. DE ALMACEN', 'BANCO PROVINCIAL', '0108-0064-1301-0045-5691', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('MARIA EUGENIA', 'CONTRERAS COLMENAREZ', 'V-23551673', '2025-10-06', 'CAJERO (A)', 'BANCO VENEZUELA', '0102-0328-7900-0026-0316', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('MANUEL ALEJANDRO', 'VILLANUEVA', 'V-18893944', '2025-10-06', 'CAJERO (A)', 'BANCO VENEZUELA', '0102-0742-8100-0005-5482', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('MARIANA VALENTINA', 'ARELLANO BENCOMO', 'V-32489512', '2025-12-01', 'CAJERO (A)', 'BANCO PROVINCIAL', '0108-0201-61-0100311472', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('HAYAIMAR VANESSA', 'MONTES LEO', 'V-31812734', '2025-12-01', 'CAJERO (A)', 'BANCO VENEZUELA', '0102-0742-8100-0105-6985', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+
+-- ======================== FARMACIAS PACHECO (FARPACA) C.A ========================
+('GIONELA VELINA', 'GOMEZ KIELAK', 'V-20544905', '2026-01-07', 'COORD. ADMINISTRATIVO', 'BANCO PROVINCIAL', '0108-0542-2415-0001-7779', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('ROSALIA DEL CARMEN', 'SEGOVIA RIVERO', 'V-16072175', '2025-05-18', 'CAJERO (A)', 'BANCO MERCANTIL', '01050290091290194149', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('DAIR DEL CARMEN', 'BRITO MOYETONES', 'V-10726140', '2025-05-18', 'CAJERO (A)', 'BANCO MERCANTIL', '01050059161059352419', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('RUBEN DARIO', 'CASTELLA GARCIA', 'V-12238203', '2025-05-18', 'CAJERO (A)', 'BANCO MERCANTIL', '01050059111059438771', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('KAREN ASLHEY', 'FAJARDO OSTO', 'V-27102918', '2025-05-18', 'CAJERO (A)', 'BANCO MERCANTIL', '01050059111059422697', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('TERESA DE JESUS', 'PACHECO ARMAS', 'V-4138739', NULL, 'FARMACEUTICO', 'BANCO BANCAMIGA', '0172-0250-2625-0837-4242', 'CORRIENTE', true, '', '', '', NOW(), NOW()),
+('OSWALDO RAFAEL', 'GONZALEZ GONZALEZ', 'V-12240037', '2025-12-08', 'CAJERO (A)', 'BANCO VENEZUELA', '0102-0741-0100-0017-1700', 'CORRIENTE', true, '', '', '', NOW(), NOW())
+;
+
+-- ============================================================
+-- Total: 78 empleados
+-- Teresa de Jesus Pacheco Armas no tiene fecha de ingreso (NULL)
+-- ============================================================
