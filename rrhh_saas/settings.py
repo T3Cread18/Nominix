@@ -88,6 +88,7 @@ TENANT_DOMAIN_MODEL: str = 'customers.Domain'
 # MIDDLEWARE
 # =============================================================================
 
+
 MIDDLEWARE: List[str] = [
     'django_tenants.middleware.main.TenantMainMiddleware',  # Debe estar primero
     'django.middleware.security.SecurityMiddleware',
@@ -208,7 +209,7 @@ REST_FRAMEWORK: Dict[str, Any] = {
         'rest_framework.authentication.SessionAuthentication',
         'rest_framework.authentication.BasicAuthentication',
     ],
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'DEFAULT_PAGINATION_CLASS': 'rrhh_saas.pagination.StandardResultsSetPagination',
     'PAGE_SIZE': 20,
 }
 

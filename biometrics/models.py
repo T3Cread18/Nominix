@@ -110,6 +110,12 @@ class BiometricDevice(models.Model):
         verbose_name='Ubicación',
         help_text='Ej: Puerta principal, Piso 2'
     )
+    timezone = models.CharField(
+        max_length=50,
+        default='America/Caracas',
+        verbose_name='Zona Horaria',
+        help_text='Zona horaria del dispositivo (ej: UTC, America/Caracas)'
+    )
     is_active = models.BooleanField(default=True, verbose_name='Activo')
     last_sync = models.DateTimeField(
         null=True, 

@@ -210,7 +210,7 @@ class BiometricDeviceViewSet(viewsets.ModelViewSet):
         
         try:
             client = BiometricSyncService.get_client(device)
-            result = client.search_users()
+            result = client.search_users_all()
             return Response(result)
         except Exception as e:
             return Response(
@@ -266,16 +266,22 @@ class AttendanceEventViewSet(viewsets.ReadOnlyModelViewSet):
         
         if date_from:
             try:
-                date_from_parsed = datetime.fromisoformat(date_from)
-                queryset = queryset.filter(timestamp__gte=date_from_parsed)
-            except ValueError:
+                if len(date_from) == 10:
+                    queryset = queryset.filter(timestamp__date__gte=date_from)
+                else:
+                    date_from_parsed = datetime.fromisoformat(date_from)
+                    queryset = queryset.filter(timestamp__gte=date_from_parsed)
+            except (ValueError, TypeError):
                 pass
         
         if date_to:
             try:
-                date_to_parsed = datetime.fromisoformat(date_to)
-                queryset = queryset.filter(timestamp__lte=date_to_parsed)
-            except ValueError:
+                if len(date_to) == 10:
+                    queryset = queryset.filter(timestamp__date__lte=date_to)
+                else:
+                    date_to_parsed = datetime.fromisoformat(date_to)
+                    queryset = queryset.filter(timestamp__lte=date_to_parsed)
+            except (ValueError, TypeError):
                 pass
         
         return queryset
@@ -367,8 +373,17 @@ class DailyAttendanceViewSet(viewsets.ViewSet):
                     status=status.HTTP_400_BAD_REQUEST
                 )
         
+        branch_id = request.query_params.get('branch')
+        search_query = request.query_params.get('search')
+        tz_name = request.query_params.get('tz')
+        
         try:
-            summary = DailyAttendanceService.get_daily_summary(target_date)
+            summary = DailyAttendanceService.get_daily_summary(
+                target_date, 
+                branch_id=branch_id, 
+                search_query=search_query,
+                tz_name=tz_name
+            )
             return Response(summary)
         except Exception as e:
             logger.exception("Error generating daily attendance summary")

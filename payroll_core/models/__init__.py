@@ -15,7 +15,7 @@ from .base import tenant_upload_path
 from customers.models import Currency, ExchangeRate, InterestRateBCV
 from .organization import Branch, Department, Company, JobPosition, PayrollPolicy
 from .employee import Employee, LaborContract
-from .work_schedule import WorkSchedule
+from .work_schedule import WorkSchedule, EmployeeDailyShift
 from .concepts import PayrollConcept, EmployeeConcept
 from .payroll import PayrollPeriod, PayrollReceipt, PayrollReceiptLine, PayrollNovelty
 from .loans import Loan, LoanPayment
@@ -40,6 +40,7 @@ __all__ = [
     'Employee',
     'LaborContract',
     'WorkSchedule',
+    'EmployeeDailyShift',
     # Concepts
     'PayrollConcept',
     'EmployeeConcept',

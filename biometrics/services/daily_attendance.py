@@ -11,23 +11,45 @@ class DailyAttendanceService:
     """
     
     @staticmethod
-    def get_daily_summary(target_date: date) -> List[Dict[str, Any]]:
+    def get_daily_summary(target_date: date, branch_id: Optional[int] = None, search_query: Optional[str] = None, tz_name: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         Genera el resumen diario de asistencia para todos los empleados activos.
         
         Args:
             target_date: Fecha a consultar.
+            branch_id: Opcional ID de sede para filtrar.
+            search_query: Opcional texto de búsqueda (nombre o cédula).
+            tz_name: Opcional nombre de zona horaria para pruebas (ej: 'UTC', 'America/Caracas').
             
         Returns:
             Lista de objetos con informacion de empleado y sus bloques de tiempo.
         """
-        # 1. Obtener empleados activos
-        employees = Employee.objects.filter(is_active=True).select_related('work_schedule', 'department')
+        # 1. Definir zona horaria de cálculo
+        import pytz
+        try:
+            calc_tz = pytz.timezone(tz_name) if tz_name else timezone.get_current_timezone()
+        except Exception:
+            calc_tz = timezone.get_current_timezone()
+
+        # 2. Obtener empleados activos
+        queryset = Employee.objects.filter(is_active=True).select_related('work_schedule', 'department', 'branch')
         
-        # 2. Obtener eventos del día (con un margen de seguridad, ej: +/- 4 horas para turnos nocturnos)
-        # Por ahora asumimos turno diurno simple: 00:00 a 23:59 del mismo día
-        day_start = timezone.make_aware(datetime.combine(target_date, time.min))
-        day_end = timezone.make_aware(datetime.combine(target_date, time.max))
+        if branch_id:
+            queryset = queryset.filter(branch_id=branch_id)
+            
+        if search_query:
+            from django.db.models import Q
+            queryset = queryset.filter(
+                Q(first_name__icontains=search_query) | 
+                Q(last_name__icontains=search_query) | 
+                Q(national_id__icontains=search_query)
+            )
+            
+        employees = queryset.all()
+        
+        # 3. Obtener eventos del día en la zona horaria seleccionada
+        day_start = timezone.make_aware(datetime.combine(target_date, time.min), calc_tz)
+        day_end = timezone.make_aware(datetime.combine(target_date, time.max), calc_tz)
         
         events = AttendanceEvent.objects.filter(
             timestamp__range=(day_start, day_end)

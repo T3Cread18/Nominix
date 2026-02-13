@@ -13,9 +13,9 @@ from django.http import HttpResponse
 from django.db.models import ProtectedError
 import weasyprint
 import csv
-from .services import BCVRateService
+from ..services import BCVRateService
 from rest_framework.views import APIView
-from .models import (
+from ..models import (
     PayrollPeriod, PayrollReceipt, PayrollNovelty, Employee, 
     LaborContract, PayrollConcept, Company, Loan, Branch,
     ExchangeRate, EmployeeConcept, Currency, Department, LoanPayment, JobPosition,
@@ -23,7 +23,7 @@ from .models import (
     # Social Benefits
     SocialBenefitsLedger, SocialBenefitsSettlement, InterestRateBCV
 )
-from .serializers import (
+from ..serializers import (
     PayrollPeriodSerializer, PayrollReceiptSerializer, PayrollNoveltySerializer,
     EmployeeSerializer, LaborContractSerializer, PayrollConceptSerializer,
     CompanySerializer, LoanSerializer, BranchSerializer,
@@ -34,9 +34,10 @@ from .serializers import (
     SocialBenefitsLedgerSerializer, SocialBenefitsSettlementSerializer,
     InterestRateBCVSerializer, AdvanceRequestSerializer, QuarterlyGuaranteeSerializer
 )
-from .engine import PayrollEngine
+from ..engine import PayrollEngine
 
-
+# Import new views
+from .import_views import *
 
 class CurrencyViewSet(viewsets.ModelViewSet):
     queryset = Currency.objects.all()
@@ -60,6 +61,7 @@ class PayrollConceptViewSet(viewsets.ModelViewSet):
 
     def perform_destroy(self, instance):
         if instance.is_system:
+            from rest_framework import serializers
             raise serializers.ValidationError(
                 "No se puede eliminar un concepto de sistema."
             )
@@ -361,7 +363,7 @@ class PayrollPeriodViewSet(viewsets.ModelViewSet):
         Calcula la nómina proyectada para todos los empleados del periodo.
         """
         try:
-            from .services.payroll import PayrollProcessor
+            from ..services.payroll import PayrollProcessor
             manual_rate = request.data.get('manual_rate') if request.method == 'POST' else request.query_params.get('manual_rate')
             result = PayrollProcessor.preview_period(pk, manual_rate=manual_rate)
             return Response(result, status=status.HTTP_200_OK)
@@ -377,7 +379,7 @@ class PayrollPeriodViewSet(viewsets.ModelViewSet):
         Inicia el proceso de cálculo masivo y cierre inmutable.
         """
         try:
-            from .services import PayrollProcessor
+            from ..services import PayrollProcessor
             manual_rate = request.data.get('manual_rate')
             result = PayrollProcessor.process_period(pk, user=request.user, manual_rate=manual_rate)
             return Response(result, status=status.HTTP_200_OK)
@@ -886,7 +888,7 @@ class SocialBenefitsViewSet(viewsets.ReadOnlyModelViewSet):
             )
         
         # Importar el motor de prestaciones sociales
-        from .services.social_benefits_engine import process_quarterly_guarantee
+        from ..services.social_benefits_engine import process_quarterly_guarantee
         
         try:
             # Obtener información del usuario para auditoría
@@ -950,7 +952,7 @@ class SocialBenefitsViewSet(viewsets.ReadOnlyModelViewSet):
             termination_date = timezone.now().date()
         
         # Importar y ejecutar el cálculo
-        from .services.social_benefits_engine import calculate_final_settlement
+        from ..services.social_benefits_engine import calculate_final_settlement
         
         try:
             comparison = calculate_final_settlement(contract, termination_date)
@@ -1001,7 +1003,7 @@ class SocialBenefitsViewSet(viewsets.ReadOnlyModelViewSet):
         employee = contract.employee
         
         # Importar helper para obtener saldo actual
-        from .services.social_benefits_engine import (
+        from ..services.social_benefits_engine import (
             get_current_balance,
             calculate_comprehensive_salary
         )
@@ -1093,7 +1095,7 @@ class SocialBenefitsViewSet(viewsets.ReadOnlyModelViewSet):
                 status=status.HTTP_404_NOT_FOUND
             )
         
-        from .services.social_benefits_engine import get_current_balance
+        from ..services.social_benefits_engine import get_current_balance
         
         balance = get_current_balance(employee)
         

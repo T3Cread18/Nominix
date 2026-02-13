@@ -42,9 +42,10 @@ class HikvisionClient:
     
     TIMEOUT = 30  # Timeout en segundos para requests (alto para dispositivos remotos)
     
-    def __init__(self, ip: str, port: int, username: str, password: str):
+    def __init__(self, ip: str, port: int, username: str, password: str, device_timezone: str = 'UTC'):
         self.base_url = f"http://{ip}:{port}"
         self.auth = HTTPDigestAuth(username, password)
+        self.device_timezone = device_timezone
         self.session = requests.Session()
         self.session.auth = self.auth
         self.session.headers.update({
@@ -61,11 +62,35 @@ class HikvisionClient:
             response = self.session.request(method, url, **kwargs)
             
             if response.status_code == 401:
+                # Detectar bloqueo por intentos fallidos
+                if '<lockStatus>lock</lockStatus>' in response.text:
+                    retry_time = "desconocido"
+                    if '<unlockTime>' in response.text:
+                        try:
+                            retry_time = response.text.split('<unlockTime>')[1].split('</unlockTime>')[0]
+                        except IndexError:
+                            pass
+                    
+                    raise HikvisionAuthError(
+                        f"¡DISPOSITIVO BLOQUEADO! Demasiados intentos fallidos. "
+                        f"Tiempo de espera: {retry_time} segundos."
+                    )
+                
                 raise HikvisionAuthError(
                     f"Autenticación fallida con el dispositivo en {self.base_url}. "
                     "Verifica usuario y contraseña."
                 )
             
+            # Algunos endpoints retornan 200 OK pero con error en el cuerpo (JSON)
+            if 'json' in response.headers.get('Content-Type', ''):
+                try:
+                    data = response.json()
+                    if data.get('statusCode') != 1 and data.get('statusCode') is not None:
+                         # 1 = OK en Hikvision ISAPI JSON
+                         logger.warning(f"Hikvision JSON error: {data}")
+                except ValueError:
+                    pass
+
             response.raise_for_status()
             return response
             
@@ -85,7 +110,7 @@ class HikvisionClient:
             raise HikvisionConnectionError(
                 f"Error HTTP {response.status_code} del dispositivo: {e}"
             )
-    
+
     def test_connection(self) -> Dict[str, Any]:
         """
         Probar la conexión con el dispositivo.
@@ -155,7 +180,7 @@ class HikvisionClient:
             'model_name': get_text('model'),
             'mac_address': get_text('macAddress'),
         }
-    
+
     def search_events(
         self, 
         start_time: datetime, 
@@ -219,85 +244,107 @@ class HikvisionClient:
             'total': total,
             'events': events,
         }
-    
+
+    def search_events_all(
+        self,
+        start_time: datetime,
+        end_time: datetime,
+        page_size: int = 100,
+        max_pages: int = 50,
+    ) -> List[Dict[str, Any]]:
+        """
+        Buscar TODOS los eventos de acceso paginando automáticamente.
+        
+        Itera por todas las páginas hasta obtener todos los resultados.
+        
+        Args:
+            start_time: Fecha/hora de inicio.
+            end_time: Fecha/hora de fin.
+            page_size: Eventos por página.
+            max_pages: Máximo de páginas para evitar loops infinitos.
+        
+        Returns:
+            Lista plana de todos los eventos encontrados.
+        """
+        all_events = []
+        page_no = 0
+        
+        while page_no < max_pages:
+            result = self.search_events(
+                start_time=start_time,
+                end_time=end_time,
+                page_no=page_no,
+                page_size=page_size,
+            )
+            
+            events = result.get('events', [])
+            total = result.get('total', 0)
+            
+            all_events.extend(events)
+            
+            # Si ya tenemos todos o no hay más resultados
+            if len(all_events) >= total or not events:
+                break
+            
+            page_no += 1
+        
+        logger.info(f"search_events_all: {len(all_events)} eventos descargados en {page_no + 1} páginas")
+        return all_events
+
     def _parse_event(self, raw_event: dict) -> Dict[str, Any]:
         """
         Parsear un evento individual de ISAPI a formato normalizado.
-        
-        Usa el campo `attendanceStatus` del dispositivo Hikvision para
-        determinar el tipo de evento (entrada, salida, descanso).
-        
-        Mapeo attendanceStatus de Hikvision:
-            - "checkIn"    / "0xab"  → entry (Entrada)
-            - "checkOut"   / "0xac"  → exit (Salida)
-            - "breakOut"   / "0xad"  → break_start (Inicio Descanso)
-            - "breakIn"    / "0xae"  → break_end (Fin Descanso)
-            - "overtimeIn" / "0xaf"  → entry (Entrada horas extra)
-            - "overtimeOut"/ "0xb0"  → exit (Salida horas extra)
         """
         # === Tipo de evento basado en attendanceStatus ===
         attendance_status = raw_event.get('attendanceStatus', '')
         
         attendance_status_map = {
-            # Valores textuales
-            'checkIn': 'entry',
-            'checkOut': 'exit',
-            'breakOut': 'break_start',
-            'breakIn': 'break_end',
-            'overtimeIn': 'entry',
-            'overtimeOut': 'exit',
-            # Valores hexadecimales (algunos firmwares)
-            '0xab': 'entry',
-            '0xac': 'exit',
-            '0xad': 'break_start',
-            '0xae': 'break_end',
-            '0xaf': 'entry',
-            '0xb0': 'exit',
+            'checkIn': 'entry', 'checkOut': 'exit',
+            'breakOut': 'break_start', 'breakIn': 'break_end',
+            'overtimeIn': 'entry', 'overtimeOut': 'exit',
+            '0xab': 'entry', '0xac': 'exit',
+            '0xad': 'break_start', '0xae': 'break_end',
+            '0xaf': 'entry', '0xb0': 'exit',
         }
         
         event_type = attendance_status_map.get(str(attendance_status), 'unknown')
         
-        # Fallback: si no hay attendanceStatus, intentar por cardReaderNo
         if event_type == 'unknown' and not attendance_status:
             card_reader_no = raw_event.get('cardReaderNo', 0)
-            if card_reader_no == 1:
-                event_type = 'entry'
-            elif card_reader_no == 2:
-                event_type = 'exit'
+            if card_reader_no == 1: event_type = 'entry'
+            elif card_reader_no == 2: event_type = 'exit'
         
-        # === Modo de verificación (basado en campo 'minor' del evento) ===
-        # El DS-K1A8503MF-B usa el campo 'minor' para indicar el método,
-        # no 'currentVerifyMode'. major=5 es siempre "evento de acceso".
         minor = raw_event.get('minor', 0)
         minor_verification_map = {
-            1: 'card',          # Tarjeta válida
-            38: 'fingerprint',  # Huella válida (confirmado con dispositivo real)
-            75: 'fingerprint',  # Huella válida (variante firmware)
-            80: 'face',         # Rostro válido
-            26: 'password',     # Contraseña válida
+            1: 'card', 38: 'fingerprint', 75: 'fingerprint',
+            80: 'face', 26: 'password',
         }
         verification_mode = minor_verification_map.get(minor, 'other')
         
-        # Fallback: intentar currentVerifyMode si existe
         if verification_mode == 'other' and 'currentVerifyMode' in raw_event:
             cvm_map = {1: 'card', 4: 'card', 6: 'fingerprint', 15: 'fingerprint',
                        21: 'face', 9: 'combined', 28: 'combined', 29: 'combined'}
             verification_mode = cvm_map.get(raw_event['currentVerifyMode'], 'other')
         
-        # === Timestamp del evento ===
         time_str = raw_event.get('time', '')
         try:
-            # Hikvision puede devolver timestamps con/sin timezone
             if '+' in time_str or 'Z' in time_str:
                 timestamp = datetime.fromisoformat(time_str.replace('Z', '+00:00'))
             else:
+                # Si el timestamp es 'naive', lo localizamos en la zona horaria del dispositivo
                 timestamp = datetime.fromisoformat(time_str)
+                if self.device_timezone:
+                    try:
+                        import pytz
+                        tz = pytz.timezone(self.device_timezone)
+                        timestamp = tz.localize(timestamp)
+                    except Exception as e:
+                        logger.warning(f"Error localizing timestamp {time_str} with {self.device_timezone}: {e}")
         except (ValueError, AttributeError):
             timestamp = datetime.now()
         
         return {
-            'employee_device_id': str(raw_event.get('employeeNoString', 
-                                       raw_event.get('cardNo', ''))),
+            'employee_device_id': str(raw_event.get('employeeNoString', raw_event.get('cardNo', ''))),
             'employee_name': raw_event.get('name', ''),
             'event_type': event_type,
             'attendance_status_raw': str(attendance_status),
@@ -307,89 +354,53 @@ class HikvisionClient:
             'door_no': raw_event.get('doorNo', 0),
             'raw_data': raw_event,
         }
-    
-    def search_events_all(
-        self,
-        start_time: datetime,
-        end_time: datetime,
-        page_size: int = 50,
-    ) -> List[Dict[str, Any]]:
-        """
-        Buscar TODOS los eventos en un rango de fechas (paginación automática).
-        
-        Args:
-            start_time: Fecha/hora de inicio.
-            end_time: Fecha/hora de fin.
-            page_size: Tamaño de página.
-        
-        Returns:
-            Lista completa de eventos.
-        """
-        all_events = []
-        page_no = 0
-        
-        while True:
-            result = self.search_events(
-                start_time=start_time,
-                end_time=end_time,
-                page_no=page_no,
-                page_size=page_size,
-            )
-            
-            events = result['events']
-            all_events.extend(events)
-            
-            # Si recibimos menos de page_size, es la última página
-            if len(events) < page_size:
-                break
-            
-            page_no += 1
-            
-            # Safety limit
-            if page_no > 100:
-                logger.warning(
-                    f"Alcanzado límite de 100 páginas al buscar eventos. "
-                    f"Total acumulado: {len(all_events)}"
-                )
-                break
-        
-        return all_events
-    
-    def search_users(self, page_no: int = 0, page_size: int = 50) -> Dict[str, Any]:
+
+    def search_users(self, page_no: int = 0, page_size: int = 50, start_position: Optional[int] = None) -> Dict[str, Any]:
         """
         Buscar usuarios registrados en el dispositivo.
         
         POST /ISAPI/AccessControl/UserInfo/Search?format=json
         
-        Nota: Algunos modelos (DS-K1A8503MF-B) pueden responder en XML
-        aunque se solicite JSON. Se maneja ambos formatos.
+        Usa payload JSON para evitar bloqueos en modelos DS-K1A8503MF-B.
+        
+        Args:
+            page_no: Número de página (0-indexed). Usado si start_position es None.
+            page_size: Cantidad de resultados por request.
+            start_position: Posición de inicio absoluta (override page_no).
         
         Returns:
             dict con claves: total, users (list[dict])
         """
+        
+        # Calculate position: explicit start_pos OR page_no * page_size
+        position = start_position if start_position is not None else (page_no * page_size)
+        
         payload = {
             "UserInfoSearchCond": {
                 "searchID": f"search_{int(datetime.now().timestamp())}",
-                "searchResultPosition": page_no * page_size,
+                "searchResultPosition": position,
                 "maxResults": page_size,
             }
         }
         
+        # Forzar JSON usage
         response = self._request(
             'POST',
             '/ISAPI/AccessControl/UserInfo/Search?format=json',
             json=payload
         )
         
-        content_type = response.headers.get('Content-Type', '')
-        
-        if 'json' in content_type:
+        try:
             return self._parse_users_json(response.json())
-        else:
-            return self._parse_users_xml(response.text)
+        except ValueError:
+            logger.error(f"Error parseando respuesta JSON de usuarios: {response.text[:200]}")
+            return {'total': 0, 'users': []}
     
     def _parse_users_json(self, data: dict) -> Dict[str, Any]:
         """Parsear respuesta JSON de UserInfo/Search."""
+        # Estructura típica:
+        # { "UserInfoSearch": { "totalMatches": 22, "UserInfo": [ ... ] } }
+        
         user_info_search = data.get('UserInfoSearch', {})
         total = user_info_search.get('totalMatches', 0)
         user_list = user_info_search.get('UserInfo', [])
@@ -405,39 +416,42 @@ class HikvisionClient:
         
         return {'total': total, 'users': users}
     
-    def _parse_users_xml(self, xml_text: str) -> Dict[str, Any]:
-        """Parsear respuesta XML de UserInfo/Search."""
-        import xml.etree.ElementTree as ET
-        import re
+
+    def search_users_all(self) -> List[Dict[str, Any]]:
+        """
+        Buscar TODOS los usuarios registrados paginando automáticamente.
         
-        # Remover namespace
-        xml_clean = xml_text
-        if 'xmlns' in xml_text:
-            xml_clean = re.sub(r'\sxmlns="[^"]+"', '', xml_text)
+        Maneja paginación dinámica incrementando 'start_position' basado en
+        la cantidad real de registros recibidos, para evitar saltos si el
+        dispositivo fuerza un page_size menor al solicitado.
         
-        try:
-            root = ET.fromstring(xml_clean)
-        except ET.ParseError:
-            logger.warning(f"No se pudo parsear XML de users: {xml_text[:200]}")
-            return {'total': 0, 'users': []}
+        Returns:
+            Lista plana de todos los usuarios.
+        """
+        all_users = []
+        position = 0
+        page_size = 50
+        max_requests = 200  # Avoid infinite loops
         
-        def get_text(element, tag):
-            el = element.find(tag)
-            return el.text if el is not None and el.text else ''
-        
-        total_el = root.find('totalMatches')
-        total = int(total_el.text) if total_el is not None and total_el.text else 0
-        
-        users = []
-        for user_el in root.findall('.//UserInfo'):
-            users.append({
-                'employee_no': get_text(user_el, 'employeeNo'),
-                'name': get_text(user_el, 'name'),
-                'user_type': get_text(user_el, 'userType'),
-                'valid': {},
-            })
-        
-        return {'total': total, 'users': users}
+        for _ in range(max_requests):
+            result = self.search_users(page_size=page_size, start_position=position)
+            users = result.get('users', [])
+            total = result.get('total', 0)
+            
+            if not users:
+                break
+                
+            all_users.extend(users)
+            position += len(users)
+            
+            # Si hemos recuperado el total declarado, terminamos.
+            if total > 0 and position >= total:
+                break
+                
+        logger.info(f"search_users_all: {len(all_users)} usuarios descargados")
+        return all_users
+
+
     
     def add_user(self, employee_no: str, name: str) -> bool:
         """

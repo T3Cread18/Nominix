@@ -12,8 +12,11 @@ from .views import (
     PayrollVariablesView, ValidateFormulaView, JobPositionViewSet,
     ConceptConfigMetadataView, PayrollPolicyView,
     # Social Benefits
-    SocialBenefitsViewSet, InterestRateBCVViewSet, ExchangeRateViewSet
+    SocialBenefitsViewSet, InterestRateBCVViewSet, ExchangeRateViewSet,
+    # Import Views
+    ImportFieldsView, ImportPreviewView, ImportValidateView, ImportExecuteView
 )
+from .views.import_views import ImportTemplateView
 
 
 
@@ -40,7 +43,12 @@ router.register(r'social-benefits', SocialBenefitsViewSet, basename='social-bene
 router.register(r'bcv-rates', InterestRateBCVViewSet, basename='bcv-rate')
 router.register(r'exchange-rates', ExchangeRateViewSet, basename='exchange-rate')
 
+
+
 urlpatterns = [
+    # Template Route (Separate - moved to top to avoid conflicts)
+    path('templates/<str:model_key>/', ImportTemplateView.as_view(), name='import-template'),
+
     path('company/config/', CompanyConfigView.as_view(), name='company-config'),
     path('company/policies/', PayrollPolicyView.as_view(), name='payroll-policy'),
     path('concepts/config-metadata/', ConceptConfigMetadataView.as_view(), name='concept-config-metadata'),
@@ -48,6 +56,13 @@ urlpatterns = [
     path('', include(router.urls)),
     path('payroll/variables/', PayrollVariablesView.as_view(), name='payroll-variables'),
     path('payroll/validate-formula/', ValidateFormulaView.as_view(), name='validate-formula'),
+    
+    # Import Routes
+    path('import/preview/', ImportPreviewView.as_view(), name='import-preview'),
+    path('import/<str:model_key>/fields/', ImportFieldsView.as_view(), name='import-fields'),
+    path('import/<str:model_key>/validate/', ImportValidateView.as_view(), name='import-validate'),
+    path('import/<str:model_key>/execute/', ImportExecuteView.as_view(), name='import-execute'),
+    path('import/<str:model_key>/execute/', ImportExecuteView.as_view(), name='import-execute'),
+    
+
 ]
-
-

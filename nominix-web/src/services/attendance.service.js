@@ -120,10 +120,12 @@ const attendanceService = {
     /**
      * Obtiene el resumen diario de asistencia (agregado).
      * @param {string} date - Fecha en formato YYYY-MM-DD
+     * @param {object} params - { branch, search }
      */
-    getDailyAttendance: async (date) => {
-        const params = date ? { date } : {};
-        const response = await axiosClient.get('/biometric/daily-attendance/', { params });
+    getDailyAttendance: async (date, params = {}) => {
+        const queryParams = { ...params };
+        if (date) queryParams.date = date;
+        const response = await axiosClient.get('/biometric/daily-attendance/', { params: queryParams });
         return response.data;
     },
 

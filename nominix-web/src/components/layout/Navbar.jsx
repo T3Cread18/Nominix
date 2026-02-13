@@ -31,6 +31,7 @@ const Navbar = () => {
     ];
 
     const secondaryNavItems = [
+        { path: '/import', icon: FileSpreadsheet, label: 'Importar' },
         { path: '/loans', icon: Banknote, label: 'Préstamos' },
         { path: '/reports', icon: PieChart, label: 'Reportes' },
     ];

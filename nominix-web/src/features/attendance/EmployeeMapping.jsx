@@ -102,47 +102,63 @@ const EmployeeMapping = () => {
      * Genera 3 listas: matched, unmappedDevice, unmappedEmployee.
      */
     const comparison = useMemo(() => {
-        // Set de IDs ya mapeados
-        const mappedDeviceIds = new Set(mappings.map(m => m.device_employee_id));
+        const normalizeId = (id) => {
+            if (!id) return '';
+            // Convert to string and strip everything except numbers
+            return String(id).replace(/\D/g, '');
+        };
+
+        // Set de IDs ya mapeados (normalizados)
+        const mappedDeviceIds = new Set(mappings.map(m => normalizeId(m.device_employee_id)));
         const mappedEmployeeIds = new Set(mappings.map(m => String(m.employee)));
 
-        // Mapa: números de cédula → empleado
-        const cedulaMap = {};
+        // Mapa: números de cédula normalizados → empleado
+        const cedulaMap = new Map();
         employees.forEach(emp => {
-            const nums = extractCedulaNumbers(emp.national_id || emp.cedula || emp.identification_number);
-            if (nums) {
-                cedulaMap[nums] = emp;
+            // Try national_id, then others. Normalize strictly.
+            const rawId = emp.national_id || emp.identification_number || emp.cedula;
+            const cleanId = normalizeId(rawId);
+            if (cleanId) {
+                cedulaMap.set(cleanId, emp);
             }
         });
 
-        // IDs del huellero
-        const deviceIdSet = new Set(deviceUsers.map(u => u.employee_no || u.employeeNo || ''));
+        // IDs del huellero (para verificar existencia)
+        const deviceIdSet = new Set();
 
-        // Coincidencias automáticas (cédula = ID huellero, no mapeados aún)
+        // Coincidencias automáticas
         const matched = [];
         const unmappedDevice = [];
         const unmappedEmployee = [];
 
-        // Buscar coincidencias
         deviceUsers.forEach(du => {
-            const deviceId = du.employee_no || du.employeeNo || '';
-            if (!deviceId) return;
+            const rawDeviceId = du.employee_no || du.employeeNo || '';
+            const cleanDeviceId = normalizeId(rawDeviceId);
 
-            if (mappedDeviceIds.has(deviceId)) return; // Ya mapeado
+            if (!cleanDeviceId) return;
 
-            const emp = cedulaMap[deviceId];
+            deviceIdSet.add(cleanDeviceId);
+
+            if (mappedDeviceIds.has(cleanDeviceId)) return; // Ya mapeado
+
+            const emp = cedulaMap.get(cleanDeviceId);
+
             if (emp && !mappedEmployeeIds.has(String(emp.id))) {
-                matched.push({ deviceUser: du, employee: emp, deviceId });
+                matched.push({ deviceUser: du, employee: emp, deviceId: rawDeviceId });
             } else {
-                unmappedDevice.push({ deviceUser: du, deviceId });
+                unmappedDevice.push({ deviceUser: du, deviceId: rawDeviceId });
             }
         });
 
         // Empleados sin mapeo ni coincidencia
         employees.forEach(emp => {
             if (mappedEmployeeIds.has(String(emp.id))) return;
-            const nums = extractCedulaNumbers(emp.national_id || emp.cedula || emp.identification_number);
-            if (!deviceIdSet.has(nums)) {
+
+            const rawId = emp.national_id || emp.identification_number || emp.cedula;
+            const cleanId = normalizeId(rawId);
+
+            // Check if this employee's ID exists in the device set
+            if (!deviceIdSet.has(cleanId)) {
                 unmappedEmployee.push(emp);
             }
         });
@@ -430,8 +446,8 @@ const EmployeeMapping = () => {
                                             </td>
                                             <td className="py-3 px-4">
                                                 <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${m.is_active !== false
-                                                        ? 'bg-emerald-500/10 text-emerald-400'
-                                                        : 'bg-gray-500/10 text-gray-400'
+                                                    ? 'bg-emerald-500/10 text-emerald-400'
+                                                    : 'bg-gray-500/10 text-gray-400'
                                                     }`}>
                                                     {m.is_active !== false ? 'Activo' : 'Inactivo'}
                                                 </span>
@@ -531,7 +547,8 @@ const EmployeeMapping = () => {
 
 async function loadEmployees() {
     try {
-        const response = await axiosClient.get('/employees/');
+        // Request larger page size to populate dropdown fully
+        const response = await axiosClient.get('/employees/?page_size=1000');
         return response.data.results || response.data;
     } catch {
         return [];

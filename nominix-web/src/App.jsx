@@ -21,6 +21,7 @@ import TenantsAdmin from './features/tenants/TenantsAdmin';
 import VacationManager from './features/vacations/VacationManager';
 import VacationSettings from './features/vacations/VacationSettings';
 import { AttendanceDashboard } from './features/attendance';
+import ImportWizard from './features/import/ImportWizard';
 
 /**
  * App - Componente principal de la aplicación.
@@ -102,6 +103,9 @@ function App() {
 
                 {/* Módulo: Asistencia */}
                 <Route path="attendance" element={<AttendanceDashboard />} />
+
+                {/* Módulo: Importación */}
+                <Route path="import" element={<ImportWizard />} />
 
                 {/* Fallback */}
                 <Route path="*" element={<Navigate to="/" replace />} />

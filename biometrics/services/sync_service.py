@@ -52,6 +52,7 @@ class BiometricSyncService:
                 port=device.port,
                 username=device.username,
                 password=device.password,
+                device_timezone=device.timezone,
             )
         else:
             raise ValueError(

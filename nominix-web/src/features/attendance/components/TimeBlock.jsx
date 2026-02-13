@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { AlertTriangle, Clock, CheckCircle2, XCircle, Edit3 } from 'lucide-react';
+import { APP_CONFIG } from '../../../config';
 
 /**
  * TimeBlock — Celda visual para un bloque de tiempo.
@@ -42,11 +43,18 @@ const TimeBlock = ({ block, label, expectedTime, onCorrect }) => {
     const config = statusConfig[status] || statusConfig.missing;
     const StatusIcon = config.icon;
 
+    // START NEW CONTENT
     const formatTime = (isoTime) => {
         if (!isoTime) return '--:--';
         try {
             const d = new Date(isoTime);
-            return d.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit', hour12: false });
+            const is12h = APP_CONFIG.TIME_FORMAT === '12h';
+
+            return d.toLocaleTimeString('es-VE', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: is12h
+            });
         } catch {
             return '--:--';
         }

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Calendar, RefreshCw, Loader2, Users, Clock, AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, WifiOff, Wifi } from 'lucide-react';
-import { Card, CardContent } from '../../components/ui';
+import { Calendar, RefreshCw, Loader2, Users, Clock, AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, WifiOff, Wifi, Search, Building2, Globe } from 'lucide-react';
+import { Card, CardContent, InputField, SelectField } from '../../components/ui';
 import attendanceService from '../../services/attendance.service';
+import { useBranches } from '../../hooks/useOrganization';
 import TimeBlock from './components/TimeBlock';
 
 /**
@@ -14,11 +15,22 @@ const DailyAttendanceView = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
+    // Filtros
+    const [branch, setBranch] = useState('');
+    const [search, setSearch] = useState('');
+    const [tz, setTz] = useState('');
+
+    const { data: branches = [] } = useBranches();
+
     const loadData = useCallback(async () => {
         setLoading(true);
         setError(null);
         try {
-            const result = await attendanceService.getDailyAttendance(date);
+            const result = await attendanceService.getDailyAttendance(date, {
+                branch: branch || undefined,
+                search: search || undefined,
+                tz: tz || undefined
+            });
             setData(Array.isArray(result) ? result : []);
         } catch (err) {
             console.error('Error loading daily attendance:', err);
@@ -27,9 +39,16 @@ const DailyAttendanceView = () => {
         } finally {
             setLoading(false);
         }
-    }, [date]);
+    }, [date, branch, search, tz]);
 
-    useEffect(() => { loadData(); }, [loadData]);
+    useEffect(() => {
+        // Implementamos un pequeño delay para la búsqueda si el usuario escribe rápido
+        const timer = setTimeout(() => {
+            loadData();
+        }, search ? 400 : 0);
+
+        return () => clearTimeout(timer);
+    }, [loadData, search]);
 
     const changeDate = (delta) => {
         const d = new Date(date + 'T12:00:00');
@@ -49,39 +68,83 @@ const DailyAttendanceView = () => {
 
     return (
         <div className="space-y-5">
-            {/* Header — Date Nav + Refresh */}
-            <div className="flex items-center justify-between flex-wrap gap-3">
-                {/* Date Navigator */}
-                <div className="flex items-center gap-1 bg-white border border-gray-100 rounded-xl p-1 shadow-sm">
-                    <button onClick={() => changeDate(-1)}
-                        className="p-2 rounded-lg hover:bg-nominix-smoke text-gray-400 hover:text-nominix-dark transition-colors">
-                        <ChevronLeft size={18} />
-                    </button>
-                    <div className="flex items-center gap-2 px-3">
-                        <Calendar size={16} className="text-nominix-electric" />
-                        <input
-                            type="date"
-                            value={date}
-                            onChange={(e) => setDate(e.target.value)}
-                            className="bg-transparent border-none text-sm font-bold text-nominix-dark cursor-pointer outline-none"
+            {/* Header — Date Nav + Filters + Refresh */}
+            <div className="flex items-center justify-between flex-wrap gap-4 bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+                <div className="flex items-center gap-4 flex-wrap">
+                    {/* Date Navigator */}
+                    <div className="flex items-center gap-1 bg-nominix-smoke border border-gray-100 rounded-xl p-1">
+                        <button onClick={() => changeDate(-1)}
+                            className="p-1.5 rounded-lg hover:bg-white text-gray-400 hover:text-nominix-dark transition-colors">
+                            <ChevronLeft size={16} />
+                        </button>
+                        <div className="flex items-center gap-2 px-2">
+                            <Calendar size={14} className="text-nominix-electric" />
+                            <input
+                                type="date"
+                                value={date}
+                                onChange={(e) => setDate(e.target.value)}
+                                className="bg-transparent border-none text-xs font-bold text-nominix-dark cursor-pointer outline-none"
+                            />
+                        </div>
+                        <button onClick={() => changeDate(1)}
+                            className="p-1.5 rounded-lg hover:bg-white text-gray-400 hover:text-nominix-dark transition-colors">
+                            <ChevronRight size={16} />
+                        </button>
+                    </div>
+
+                    {/* Selector de Sede */}
+                    <div className="w-56">
+                        <SelectField
+                            value={branch}
+                            onChange={(e) => setBranch(e.target.value)}
+                            options={[
+                                { value: '', label: 'Todas las Sedes' },
+                                ...branches.map(b => ({ value: b.id, label: b.name }))
+                            ]}
+                            icon={Building2}
+                            placeholder="Filtrar Sede"
+                            className="!py-1.5 !text-xs"
                         />
                     </div>
-                    <button onClick={() => changeDate(1)}
-                        className="p-2 rounded-lg hover:bg-nominix-smoke text-gray-400 hover:text-nominix-dark transition-colors">
-                        <ChevronRight size={18} />
-                    </button>
-                    <button onClick={() => setDate(getTodayStr())}
-                        className="px-3 py-1.5 rounded-lg bg-blue-50 border border-blue-100 text-nominix-electric text-xs font-bold hover:bg-blue-100 transition-colors ml-1">
-                        Hoy
-                    </button>
+
+                    {/* Buscador Inteligente */}
+                    <div className="w-64">
+                        <InputField
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            placeholder="Buscar por nombre o CI..."
+                            icon={Search}
+                            className="!py-1.5 !text-xs"
+                        />
+                    </div>
+
+                    {/* Selector de Zona Horaria (MODO PRUEBA) */}
+                    <div className="w-44">
+                        <SelectField
+                            value={tz}
+                            onChange={(e) => setTz(e.target.value)}
+                            options={[
+                                { value: '', label: 'TZ: Por defecto' },
+                                { value: 'UTC', label: 'TZ: UTC' },
+                                { value: 'America/Caracas', label: 'TZ: Caracas' },
+                            ]}
+                            icon={Globe}
+                            className="!py-1.5 !text-[11px] border-amber-100 bg-amber-50/30"
+                        />
+                    </div>
                 </div>
 
-                {/* Refresh */}
-                <button onClick={loadData} disabled={loading}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white border border-gray-100 text-gray-500 text-sm font-semibold hover:bg-nominix-smoke hover:text-nominix-dark transition-colors shadow-sm disabled:opacity-50">
-                    {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-                    Actualizar
-                </button>
+                <div className="flex items-center gap-2">
+                    <button onClick={() => { setBranch(''); setSearch(''); setTz(''); setDate(getTodayStr()); }}
+                        className="px-3 py-1.5 rounded-xl text-gray-400 text-xs font-bold hover:bg-nominix-smoke transition-colors">
+                        Limpiar
+                    </button>
+                    <button onClick={loadData} disabled={loading}
+                        className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-nominix-electric text-white text-xs font-bold hover:bg-blue-600 transition-colors shadow-lg shadow-blue-100 disabled:opacity-50">
+                        {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                        Actualizar
+                    </button>
+                </div>
             </div>
 
             {/* KPI Cards */}
@@ -196,16 +259,16 @@ const EmployeeRow = ({ row, index, onCorrect }) => {
 
             {/* Time Blocks */}
             <td className="px-3 py-3 text-center">
-                <TimeBlock block={blocks?.entry} label="Entrada" expectedTime="08:00" onCorrect={onCorrect} />
+                <TimeBlock block={blocks?.entry} label="Entrada" expectedTime={blocks?.entry?.expected_time} onCorrect={onCorrect} />
             </td>
             <td className="px-3 py-3 text-center">
-                <TimeBlock block={blocks?.lunch_out} label="Sal. Almuerzo" expectedTime="12:00" onCorrect={onCorrect} />
+                <TimeBlock block={blocks?.lunch_out} label="Sal. Almuerzo" expectedTime={blocks?.lunch_out?.expected_time} onCorrect={onCorrect} />
             </td>
             <td className="px-3 py-3 text-center">
-                <TimeBlock block={blocks?.lunch_in} label="Ret. Almuerzo" expectedTime="13:00" onCorrect={onCorrect} />
+                <TimeBlock block={blocks?.lunch_in} label="Ret. Almuerzo" expectedTime={blocks?.lunch_in?.expected_time} onCorrect={onCorrect} />
             </td>
             <td className="px-3 py-3 text-center">
-                <TimeBlock block={blocks?.exit} label="Salida" expectedTime="17:00" onCorrect={onCorrect} />
+                <TimeBlock block={blocks?.exit} label="Salida" expectedTime={blocks?.exit?.expected_time} onCorrect={onCorrect} />
             </td>
 
             {/* Effective Hours */}

@@ -1,0 +1,20 @@
+Connecting to 201.221.114.242:8001...
+Device: DS-K1A8503MF-B (J61284722)
+
+Searching ALL users (pagination enabled)...
+First Page Total returned by device: 22
+First Page Users count: 10
+
+[OK] Success!
+Total users fetched: 22
+Time taken: 0.20s
+
+First 5 users:
+ - 13038433: Evelyn Rodriguez
+ - 13345492: Yonathan Elpidio
+ - 14178811: Maria F. Perez
+ - 15798914: Gloria Pereira
+ - 16752853: Yadira Silva
+
+... and 17 more.
+Limit of 10 seems to be BROKEN (Good!)

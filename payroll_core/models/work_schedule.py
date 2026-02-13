@@ -73,4 +73,40 @@ class WorkSchedule(models.Model):
         total_seconds = (end - start).total_seconds()
         lunch_seconds = (lunch_end - lunch_start).total_seconds()
         
-        return (total_seconds - lunch_seconds) / 3600
+
+class EmployeeDailyShift(models.Model):
+    """
+    Asignación diaria de turno específico.
+    Sobreescribe el work_schedule por defecto del empleado para una fecha dada.
+    """
+    employee = models.ForeignKey(
+        'payroll_core.Employee',
+        on_delete=models.CASCADE,
+        related_name='daily_shifts',
+        verbose_name='Empleado'
+    )
+    
+    date = models.DateField(
+        verbose_name='Fecha'
+    )
+    
+    work_schedule = models.ForeignKey(
+        WorkSchedule,
+        on_delete=models.CASCADE,
+        related_name='daily_assignments',
+        verbose_name='Horario Asignado'
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Turno Diario"
+        verbose_name_plural = "Turnos Diarios"
+        unique_together = ['employee', 'date']
+        indexes = [
+            models.Index(fields=['employee', 'date']),
+        ]
+        
+    def __str__(self):
+        return f"{self.employee} - {self.date}: {self.work_schedule.name}"

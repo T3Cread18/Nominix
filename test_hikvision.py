@@ -1,7 +1,9 @@
 """
-Test script v3 - Sends XML body for user search since DS-K1A8503MF-B
-prefers XML for that endpoint. Saves results to /app/test_results.json
-READ-ONLY only.
+Test script v4 - Debugging Mode
+- Checks lock status first.
+- Prioritizes JSON over XML (XML suspects of causing Auth Lock).
+- Adds Capability checks.
+- Saves results to /app/test_results.json
 """
 import json
 import time
@@ -14,48 +16,53 @@ base = 'http://201.221.114.242:8001'
 TIMEOUT = 30
 results = {}
 
-def safe_get(url, retries=3):
+def safe_get(url, retries=2):
     for attempt in range(retries):
         try:
             return requests.get(url, auth=auth, timeout=TIMEOUT)
         except Exception as e:
             print(f"  Intento {attempt+1}/{retries} falló: {type(e).__name__}: {e}")
-            if attempt < retries - 1:
-                time.sleep(3)
-            else:
-                raise
+            if attempt < retries - 1: time.sleep(2)
+            else: raise
 
-def safe_post(url, retries=3, **kwargs):
+def safe_post(url, retries=2, **kwargs):
     for attempt in range(retries):
         try:
             return requests.post(url, auth=auth, timeout=TIMEOUT, **kwargs)
         except Exception as e:
             print(f"  Intento {attempt+1}/{retries} falló: {type(e).__name__}: {e}")
-            if attempt < retries - 1:
-                time.sleep(3)
-            else:
-                raise
+            if attempt < retries - 1: time.sleep(2)
+            else: raise
 
-# TEST 1: Device Info
-print("Test 1: Device Info...")
+print("--- HIKVISION DEBUG SCRIPT V4 ---")
+
+# 1. Device Info & Lock Check
+print("\n[1] Checking Device Status...")
 try:
     r = safe_get(f'{base}/ISAPI/System/deviceInfo')
     results['device_info'] = {'status': r.status_code, 'raw': r.text}
-    print(f"  OK - Status {r.status_code}")
+    
+    if r.status_code == 401 and '<lockStatus>lock</lockStatus>' in r.text:
+        print("!! CRITICAL: DEVICE IS LOCKED !!")
+        if '<unlockTime>' in r.text:
+            t = r.text.split('<unlockTime>')[1].split('</unlockTime>')[0]
+            print(f"   Time remaining: {t} seconds")
+        print("   Aborting tests to prevent further lockout extension.")
+        exit(1)
+        
+    print(f"   OK - Status {r.status_code}")
 except Exception as e:
+    print(f"   FAIL - {e}")
     results['device_info'] = {'error': str(e)}
-    print(f"  FAIL - {e}")
 
-time.sleep(2)
-
-# TEST 2: Events (last 7 days, first 5)
-print("Test 2: Events (last 7 days)...")
+# 2. Events (Known working)
+print("\n[2] Checking Events (JSON)...")
 try:
     end = datetime.now()
-    start = end - timedelta(days=7)
+    start = end - timedelta(days=2) # Shorter range
     payload = {
         "AcsEventCond": {
-            "searchID": "test_read",
+            "searchID": "test_debug",
             "searchResultPosition": 0,
             "maxResults": 5,
             "major": 0,
@@ -65,102 +72,73 @@ try:
         }
     }
     r = safe_post(f'{base}/ISAPI/AccessControl/AcsEvent?format=json', json=payload)
-    data = r.json()
-    total = data.get('AcsEvent', {}).get('totalMatches', 0)
-    events = data.get('AcsEvent', {}).get('InfoList', [])
-    
-    # Collect unique attendance statuses
-    all_statuses = set()
-    if total > 0:
-        # Get more events to see different statuses
-        payload2 = dict(payload)
-        payload2['AcsEventCond'] = dict(payload['AcsEventCond'])
-        payload2['AcsEventCond']['maxResults'] = min(total, 100)
-        payload2['AcsEventCond']['searchID'] = 'test_all_statuses'
-        time.sleep(1)
-        r2 = safe_post(f'{base}/ISAPI/AccessControl/AcsEvent?format=json', json=payload2)
-        all_events = r2.json().get('AcsEvent', {}).get('InfoList', [])
-        for ev in all_events:
-            all_statuses.add(ev.get('attendanceStatus', 'N/A'))
-    
-    results['events'] = {
-        'status': r.status_code,
-        'total_matches': total,
-        'sample_events': events,
-        'event_keys': list(events[0].keys()) if events else [],
-        'unique_attendance_statuses': list(all_statuses),
-    }
-    print(f"  OK - {total} total events")
-    print(f"  Attendance statuses found: {all_statuses}")
+    results['events'] = {'status': r.status_code}
+    if r.status_code == 200:
+        total = r.json().get('AcsEvent', {}).get('totalMatches', 0)
+        print(f"   OK - {total} matches found")
+    else:
+        print(f"   FAIL - Status {r.status_code}")
 except Exception as e:
-    results['events'] = {'error': str(e)}
-    print(f"  FAIL - {e}")
+    print(f"   FAIL - {e}")
 
-time.sleep(2)
-
-# TEST 3: Users (try XML body)
-print("Test 3: Users...")
+# 3. User Capabilities (New)
+print("\n[3] Checking User Capabilities...")
 try:
-    xml_body = """<?xml version="1.0" encoding="UTF-8"?>
-<UserInfoSearchCond version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
-<searchID>test_users</searchID>
-<searchResultPosition>0</searchResultPosition>
-<maxResults>10</maxResults>
-</UserInfoSearchCond>"""
+    r = safe_get(f'{base}/ISAPI/AccessControl/UserInfo/capabilities?format=json')
+    results['user_caps'] = {'status': r.status_code, 'text': r.text[:500]}
     
-    r = safe_post(
-        f'{base}/ISAPI/AccessControl/UserInfo/Search?format=json',
-        data=xml_body,
-        headers={'Content-Type': 'application/xml'}
-    )
-    
-    content_type = r.headers.get('Content-Type', '')
-    results['users'] = {
-        'status': r.status_code,
-        'content_type': content_type,
-        'raw_response': r.text[:3000],
-    }
-    
-    if 'json' in content_type:
-        data = r.json()
-        user_data = data.get('UserInfoSearch', {})
-        results['users']['total'] = user_data.get('totalMatches', 0)
-        results['users']['sample_users'] = user_data.get('UserInfo', [])[:5]
-    
-    print(f"  OK - Status {r.status_code} ({content_type})")
+    if r.status_code == 200:
+        print("   OK - Capabilities received")
+        print(f"   Raw: {r.text[:200]}...")
+    else:
+        print(f"   FAIL - Status {r.status_code}")
 except Exception as e:
-    results['users'] = {'error': str(e)}
-    print(f"  FAIL - {e}")
+    print(f"   FAIL - {e}")
 
-time.sleep(1)
-
-# TEST 3b: Users (try JSON body as fallback)
-print("Test 3b: Users (JSON body)...")
+# 4. User Count (New - Simpler than search)
+print("\n[4] Checking User Count...")
 try:
+    r = safe_get(f'{base}/ISAPI/AccessControl/UserInfo/count?format=json')
+    results['user_count'] = {'status': r.status_code, 'text': r.text[:200]}
+    
+    if r.status_code == 200:
+        print(f"   OK - {r.text}")
+    else:
+        print(f"   FAIL - Status {r.status_code}")
+except Exception as e:
+    print(f"   FAIL - {e}")
+
+# 5. User Search (JSON) - Modified Payload
+print("\n[5] Search Users (JSON)...")
+try:
+    # Minimal payload
     payload = {
         "UserInfoSearchCond": {
-            "searchID": "test_users_json",
-            "searchResultPosition": 0,
+            "searchID": "test_users_v4",
             "maxResults": 10,
+            "searchResultPosition": 0
         }
     }
-    r = safe_post(
-        f'{base}/ISAPI/AccessControl/UserInfo/Search?format=json',
-        json=payload
-    )
-    content_type = r.headers.get('Content-Type', '')
-    results['users_json'] = {
-        'status': r.status_code,
-        'content_type': content_type,
-        'raw_response': r.text[:3000],
-    }
-    print(f"  OK - Status {r.status_code} ({content_type})")
+    r = safe_post(f'{base}/ISAPI/AccessControl/UserInfo/Search?format=json', json=payload)
+    results['user_search_json'] = {'status': r.status_code, 'text': r.text[:500]}
+    
+    if r.status_code == 200:
+        print("   OK - Users retrieved!")
+        data = r.json()
+        users = data.get('UserInfoSearch', {}).get('UserInfo', [])
+        print(f"   Found {len(users)} users in sample")
+    else:
+        print(f"   FAIL - Status {r.status_code}")
+        print(f"   Response: {r.text[:200]}")
+        
 except Exception as e:
-    results['users_json'] = {'error': str(e)}
-    print(f"  FAIL - {e}")
+    print(f"   FAIL - {e}")
 
-# Save results
-with open('/app/test_results.json', 'w', encoding='utf-8') as f:
-    json.dump(results, f, indent=2, ensure_ascii=False, default=str)
+# 6. Skip XML test to avoid lockout
+print("\n[6] Skipped XML test (Risk of lockout)")
 
-print("\nDone! Results saved to /app/test_results.json")
+# Save
+with open('test_results.json', 'w', encoding='utf-8') as f:
+    json.dump(results, f, indent=2, ensure_ascii=False)
+
+print("\nDone. Check test_results.json")
