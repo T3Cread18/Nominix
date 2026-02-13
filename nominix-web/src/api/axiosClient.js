@@ -13,7 +13,7 @@ import axios from 'axios';
 
 // ============ CONFIGURACIÓN ============
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 const MAX_RETRIES = 2;
 const RETRY_DELAY = 1000; // ms
 
@@ -36,9 +36,7 @@ const axiosClient = axios.create({
 // Función para obtener el token CSRF manualmente (necesario para Cross-Domain)
 const fetchCsrfToken = async () => {
     try {
-        const response = await axios.get(`${API_BASE_URL}/auth/csrf/`, {
-            withCredentials: true
-        });
+        const response = await axiosClient.get('/auth/csrf/');
         if (response.data && response.data.csrfToken) {
             axiosClient.defaults.headers.common['X-CSRFToken'] = response.data.csrfToken;
             if (import.meta.env.DEV) console.log('✅ CSRF Token set manually');
@@ -106,7 +104,11 @@ axiosClient.interceptors.response.use(
         const originalRequest = error.config;
 
         // ======= ERROR 401: SESIÓN EXPIRADA =======
-        if (error.response?.status === 401 && !originalRequest._retry) {
+        // No interceptar rutas de verificación de auth (dejar que AuthContext maneje el 401)
+        const skipRefreshUrls = ['/auth/me/', '/auth/csrf/', '/auth/refresh/', '/tenant-info/'];
+        const shouldSkipRefresh = skipRefreshUrls.some(url => originalRequest.url?.includes(url));
+
+        if (error.response?.status === 401 && !originalRequest._retry && !shouldSkipRefresh) {
 
             // Si ya estamos refrescando, agregar a la cola
             if (isRefreshing) {
@@ -120,9 +122,7 @@ axiosClient.interceptors.response.use(
 
             try {
                 // Intentar refrescar la sesión (Django session-based)
-                await axios.post(`${API_BASE_URL}/auth/refresh/`, {}, {
-                    withCredentials: true
-                });
+                await axiosClient.post('/auth/refresh/', {});
 
                 processQueue(null);
                 return axiosClient(originalRequest);
@@ -133,10 +133,6 @@ axiosClient.interceptors.response.use(
                 // Redirigir a login
                 console.warn('🔒 Sesión expirada. Redirigiendo a login...');
 
-                // Limpiar estado de auth y redirigir
-                // Nota: En producción, esto debería llamar a logout del AuthContext
-                // Limpiar estado de auth y redirigir
-                // Nota: En producción, esto debería llamar a logout del AuthContext
                 if (!window.location.pathname.startsWith('/login')) {
                     window.location.href = '/login';
                 }
