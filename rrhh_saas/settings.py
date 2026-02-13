@@ -33,6 +33,19 @@ CSRF_TRUSTED_ORIGINS: List[str] = [
     'http://*.localhost:8000',
 ]
 CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True  # Permitir cookies en cross-origin
+
+# Configuración de Cookies para Cross-Domain (Vercel <-> API)
+# 'None' es necesario para que las cookies viajen entre dominios diferentes (nominix.vercel.app -> api.nominix.net)
+SESSION_COOKIE_SAMESITE = 'None'
+CSRF_COOKIE_SAMESITE = 'None'
+SESSION_COOKIE_SECURE = True  # Requerido si SameSite='None' (solo HTTPS)
+CSRF_COOKIE_SECURE = True     # Requerido si SameSite='None' (solo HTTPS)
+
+# Permitir que el frontend lea la cookie CSRF
+CSRF_COOKIE_HTTPONLY = False  
+SESSION_COOKIE_HTTPONLY = True # La session ID sí debe ser oculta
+CSRF_COOKIE_DOMAIN = None      # Dejar que el navegador maneje el dominio automáticamente o fijar si es necesario
 # =============================================================================
 # CONFIGURACIÓN DE DJANGO-TENANTS
 # =============================================================================

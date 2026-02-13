@@ -452,12 +452,29 @@ class AuthView(viewsets.ViewSet):
         
         if user:
             login(request, user)
-            return Response(UserSerializer(user).data)
+            
+            # Obtener el nuevo token CSRF generado tras el login
+            from django.middleware.csrf import get_token
+            csrf_token = get_token(request)
+            
+            return Response({
+                'user': UserSerializer(user).data,
+                'csrfToken': csrf_token
+            })
         
         return Response(
             {'error': 'Credenciales inválidas'}, 
             status=status.HTTP_401_UNAUTHORIZED
         )
+
+    @action(detail=False, methods=['get'])
+    def csrf(self, request):
+        """
+        Retorna el token CSRF para clientes que no pueden leer la cookie.
+        GET /api/auth/csrf/
+        """
+        from django.middleware.csrf import get_token
+        return Response({'csrfToken': get_token(request)})
 
     @action(detail=False, methods=['post'])
     def logout(self, request):
@@ -467,6 +484,21 @@ class AuthView(viewsets.ViewSet):
         """
         logout(request)
         return Response({'message': 'Sesión cerrada exitosamente'})
+
+    @action(detail=False, methods=['post'])
+    def refresh(self, request):
+        """
+        Refresca la sesión actual (extiende la expiración de la cookie).
+        POST /api/auth/refresh/
+        """
+        # El middleware de sesión actualiza la expiración automáticamente
+        # al recibir cualquier request autenticado.
+        if request.user.is_authenticated:
+            return Response({'message': 'Sesión refrescada'})
+        return Response(
+            {'error': 'No autenticado'}, 
+            status=status.HTTP_401_UNAUTHORIZED
+        )
 
     @action(detail=False, methods=['get'])
     def me(self, request):

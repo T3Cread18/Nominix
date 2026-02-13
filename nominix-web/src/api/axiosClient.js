@@ -13,7 +13,7 @@ import axios from 'axios';
 
 // ============ CONFIGURACIÓN ============
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 const MAX_RETRIES = 2;
 const RETRY_DELAY = 1000; // ms
 
@@ -30,6 +30,26 @@ const axiosClient = axios.create({
     },
     timeout: 30000, // 30 segundos
 });
+
+// ============ CSRF TOKEN FETCHING ============
+
+// Función para obtener el token CSRF manualmente (necesario para Cross-Domain)
+const fetchCsrfToken = async () => {
+    try {
+        const response = await axios.get(`${API_BASE_URL}/auth/csrf/`, {
+            withCredentials: true
+        });
+        if (response.data && response.data.csrfToken) {
+            axiosClient.defaults.headers.common['X-CSRFToken'] = response.data.csrfToken;
+            if (import.meta.env.DEV) console.log('✅ CSRF Token set manually');
+        }
+    } catch (error) {
+        console.warn('⚠️ Could not fetch CSRF token', error);
+    }
+};
+
+// Intentar obtener el token al cargar
+fetchCsrfToken();
 
 // ============ ESTADO DE REFRESH ============
 
@@ -115,7 +135,9 @@ axiosClient.interceptors.response.use(
 
                 // Limpiar estado de auth y redirigir
                 // Nota: En producción, esto debería llamar a logout del AuthContext
-                if (window.location.pathname !== '/login') {
+                // Limpiar estado de auth y redirigir
+                // Nota: En producción, esto debería llamar a logout del AuthContext
+                if (!window.location.pathname.startsWith('/login')) {
                     window.location.href = '/login';
                 }
 
