@@ -80,6 +80,7 @@ SHARED_APPS: List[str] = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.admin',
+    'corsheaders',
     
     # Apps de terceros
     'rest_framework',
@@ -99,6 +100,7 @@ TENANT_APPS: List[str] = [
     # Apps de nómina y RRHH
     'payroll_core',
     'vacations',  # Módulo de Gestión de Vacaciones
+    'biometrics',  # Módulo de Control Biométrico
 ]
 
 # Combinación de todas las apps instaladas
@@ -120,6 +122,7 @@ MIDDLEWARE: List[str] = [
     'django_tenants.middleware.main.TenantMainMiddleware',
     'corsheaders.middleware.CorsMiddleware',  # Debe estar primero
     'django.middleware.security.SecurityMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',

@@ -20,6 +20,7 @@ import TenantsLogin from './features/tenants/TenantsLogin';
 import TenantsAdmin from './features/tenants/TenantsAdmin';
 import VacationManager from './features/vacations/VacationManager';
 import VacationSettings from './features/vacations/VacationSettings';
+import { AttendanceDashboard } from './features/attendance';
 
 /**
  * App - Componente principal de la aplicación.
@@ -98,6 +99,9 @@ function App() {
                 {/* Módulo: Vacaciones */}
                 <Route path="vacations" element={<VacationManager />} />
                 <Route path="vacations/settings" element={<VacationSettings />} />
+
+                {/* Módulo: Asistencia */}
+                <Route path="attendance" element={<AttendanceDashboard />} />
 
                 {/* Fallback */}
                 <Route path="*" element={<Navigate to="/" replace />} />
