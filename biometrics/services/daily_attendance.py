@@ -158,15 +158,6 @@ class DailyAttendanceService:
     def _process_employee_day(employee: Employee, schedule: WorkSchedule, events: List[AttendanceEvent], target_date: date) -> Dict[str, Any]:
         """Procesa los eventos de un empleado para generar sus bloques."""
         
-        # Estructura de bloques
-        # 1. Entrada (Check-In)
-        # 2. Salida Almuerzo (Break-Start)
-        # 3. Retorno Almuerzo (Break-End)
-        # 4. Salida (Check-Out)
-        
-        # Identificar eventos más cercanos a los hitos esperados
-        # Nota: Esto es una simplificación. Un algoritmo real debe considerar el TIPO de evento.
-        
         # Helpers
         def get_dt(t: time):
             return timezone.make_aware(datetime.combine(target_date, t))
@@ -179,43 +170,34 @@ class DailyAttendanceService:
         # Tolerancia
         tolerance = timedelta(minutes=schedule.tolerance_minutes)
         
-        # --- BUSQUEDA DE EVENTOS ---
-        # Buscamos por tipo si existe, o por proximidad temporal
+        # --- CLASIFICACIÓN DINÁMICA POR SECUENCIA ---
+        # Ignora el event_type del dispositivo. Asigna roles basándose
+        # en el orden cronológico de las marcaciones del día.
+        assigned = DailyAttendanceService._assign_events_by_sequence(
+            events, schedule, target_date
+        )
         
-        entry_evt = DailyAttendanceService._find_best_event(events, 'entry', expected_in)
-        lunch_out_evt = DailyAttendanceService._find_best_event(events, 'break_start', expected_lunch_out)
-        lunch_in_evt = DailyAttendanceService._find_best_event(events, 'break_end', expected_lunch_in)
-        exit_evt = DailyAttendanceService._find_best_event(events, 'exit', expected_out)
-        
-        # Si no hay tipos definidos (ej: solo 'other'), usar proximidad
-        # TODO: Implementar lógica de proximidad si event_type es 'unknown'/'other'
-        # Por ahora, confiamos en que los eventos tengan tipo (entry/exit). 
-        # Si no, el sistema requeriría heurística compleja fuera del alcance actual.
+        entry_evt = assigned.get('entry')
+        lunch_out_evt = assigned.get('lunch_out')
+        lunch_in_evt = assigned.get('lunch_in')
+        exit_evt = assigned.get('exit')
         
         # Calcular Status de Bloques
         blocks = {
             'entry': DailyAttendanceService._build_block(entry_evt, expected_in, tolerance, is_entry=True),
-            'lunch_out': DailyAttendanceService._build_block(lunch_out_evt, expected_lunch_out, tolerance, is_entry=False), # Salir antes es malo? Salir a tiempo
+            'lunch_out': DailyAttendanceService._build_block(lunch_out_evt, expected_lunch_out, tolerance, is_entry=False),
             'lunch_in': DailyAttendanceService._build_block(lunch_in_evt, expected_lunch_in, tolerance, is_entry=True),
-            'exit': DailyAttendanceService._build_block(exit_evt, expected_out, tolerance, is_entry=False), # Salir antes es malo
+            'exit': DailyAttendanceService._build_block(exit_evt, expected_out, tolerance, is_entry=False),
         }
         
         # Calcular Tiempo Efectivo
         effective_hours = 0
         if entry_evt and exit_evt:
-            # (Salida - Entrada)
             total = (exit_evt.timestamp - entry_evt.timestamp).total_seconds()
             
-            # Restar almuerzo
             lunch_duration = 0
             if lunch_out_evt and lunch_in_evt:
                 lunch_duration = (lunch_in_evt.timestamp - lunch_out_evt.timestamp).total_seconds()
-            else:
-                 # Si no marcó almuerzo, asumimos la hora legal? O 0?
-                 # Por ahora 0, castigando al empleado o beneficiandolo? 
-                 # Restamos el almuerzo TEÓRICO si no hay marcas? 
-                 # Mejor: solo sumar tiempo real. 
-                 pass
             
             effective_seconds = total - lunch_duration
             effective_hours = max(0, effective_seconds / 3600)
@@ -230,27 +212,96 @@ class DailyAttendanceService:
             'blocks': blocks,
             'effective_hours': round(effective_hours, 2),
             'schedule_name': schedule.name,
-            'is_synced': any(e.event_type != 'manual' for e in [entry_evt, exit_evt] if e) # Ejemplo
+            'is_synced': len(events) > 0,
         }
 
     @staticmethod
-    def _find_best_event(events: List[AttendanceEvent], type_hint: str, expected_time: datetime) -> Optional[AttendanceEvent]:
-        """Encuentra el evento que mejor calza con el tipo y hora."""
-        candidates = [e for e in events if e.event_type == type_hint]
+    def _assign_events_by_sequence(
+        events: List[AttendanceEvent],
+        schedule: WorkSchedule,
+        target_date: date,
+    ) -> Dict[str, Optional[AttendanceEvent]]:
+        """
+        Clasifica las marcaciones del día por secuencia cronológica,
+        ignorando el event_type reportado por el dispositivo.
         
-        # Si no hay candidatos por tipo, buscar en 'unknown' o 'other' cercanos?
-        # Por simplicidad, solo tipos explícitos.
-        if not candidates:
-            # Fallback a 'checkIn'/'checkOut' del texto raw? O proximity?
-            # Busquemos eventos 'unknown' dentro de +/- 30 mins
-            window = timedelta(minutes=60)
-            candidates = [e for e in events if (e.event_type in ['unknown', 'other']) and abs(e.timestamp - expected_time) <= window]
+        Reglas:
+          1 marcación  → entry
+          2 marcaciones → entry + exit
+          3 marcaciones → entry + lunch_out + exit
+          4+ marcaciones → se eligen las 4 mejores por proximidad al horario
+        """
+        result: Dict[str, Optional[AttendanceEvent]] = {
+            'entry': None, 'lunch_out': None, 'lunch_in': None, 'exit': None,
+        }
         
-        if not candidates:
-            return None
+        if not events:
+            return result
+        
+        # Los eventos ya vienen ordenados por timestamp (ORDER BY timestamp)
+        sorted_events = sorted(events, key=lambda e: e.timestamp)
+        n = len(sorted_events)
+        
+        if n == 1:
+            result['entry'] = sorted_events[0]
+        
+        elif n == 2:
+            result['entry'] = sorted_events[0]
+            result['exit'] = sorted_events[1]
+        
+        elif n == 3:
+            result['entry'] = sorted_events[0]
+            result['lunch_out'] = sorted_events[1]
+            result['exit'] = sorted_events[2]
+        
+        else:
+            # 4+ marcaciones: elegir las 4 mejores por proximidad al horario teórico.
+            # Esto descarta marcaciones espurias (doble marcaje accidental).
             
-        # Retornar el más cercano
-        return min(candidates, key=lambda e: abs(e.timestamp - expected_time))
+            def get_dt(t: time):
+                return timezone.make_aware(datetime.combine(target_date, t))
+            
+            expected_times = [
+                ('entry', get_dt(schedule.check_in_time)),
+                ('lunch_out', get_dt(schedule.lunch_start_time)),
+                ('lunch_in', get_dt(schedule.lunch_end_time)),
+                ('exit', get_dt(schedule.check_out_time)),
+            ]
+            
+            # Asignación voraz preservando orden cronológico:
+            # Para cada rol (en orden), encontrar el evento aún no usado
+            # más cercano a la hora esperada, pero respetando que la
+            # asignación mantiene el orden temporal.
+            available = list(sorted_events)
+            
+            for role, expected_dt in expected_times:
+                if not available:
+                    break
+                
+                best_idx = 0
+                best_delta = abs((available[0].timestamp - expected_dt).total_seconds())
+                
+                for i, evt in enumerate(available):
+                    delta = abs((evt.timestamp - expected_dt).total_seconds())
+                    if delta < best_delta:
+                        best_delta = delta
+                        best_idx = i
+                
+                result[role] = available.pop(best_idx)
+            
+            # Validar que el orden cronológico se mantiene.
+            # Si la asignación voraz rompió el orden, corregir con asignación simple.
+            assigned_list = [result[r] for r in ['entry', 'lunch_out', 'lunch_in', 'exit'] if result[r]]
+            timestamps = [e.timestamp for e in assigned_list]
+            
+            if timestamps != sorted(timestamps):
+                # Fallback: asignación directa por posición cronológica
+                result['entry'] = sorted_events[0]
+                result['lunch_out'] = sorted_events[1]
+                result['lunch_in'] = sorted_events[2]
+                result['exit'] = sorted_events[3]
+        
+        return result
 
     @staticmethod
     def _build_block(event: Optional[AttendanceEvent], expected: datetime, tolerance: timedelta, is_entry: bool) -> Dict[str, Any]:
@@ -264,20 +315,16 @@ class DailyAttendanceService:
             }
             
         actual = event.timestamp
-        diff = (actual - expected).total_seconds() / 60 # Minutos. Positivo = Tarde surante entrada.
+        diff = (actual - expected).total_seconds() / 60
         
         tolerance_min = tolerance.total_seconds() / 60
         
-        status = 'success' # Verde
+        status = 'success'
         
         if is_entry:
-            # Entrada: Tarde es malo (> tolerance)
-            # Temprano es bueno o neutro
             if diff > tolerance_min:
                 status = 'danger' if diff > 15 else 'warning'
         else:
-            # Salida: Temprano es malo (< -tolerance)
-            # Tarde es extra
             if diff < -tolerance_min:
                 status = 'danger' if diff < -15 else 'warning'
                 

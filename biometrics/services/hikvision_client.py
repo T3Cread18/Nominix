@@ -209,8 +209,20 @@ class HikvisionClient:
                 - events: list[dict], lista de eventos parseados.
         """
         # Formato de fecha ISAPI: 2026-02-10T00:00:00+00:00
-        start_str = start_time.strftime('%Y-%m-%dT%H:%M:%S+00:00')
-        end_str = end_time.strftime('%Y-%m-%dT%H:%M:%S+00:00')
+        # Si los datetimes son aware, convertir a UTC para la query ISAPI.
+        # Si son naive, asumir que representan la hora local del dispositivo.
+        def format_isapi_time(dt):
+            if dt.tzinfo is not None:
+                # Convertir a UTC y formatear
+                from datetime import timezone as dt_tz
+                utc_dt = dt.astimezone(dt_tz.utc)
+                return utc_dt.strftime('%Y-%m-%dT%H:%M:%S+00:00')
+            else:
+                # Naive: enviar tal cual (hora local del dispositivo)
+                return dt.strftime('%Y-%m-%dT%H:%M:%S+00:00')
+        
+        start_str = format_isapi_time(start_time)
+        end_str = format_isapi_time(end_time)
         
         payload = {
             "AcsEventCond": {
@@ -329,11 +341,12 @@ class HikvisionClient:
         time_str = raw_event.get('time', '')
         try:
             if '+' in time_str or 'Z' in time_str:
+                # El dispositivo envía timestamps con offset (ej: -04:30) → ya es aware
                 timestamp = datetime.fromisoformat(time_str.replace('Z', '+00:00'))
             else:
                 # Si el timestamp es 'naive', lo localizamos en la zona horaria del dispositivo
                 timestamp = datetime.fromisoformat(time_str)
-                if self.device_timezone:
+                if self.device_timezone and timestamp.tzinfo is None:
                     try:
                         import pytz
                         tz = pytz.timezone(self.device_timezone)
