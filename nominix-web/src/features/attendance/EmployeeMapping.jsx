@@ -50,12 +50,19 @@ const EmployeeMapping = () => {
     const loadData = useCallback(async () => {
         setLoading(true);
         try {
-            const [mappingsData, devicesData, employeesData] = await Promise.all([
-                // Fetch all mappings for auto-match logic (page_size large)
+            const results = await Promise.allSettled([
                 attendanceService.getMappings({ page_size: 10000 }),
                 attendanceService.getDevices(),
                 loadEmployees(),
             ]);
+
+            const mappingsData = results[0].status === 'fulfilled' ? results[0].value : [];
+            const devicesData = results[1].status === 'fulfilled' ? results[1].value : [];
+            const employeesData = results[2].status === 'fulfilled' ? results[2].value : [];
+
+            if (results[0].status === 'rejected') console.error('getMappings failed:', results[0].reason);
+            if (results[1].status === 'rejected') console.error('getDevices failed:', results[1].reason);
+            if (results[2].status === 'rejected') console.error('loadEmployees failed:', results[2].reason);
 
             // Handle paginated response structure if present
             const allMappings = mappingsData.results || mappingsData || [];
@@ -79,7 +86,9 @@ const EmployeeMapping = () => {
         }
     }, []);
 
-    // ... (rest of useEffects)
+    useEffect(() => {
+        loadData();
+    }, [loadData]);
 
     // Calculate paginated mappings for table
     const totalCount = mappings.length;
