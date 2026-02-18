@@ -43,15 +43,28 @@ const EmployeeMapping = () => {
     const [formError, setFormError] = useState('');
     const [formSuccess, setFormSuccess] = useState('');
 
+    // State for client-side pagination
+    const [page, setPage] = useState(1);
+    const [pageSize] = useState(20);
+
     const loadData = useCallback(async () => {
         setLoading(true);
         try {
             const [mappingsData, devicesData, employeesData] = await Promise.all([
-                attendanceService.getMappings(),
+                // Fetch all mappings for auto-match logic (page_size large)
+                attendanceService.getMappings({ page_size: 10000 }),
                 attendanceService.getDevices(),
                 loadEmployees(),
             ]);
-            setMappings(Array.isArray(mappingsData) ? mappingsData : []);
+
+            // Handle paginated response structure if present
+            const allMappings = mappingsData.results || mappingsData || [];
+            if (Array.isArray(allMappings)) {
+                setMappings(allMappings);
+            } else {
+                setMappings([]);
+            }
+
             setDevices(Array.isArray(devicesData) ? devicesData : []);
             setEmployees(Array.isArray(employeesData) ? employeesData : []);
 
@@ -66,9 +79,125 @@ const EmployeeMapping = () => {
         }
     }, []);
 
-    useEffect(() => {
-        loadData();
-    }, [loadData]);
+    // ... (rest of useEffects)
+
+    // Calculate paginated mappings for table
+    const totalCount = mappings.length;
+    const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+    const paginatedMappings = mappings.slice((page - 1) * pageSize, page * pageSize);
+
+    const goToPage = (p) => {
+        if (p >= 1 && p <= totalPages) setPage(p);
+    };
+
+    // ... (rest of functions)
+
+    {/* Mapeos Existentes */ }
+    <Card className="border-0">
+        <CardHeader className="border-b border-white/5 pb-3">
+            <CardTitle className="text-sm">
+                Mapeos Existentes
+                {!loading && (
+                    <span className="ml-2 text-gray-400 font-normal">({totalCount})</span>
+                )}
+            </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+            {loading ? (
+                <div className="space-y-2 p-4">
+                    {[...Array(3)].map((_, i) => (
+                        <div key={i} className="h-10 bg-white/5 rounded-lg animate-pulse" />
+                    ))}
+                </div>
+            ) : mappings.length === 0 ? (
+                <div className="text-center py-12 text-gray-400">
+                    <Link2 size={32} className="mx-auto mb-3 opacity-30" />
+                    <p className="text-sm">No hay mapeos configurados</p>
+                    <p className="text-xs mt-1 opacity-60">
+                        Selecciona un dispositivo arriba para detectar coincidencias automáticas
+                    </p>
+                </div>
+            ) : (
+                <>
+                    <div className="overflow-x-auto">
+                        <table className="w-full">
+                            <thead>
+                                <tr className="border-b border-white/5">
+                                    <th className="text-left text-[10px] font-bold uppercase tracking-widest text-gray-400 py-3 px-4">ID Huellero</th>
+                                    <th className="text-left text-[10px] font-bold uppercase tracking-widest text-gray-400 py-3 px-4">Empleado</th>
+                                    <th className="text-left text-[10px] font-bold uppercase tracking-widest text-gray-400 py-3 px-4">Dispositivo</th>
+                                    <th className="text-left text-[10px] font-bold uppercase tracking-widest text-gray-400 py-3 px-4">Estado</th>
+                                    <th className="text-right text-[10px] font-bold uppercase tracking-widest text-gray-400 py-3 px-4">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {paginatedMappings.map((m) => (
+                                    <tr key={m.id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
+                                        <td className="py-3 px-4">
+                                            <span className="text-xs font-mono bg-white/5 px-2 py-1 rounded">
+                                                {m.device_employee_id}
+                                            </span>
+                                        </td>
+                                        <td className="py-3 px-4 text-sm">
+                                            {m.employee_display || m.employee_name || `ID: ${m.employee}`}
+                                        </td>
+                                        <td className="py-3 px-4 text-xs text-gray-400">
+                                            {m.device_display || m.device_name || `ID: ${m.device}`}
+                                        </td>
+                                        <td className="py-3 px-4">
+                                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${m.is_active !== false
+                                                ? 'bg-emerald-500/10 text-emerald-400'
+                                                : 'bg-gray-500/10 text-gray-400'
+                                                }`}>
+                                                {m.is_active !== false ? 'Activo' : 'Inactivo'}
+                                            </span>
+                                        </td>
+                                        <td className="py-3 px-4 text-right">
+                                            <button
+                                                onClick={() => handleDelete(m.id)}
+                                                className="p-1.5 rounded-lg hover:bg-red-500/10 text-gray-400 hover:text-red-400 transition-all"
+                                                title="Eliminar mapeo"
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* Pagination Footer */}
+                    {totalCount > pageSize && (
+                        <div className="flex items-center justify-between px-4 py-3 border-t border-white/5">
+                            <div className="text-xs text-gray-400 font-medium">
+                                Mostrando {((page - 1) * pageSize) + 1}–{Math.min(page * pageSize, totalCount)} de {totalCount}
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => goToPage(page - 1)}
+                                    disabled={page === 1}
+                                    className="p-1.5 rounded-lg hover:bg-white/5 text-gray-400 hover:text-white disabled:opacity-30 disabled:hover:bg-transparent"
+                                >
+                                    <ChevronLeft size={16} />
+                                </button>
+                                <span className="text-xs font-bold text-gray-400">
+                                    Página {page} de {totalPages}
+                                </span>
+                                <button
+                                    onClick={() => goToPage(page + 1)}
+                                    disabled={page >= totalPages}
+                                    className="p-1.5 rounded-lg hover:bg-white/5 text-gray-400 hover:text-white disabled:opacity-30 disabled:hover:bg-transparent"
+                                >
+                                    <ChevronRight size={16} />
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </>
+            )}
+        </CardContent>
+    </Card>
 
     // Cargar usuarios del huellero cuando se selecciona un dispositivo
     const loadDeviceUsers = useCallback(async (deviceId) => {

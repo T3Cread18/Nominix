@@ -15,6 +15,11 @@ const DailyAttendanceView = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
+    // Pagination State
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(50);
+    const [totalCount, setTotalCount] = useState(0);
+
     // Filtros
     const [branch, setBranch] = useState('');
     const [search, setSearch] = useState('');
@@ -29,9 +34,22 @@ const DailyAttendanceView = () => {
             const result = await attendanceService.getDailyAttendance(date, {
                 branch: branch || undefined,
                 search: search || undefined,
-                tz: tz || undefined
+                tz: tz || undefined,
+                page,
+                page_size: pageSize
             });
-            setData(Array.isArray(result) ? result : []);
+
+            if (result && result.results) {
+                setData(result.results);
+                setTotalCount(result.count || 0);
+            } else if (Array.isArray(result)) {
+                // Fallback backend viejo
+                setData(result);
+                setTotalCount(result.length);
+            } else {
+                setData([]);
+                setTotalCount(0);
+            }
         } catch (err) {
             console.error('Error loading daily attendance:', err);
             setError('Error al cargar datos de asistencia');
@@ -39,7 +57,7 @@ const DailyAttendanceView = () => {
         } finally {
             setLoading(false);
         }
-    }, [date, branch, search, tz]);
+    }, [date, branch, search, tz, page, pageSize]);
 
     useEffect(() => {
         // Implementamos un pequeño delay para la búsqueda si el usuario escribe rápido
@@ -50,21 +68,39 @@ const DailyAttendanceView = () => {
         return () => clearTimeout(timer);
     }, [loadData, search]);
 
+    // Reset page when filters change
+    useEffect(() => {
+        setPage(1);
+    }, [date, branch, search, tz]);
+
     const changeDate = (delta) => {
         const d = new Date(date + 'T12:00:00');
         d.setDate(d.getDate() + delta);
         setDate(d.toISOString().split('T')[0]);
     };
 
-    // KPIs
-    const totalEmployees = data.length;
-    const onTime = data.filter(d => d.blocks?.entry?.status === 'success').length;
-    const late = data.filter(d => ['warning', 'danger'].includes(d.blocks?.entry?.status)).length;
-    const missing = data.filter(d => d.blocks?.entry?.status === 'missing').length;
+    const handlePageChange = (newPage) => {
+        if (newPage >= 1 && newPage <= Math.ceil(totalCount / pageSize)) {
+            setPage(newPage);
+        }
+    };
+
+    // KPIs (Note: KPIs only reflect current page data now, ideal would be backend KPIs)
+    // For now, we keep them based on visible data or we should ask backend for summary stats.
+    // Assuming user accepts page-level KPIs for now or we remove them.
+    // The previous code calculated KPIs from `data`. 
+    // Since `data` is now paginated, KPIs are only for the page.
+    // This is often acceptable in large datasets unless backend provides aggregate stats.
+    const totalEmployees = totalCount; // Total count from backend
+    const onTime = data.filter(d => d.blocks?.entry?.status === 'success').length; // Page only
+    const late = data.filter(d => ['warning', 'danger'].includes(d.blocks?.entry?.status)).length; // Page only
+    const missing = data.filter(d => d.blocks?.entry?.status === 'missing').length; // Page only
 
     const handleCorrect = () => {
         alert('Funcionalidad de corrección manual en desarrollo.');
     };
+
+    const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 
     return (
         <div className="space-y-5">
@@ -149,10 +185,10 @@ const DailyAttendanceView = () => {
 
             {/* KPI Cards */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <KpiCard icon={Users} label="Total" value={totalEmployees} bgColor="#f0f4ff" borderColor="#dbe4ff" iconColor="#0052FF" />
-                <KpiCard icon={CheckCircle2} label="A Tiempo" value={onTime} bgColor="#ecfdf5" borderColor="#a7f3d0" iconColor="#059669" />
-                <KpiCard icon={Clock} label="Tarde" value={late} bgColor="#fffbeb" borderColor="#fde68a" iconColor="#d97706" />
-                <KpiCard icon={AlertTriangle} label="Sin Marca" value={missing} bgColor="#fef2f2" borderColor="#fecaca" iconColor="#dc2626" />
+                <KpiCard icon={Users} label="Total (Global)" value={totalEmployees} bgColor="#f0f4ff" borderColor="#dbe4ff" iconColor="#0052FF" />
+                <KpiCard icon={CheckCircle2} label="A Tiempo (Pág)" value={onTime} bgColor="#ecfdf5" borderColor="#a7f3d0" iconColor="#059669" />
+                <KpiCard icon={Clock} label="Tarde (Pág)" value={late} bgColor="#fffbeb" borderColor="#fde68a" iconColor="#d97706" />
+                <KpiCard icon={AlertTriangle} label="Sin Marca (Pág)" value={missing} bgColor="#fef2f2" borderColor="#fecaca" iconColor="#dc2626" />
             </div>
 
             {/* Error */}
@@ -178,26 +214,54 @@ const DailyAttendanceView = () => {
                             <span className="text-xs text-gray-400">Sincronice eventos desde los dispositivos primero</span>
                         </div>
                     ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full border-collapse">
-                                <thead>
-                                    <tr className="border-b border-gray-100">
-                                        <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-gray-400">Colaborador</th>
-                                        <th className="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-gray-400">Entrada</th>
-                                        <th className="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-gray-400">Sal. Almuerzo</th>
-                                        <th className="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-gray-400">Ret. Almuerzo</th>
-                                        <th className="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-gray-400">Salida</th>
-                                        <th className="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-gray-400">Hrs. Efectivas</th>
-                                        <th className="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-gray-400 w-12">Sync</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {data.map((row, idx) => (
-                                        <EmployeeRow key={row.employee?.id || idx} row={row} index={idx} onCorrect={handleCorrect} />
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+                        <>
+                            <div className="overflow-x-auto">
+                                <table className="w-full border-collapse">
+                                    <thead>
+                                        <tr className="border-b border-gray-100">
+                                            <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-gray-400">Colaborador</th>
+                                            <th className="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-gray-400">Entrada</th>
+                                            <th className="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-gray-400">Sal. Almuerzo</th>
+                                            <th className="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-gray-400">Ret. Almuerzo</th>
+                                            <th className="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-gray-400">Salida</th>
+                                            <th className="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-gray-400">Hrs. Efectivas</th>
+                                            <th className="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-gray-400 w-12">Sync</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {data.map((row, idx) => (
+                                            <EmployeeRow key={row.employee?.id || idx} row={row} index={idx} onCorrect={handleCorrect} />
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            {/* Pagination Footer */}
+                            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
+                                <div className="text-xs text-gray-400 font-medium">
+                                    Mostrando {data.length} de {totalCount} colaboradores
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => handlePageChange(page - 1)}
+                                        disabled={page === 1}
+                                        className="p-1.5 rounded-lg hover:bg-gray-50 text-gray-400 hover:text-nominix-dark disabled:opacity-30 disabled:hover:bg-transparent"
+                                    >
+                                        <ChevronLeft size={16} />
+                                    </button>
+                                    <span className="text-xs font-bold text-gray-600">
+                                        Página {page} de {totalPages}
+                                    </span>
+                                    <button
+                                        onClick={() => handlePageChange(page + 1)}
+                                        disabled={page >= totalPages}
+                                        className="p-1.5 rounded-lg hover:bg-gray-50 text-gray-400 hover:text-nominix-dark disabled:opacity-30 disabled:hover:bg-transparent"
+                                    >
+                                        <ChevronRight size={16} />
+                                    </button>
+                                </div>
+                            </div>
+                        </>
                     )}
                 </CardContent>
             </Card>

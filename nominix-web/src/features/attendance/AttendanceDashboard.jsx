@@ -28,37 +28,46 @@ const AttendanceDashboard = () => {
     const loadDashboardData = useCallback(async () => {
         setLoadingDashboard(true);
         try {
-            const [events, mappings] = await Promise.all([
+            // Get today's summary stats, recent events (limited to 20), and total mapping count
+            const [summary, eventsData, mappingsData] = await Promise.all([
+                attendanceService.getSummary(getTodayStr()).catch(() => ({})),
                 attendanceService.getEvents({
+                    page_size: 20,
                     date_from: getTodayStr(),
-                    date_to: getTodayStr(),
-                }).catch(() => []),
-                attendanceService.getMappings().catch(() => []),
+                    date_to: getTodayStr()
+                }).catch(() => ({ results: [] })),
+                attendanceService.getMappings({ page_size: 1 }).catch(() => ({ count: 0 })),
             ]);
 
-            const eventsList = Array.isArray(events) ? events : [];
-            const mappingsList = Array.isArray(mappings) ? mappings : [];
+            const totalEvents = summary.total_events || 0;
+            const uniquePresent = summary.unique_employees || 0;
 
-            // Calcular KPIs
-            const uniqueEmployees = new Set(eventsList.map(e => e.employee_device_id));
-            const entryEvents = eventsList.filter(e => e.event_type === 'entry');
-            const presentIds = new Set(entryEvents.map(e => e.employee_device_id));
+            // Handle mappings response (paginated or list)
+            let totalMappings = 0;
+            if (mappingsData.count !== undefined) {
+                totalMappings = mappingsData.count;
+            } else if (Array.isArray(mappingsData)) {
+                totalMappings = mappingsData.length;
+            } else if (mappingsData.results) {
+                totalMappings = mappingsData.results.length;
+            }
 
             setStats({
-                totalEventsToday: eventsList.length,
-                presentToday: presentIds.size,
-                absentToday: Math.max(0, mappingsList.length - presentIds.size),
-                mappedEmployees: mappingsList.length,
+                totalEventsToday: totalEvents,
+                presentToday: uniquePresent,
+                absentToday: Math.max(0, totalMappings - uniquePresent),
+                mappedEmployees: totalMappings,
             });
 
-            // Últimos 20 eventos (más recientes primero)
-            setRecentEvents(eventsList.slice(0, 20));
+            // Handle events response
+            const recent = eventsData.results || (Array.isArray(eventsData) ? eventsData : []);
+            setRecentEvents(recent);
         } catch (err) {
             console.error('Error loading dashboard data:', err);
         } finally {
             setLoadingDashboard(false);
         }
-    }, []);
+    }, [getTodayStr]);
 
     useEffect(() => {
         loadDashboardData();

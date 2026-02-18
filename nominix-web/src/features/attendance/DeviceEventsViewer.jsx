@@ -158,7 +158,7 @@ const DeviceEventsViewer = () => {
                         </span>
                         <button
                             onClick={() => fetchEvents(page + 1)}
-                            disabled={loading || events.length < pageSize}
+                            disabled={loading || page >= totalPages}
                             className="p-1.5 rounded-lg bg-nominix-smoke border border-gray-200 hover:bg-gray-100 disabled:opacity-30 transition-colors text-gray-500"
                         >
                             <ChevronRight size={16} />

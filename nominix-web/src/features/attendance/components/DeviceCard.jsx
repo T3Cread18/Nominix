@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Card, CardContent } from '../../../components/ui';
-import { Wifi, WifiOff, AlertTriangle, MapPin, Clock, RefreshCw, Settings, Loader2, CheckCircle, XCircle, Users } from 'lucide-react';
+import { Wifi, WifiOff, AlertTriangle, MapPin, Clock, RefreshCw, Settings, Loader2, CheckCircle, XCircle, Users, CalendarClock } from 'lucide-react';
 
 /**
  * DeviceCard - Tarjeta visual de un dispositivo biométrico.
@@ -16,7 +16,7 @@ const STATUS_CONFIG = {
     unknown: { icon: WifiOff, label: 'Desconocido', color: 'text-gray-400', dot: 'bg-gray-400' },
 };
 
-const DeviceCard = ({ device, onTest, onSync, onEdit, onViewUsers }) => {
+const DeviceCard = ({ device, onTest, onSync, onCustomSync, onEdit, onViewUsers }) => {
     const [testing, setTesting] = useState(false);
     const [syncing, setSyncing] = useState(false);
     const [testResult, setTestResult] = useState(null);
@@ -99,8 +99,8 @@ const DeviceCard = ({ device, onTest, onSync, onEdit, onViewUsers }) => {
                 {/* Test Result */}
                 {testResult && (
                     <div className={`flex items-center gap-2 px-3 py-2 rounded-lg mb-3 text-xs font-medium ${testResult.success
-                            ? 'bg-emerald-500/10 text-emerald-400'
-                            : 'bg-red-500/10 text-red-400'
+                        ? 'bg-emerald-500/10 text-emerald-400'
+                        : 'bg-red-500/10 text-red-400'
                         }`}>
                         {testResult.success ? <CheckCircle size={14} /> : <XCircle size={14} />}
                         {testResult.message}
@@ -126,6 +126,13 @@ const DeviceCard = ({ device, onTest, onSync, onEdit, onViewUsers }) => {
                     >
                         {syncing ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
                         Sync
+                    </button>
+                    <button
+                        onClick={() => onCustomSync?.(device)}
+                        className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 transition-all"
+                        title="Sincronizar desde fecha específica"
+                    >
+                        <CalendarClock size={12} />
                     </button>
                     <button
                         onClick={() => onViewUsers?.(device)}

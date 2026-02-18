@@ -11,7 +11,7 @@ class DailyAttendanceService:
     """
     
     @staticmethod
-    def get_daily_summary(target_date: date, branch_id: Optional[int] = None, search_query: Optional[str] = None, tz_name: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_daily_summary(target_date: date, branch_id: Optional[int] = None, search_query: Optional[str] = None, tz_name: Optional[str] = None, page: int = 1, page_size: int = 50) -> Dict[str, Any]:
         """
         Genera el resumen diario de asistencia para todos los empleados activos.
         
@@ -20,9 +20,11 @@ class DailyAttendanceService:
             branch_id: Opcional ID de sede para filtrar.
             search_query: Opcional texto de búsqueda (nombre o cédula).
             tz_name: Opcional nombre de zona horaria para pruebas (ej: 'UTC', 'America/Caracas').
+            page: Número de página (1-based).
+            page_size: Tamaño de página.
             
         Returns:
-            Lista de objetos con informacion de empleado y sus bloques de tiempo.
+            Dict con 'count' (total) y 'results' (lista de objetos).
         """
         # 1. Definir zona horaria de cálculo
         import pytz
@@ -45,9 +47,14 @@ class DailyAttendanceService:
                 Q(national_id__icontains=search_query)
             )
             
-        employees = queryset.all()
+        total_count = queryset.count()
         
-        # 2.1 Obtener turnos dinámicos para este día
+        # Paginación
+        start = (page - 1) * page_size
+        end = start + page_size
+        employees = list(queryset[start:end])
+        
+        # 2.1 Obtener turnos dinámicos para este día (solo para los empleados de la página)
         # Mapa: employee_id -> work_schedule
         daily_shifts = {
             ds.employee_id: ds.work_schedule
@@ -57,26 +64,59 @@ class DailyAttendanceService:
             ).select_related('work_schedule')
         }
         
-        # 3. Obtener eventos del día en la zona horaria seleccionada
+        # 3. Obtener eventos del día + madrugada siguiente (para turnos nocturnos)
         day_start = timezone.make_aware(datetime.combine(target_date, time.min), calc_tz)
-        day_end = timezone.make_aware(datetime.combine(target_date, time.max), calc_tz)
         
-        events = AttendanceEvent.objects.filter(
-            timestamp__range=(day_start, day_end)
+        # [MODIFICADO] Límite de búsqueda: Hasta las 05:00 AM del día siguiente
+        # El usuario solicitó un límite explícito (ej: 5:00 AM) para "tomar prestado" el evento.
+        next_day_limit = timezone.make_aware(datetime.combine(target_date + timedelta(days=1), time(5, 0)), calc_tz)
+        
+        # Para el "Lookback" (evitar duplicados en el día actual), necesitamos saber si el día ANTERIOR
+        # reclamó algún evento de la madrugada de HOY.
+        # Estrategia: Consultar eventos del día anterior (ventana normal + extendida) para ver si quedó abierto.
+        # Esto es costoso (n+1), pero necesario para la deduplicación estricta sin estado persistente.
+        # Optimizacion: Solo hacerlo si encontramos eventos "tempraneros" (antes de las 5 AM) hoy.
+        
+        from django.db.models import Q
+        all_events = AttendanceEvent.objects.filter(
+            timestamp__range=(day_start, next_day_limit)
+        ).filter(
+            Q(employee__in=employees) | Q(employee__isnull=True)
         ).select_related('device').order_by('timestamp')
         
-        # 3. Agrupar eventos por empleado (usando employee_id o employee_device_id mapeado)
+        # Separar eventos del día objetivo y del día siguiente
+        day_end_strict = timezone.make_aware(datetime.combine(target_date, time.max), calc_tz)
+        
+        events_today = []
+        events_next_day = []
+        
+        for evt in all_events:
+            if evt.timestamp <= day_end_strict:
+                events_today.append(evt)
+            else:
+                events_next_day.append(evt)
+
+        # 3.1 Agrupar eventos de HOY por empleado
         events_by_employee = {}
         unmapped_events = []
-        for evt in events:
+        
+        for evt in events_today:
             if evt.employee_id:
                 if evt.employee_id not in events_by_employee:
                     events_by_employee[evt.employee_id] = []
                 events_by_employee[evt.employee_id].append(evt)
             else:
                 unmapped_events.append(evt)
+
+        # 3.2 Agrupar eventos de MAÑANA por empleado (para lookahead)
+        next_day_by_employee = {}
+        for evt in events_next_day:
+            if evt.employee_id:
+                if evt.employee_id not in next_day_by_employee:
+                    next_day_by_employee[evt.employee_id] = []
+                next_day_by_employee[evt.employee_id].append(evt)
         
-        # Fallback: intentar vincular eventos sin mapear por cédula
+        # Fallback: intentar vincular eventos sin mapear por cédula (solo para HOY)
         if unmapped_events:
             # Construir índice: parte numérica de national_id -> employee.id
             cedula_to_emp_id = {}
@@ -98,14 +138,54 @@ class DailyAttendanceService:
         for emp in employees:
             emp_events = events_by_employee.get(emp.id, [])
             
+            # --- PRE-PROCESAMIENTO: DEDUPLICACIÓN (LOOKBACK) ---
+            # Si el PRIMER evento de hoy es de madrugada (antes de las 5:00 AM),
+            # verificar si el día anterior tenía un turno abierto que lo pudiera reclamar.
+            if emp_events:
+                first_evt = emp_events[0]
+                local_first = timezone.localtime(first_evt.timestamp, calc_tz)
+                
+                # Si es antes de las 5 AM
+                if local_first.time() < time(5, 0):
+                    # Chequear el día anterior
+                    prev_date = target_date - timedelta(days=1)
+                    
+                    # Consultamos conteo simple de eventos del día anterior (optimizado)
+                    # Si es IMPAR -> Quedó abierto -> Reclama este evento -> Lo quitamos de hoy.
+                    # Rango del día anterior estricto (00:00 - 23:59)
+                    prev_start = timezone.make_aware(datetime.combine(prev_date, time.min), calc_tz)
+                    prev_end = timezone.make_aware(datetime.combine(prev_date, time.max), calc_tz)
+                    
+                    prev_count = AttendanceEvent.objects.filter(
+                        employee=emp,
+                        timestamp__range=(prev_start, prev_end)
+                    ).count()
+                    
+                    if prev_count % 2 != 0:
+                        # El día anterior quedó abierto. Asumimos que reclamó este evento.
+                        # Lo removemos de la lista de hoy para no duplicar.
+                        emp_events.pop(0)
+
+            # --- LOGICA DE TURNO NOCTURNO (DAYBREAKER - LOOKAHEAD) ---
+            # Si el empleado tiene un número impar de marcajes hoy (ej: Entrada, Salida, Entrada...)
+            # significa que quedó con un turno abierto. Buscamos el primer marcaje del día siguiente
+            # para cerrarlo, asumiendo que es la salida del turno nocturno.
+            if len(emp_events) % 2 != 0:
+                next_events = next_day_by_employee.get(emp.id, [])
+                if next_events:
+                    # Tomamos el primer evento de la madrugada siguiente y lo añadimos a "hoy"
+                    # para que el cálculo de horas lo tome en cuenta.
+                    # OJO: Solo tomamos el primero.
+                    orphan_exit = next_events[0]
+                    emp_events.append(orphan_exit)
+
             # Determinar horario a usar: Prioridad Dinámico > Fijo
             schedule = daily_shifts.get(emp.id)
             
             # Si no hay turno asignado explícitamente, intentar "Best Fit" basado en marcajes
             if not schedule and emp_events:
                 # Buscar primer marcaje del día
-                first_event = emp_events[0] # Ya están ordenados por timestamp
-                first_time = first_event.timestamp.time() # Convert to naive time for comparison? Warning: timezone aware
+                first_event = emp_events[0] # Ya están ordenados
                 
                 # Convertir a datetime naive en la zona horaria de cálculo para comparar con horarios simples
                 local_dt = timezone.localtime(first_event.timestamp, calc_tz)
@@ -152,7 +232,10 @@ class DailyAttendanceService:
 
             summary.append(DailyAttendanceService._process_employee_day(emp, schedule, emp_events, target_date))
             
-        return summary
+        return {
+            'count': total_count,
+            'results': summary
+        }
 
     @staticmethod
     def _process_employee_day(employee: Employee, schedule: WorkSchedule, events: List[AttendanceEvent], target_date: date) -> Dict[str, Any]:

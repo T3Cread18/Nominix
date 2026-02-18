@@ -55,14 +55,14 @@ const attendanceService = {
     },
 
     /** Sincroniza eventos de un dispositivo */
-    syncEvents: async (id) => {
-        const response = await axiosClient.post(`/biometric/devices/${id}/sync_events/`);
+    syncEvents: async (id, data = {}) => {
+        const response = await axiosClient.post(`/biometric/devices/${id}/sync_events/`, data);
         return response.data;
     },
 
     /** Sincroniza todos los dispositivos */
-    syncAll: async () => {
-        const response = await axiosClient.post('/biometric/devices/sync_all/');
+    syncAll: async (data = {}) => {
+        const response = await axiosClient.post('/biometric/devices/sync_all/', data);
         return response.data;
     },
 
@@ -132,9 +132,21 @@ const attendanceService = {
     // ==================== MAPEOS ====================
 
     /** Obtiene todos los mapeos empleado-dispositivo */
-    getMappings: async () => {
-        const response = await axiosClient.get('/biometric/mappings/');
-        return response.data.results || response.data;
+    getMappings: async (params = {}) => {
+        const response = await axiosClient.get('/biometric/mappings/', { params });
+        if (response.data && response.data.results !== undefined) {
+            return response.data;
+        }
+        return { count: response.data.length, results: response.data };
+    },
+
+    /**
+     * Obtiene estadísticas rápidas de eventos para un día.
+     * @param {string} date - YYYY-MM-DD
+     */
+    getSummary: async (date) => {
+        const response = await axiosClient.get('/biometric/events/summary/', { params: { date } });
+        return response.data;
     },
 
     /** Crea un nuevo mapeo empleado-dispositivo */

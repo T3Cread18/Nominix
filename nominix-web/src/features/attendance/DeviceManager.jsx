@@ -5,6 +5,8 @@ import attendanceService from '../../services/attendance.service';
 import DeviceCard from './components/DeviceCard';
 import DeviceFormModal from './components/DeviceFormModal';
 import SyncButton from './components/SyncButton';
+import SyncOptionsModal from './components/SyncOptionsModal';
+import { CalendarClock } from 'lucide-react';
 
 /**
  * DeviceManager - Gestión de dispositivos biométricos.
@@ -16,6 +18,8 @@ const DeviceManager = () => {
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
     const [editDevice, setEditDevice] = useState(null);
+    const [showSyncModal, setShowSyncModal] = useState(false);
+    const [syncTargetDevice, setSyncTargetDevice] = useState(null);
 
     const loadDevices = useCallback(async () => {
         setLoading(true);
@@ -76,12 +80,44 @@ const DeviceManager = () => {
         loadDevices();
     };
 
+    const handleCustomSyncRequest = (device = null) => {
+        setSyncTargetDevice(device);
+        setShowSyncModal(true);
+    };
+
+    const handleSyncConfirm = async (startTime) => {
+        try {
+            let result;
+            if (syncTargetDevice) {
+                // Sync specific device
+                result = await attendanceService.syncEvents(syncTargetDevice.id, { start_time: startTime });
+            } else {
+                // Sync all
+                result = await attendanceService.syncAll({ start_time: startTime });
+            }
+            alert(result?.message || 'Sincronización completada');
+            loadDevices();
+        } catch (err) {
+            console.error('Custom sync error:', err);
+            alert('Error al sincronizar: ' + (err.response?.data?.error || err.message));
+        }
+    };
+
     return (
         <div className="space-y-4">
             {/* Toolbar */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                    <SyncButton onSync={handleSyncAll} label="Sincronizar Todo" />
+                    <div className="flex items-center gap-1">
+                        <SyncButton onSync={handleSyncAll} label="Sincronizar Todo" />
+                        <button
+                            onClick={() => handleCustomSyncRequest(null)}
+                            className="p-2 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 transition-all border border-blue-500/20"
+                            title="Opciones de Sincronización (Fecha específica)"
+                        >
+                            <CalendarClock size={16} />
+                        </button>
+                    </div>
                     <button
                         onClick={loadDevices}
                         className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 transition-all"
@@ -145,6 +181,7 @@ const DeviceManager = () => {
                             device={device}
                             onTest={handleTest}
                             onSync={handleSync}
+                            onCustomSync={handleCustomSyncRequest}
                             onEdit={handleEdit}
                             onViewUsers={handleViewUsers}
                         />
@@ -158,6 +195,14 @@ const DeviceManager = () => {
                 onClose={() => { setShowForm(false); setEditDevice(null); }}
                 device={editDevice}
                 onSaved={handleFormSaved}
+            />
+
+            {/* Sync options modal */}
+            <SyncOptionsModal
+                isOpen={showSyncModal}
+                onClose={() => { setShowSyncModal(false); setSyncTargetDevice(null); }}
+                onConfirm={handleSyncConfirm}
+                title={syncTargetDevice ? `Sincronizar ${syncTargetDevice.name}` : "Sincronización Global Personalizada"}
             />
         </div>
     );

@@ -187,6 +187,7 @@ class HikvisionClient:
         end_time: datetime,
         page_no: int = 0,
         page_size: int = 50,
+        start_position: Optional[int] = None,
         major_event: int = 0,  # 0 = Todos los eventos
         minor_event: int = 0,  # 0 = Todos
     ) -> Dict[str, Any]:
@@ -198,8 +199,9 @@ class HikvisionClient:
         Args:
             start_time: Fecha/hora de inicio.
             end_time: Fecha/hora de fin.
-            page_no: Número de página (0-indexed).
+            page_no: Número de página (0-indexed). Usado si start_position es None.
             page_size: Eventos por página.
+            start_position: Posición de inicio absoluta (override page_no).
             major_event: Tipo mayor (0 = todos, 5 = acceso válido).
             minor_event: Tipo menor (0 = todos los subtipos).
         
@@ -224,10 +226,13 @@ class HikvisionClient:
         start_str = format_isapi_time(start_time)
         end_str = format_isapi_time(end_time)
         
+        # Calculate position
+        position = start_position if start_position is not None else (page_no * page_size)
+
         payload = {
             "AcsEventCond": {
                 "searchID": f"search_{int(datetime.now().timestamp())}",
-                "searchResultPosition": page_no * page_size,
+                "searchResultPosition": position,
                 "maxResults": page_size,
                 "major": major_event,
                 "minor": minor_event,
@@ -262,45 +267,51 @@ class HikvisionClient:
         start_time: datetime,
         end_time: datetime,
         page_size: int = 100,
-        max_pages: int = 50,
+        max_requests: int = 200,
     ) -> List[Dict[str, Any]]:
         """
         Buscar TODOS los eventos de acceso paginando automáticamente.
         
-        Itera por todas las páginas hasta obtener todos los resultados.
+        Itera ajustando start_position basado en los resultados recibidos
+        para manejar dispositivos que retornan menos resultados de los solicitados.
         
         Args:
             start_time: Fecha/hora de inicio.
             end_time: Fecha/hora de fin.
             page_size: Eventos por página.
-            max_pages: Máximo de páginas para evitar loops infinitos.
+            max_requests: Límite de seguridad para evitar loops infinitos.
         
         Returns:
             Lista plana de todos los eventos encontrados.
         """
         all_events = []
-        page_no = 0
+        position = 0
         
-        while page_no < max_pages:
+        for _ in range(max_requests):
             result = self.search_events(
                 start_time=start_time,
                 end_time=end_time,
-                page_no=page_no,
+                start_position=position,
                 page_size=page_size,
             )
             
             events = result.get('events', [])
             total = result.get('total', 0)
             
-            all_events.extend(events)
-            
-            # Si ya tenemos todos o no hay más resultados
-            if len(all_events) >= total or not events:
+            if not events:
                 break
+                
+            all_events.extend(events)
+            position += len(events)
             
-            page_no += 1
+            # Si hemos recuperado el total declarado (o más), terminamos.
+            if total > 0 and len(all_events) >= total:
+                break
+                
+            # Si el total declarado es 0 pero llegaron eventos (caso raro), seguimos.
+            # El break principal es 'if not events' o 'limit reached'.
         
-        logger.info(f"search_events_all: {len(all_events)} eventos descargados en {page_no + 1} páginas")
+        logger.info(f"search_events_all: {len(all_events)} eventos descargados (Total reportado: {total if 'total' in locals() else '?'})")
         return all_events
 
     def _parse_event(self, raw_event: dict) -> Dict[str, Any]:
@@ -353,6 +364,21 @@ class HikvisionClient:
                         timestamp = tz.localize(timestamp)
                     except Exception as e:
                         logger.warning(f"Error localizing timestamp {time_str} with {self.device_timezone}: {e}")
+
+            # [FIX VENEZUELA] 
+            # Algunos dispositivos viejos o mal configurados envían -04:30 (VET antiguo).
+            # Django usa America/Caracas (-04:00).
+            # Si llega -04:30, Python lo convierte a UTC sumando 4:30.
+            # Al mostrar en -04:00, se restan 4:00. Resultado: +30 minutos extra.
+            # SOLUCIÓN: Si detectamos -04:30, forzamos -04:00 manteniendo la "hora reloj" (Wall Time).
+            if timestamp.tzinfo:
+                offset = timestamp.tzinfo.utcoffset(timestamp)
+                # -04:30 = -16200 segundos
+                if offset and int(offset.total_seconds()) == -16200:
+                    from datetime import timezone as dt_tz
+                    vet_tz = dt_tz(timedelta(hours=-4))
+                    timestamp = timestamp.replace(tzinfo=vet_tz)
+
         except (ValueError, AttributeError):
             timestamp = datetime.now()
         

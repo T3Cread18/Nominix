@@ -332,6 +332,7 @@ class EmployeeDeviceMappingViewSet(viewsets.ModelViewSet):
     ).all()
     serializer_class = EmployeeDeviceMappingSerializer
     permission_classes = [permissions.IsAuthenticated]
+    pagination_class = EventPagination
     filter_backends = [filters.OrderingFilter]
     ordering = ['employee__first_name']
     
@@ -377,12 +378,17 @@ class DailyAttendanceViewSet(viewsets.ViewSet):
         search_query = request.query_params.get('search')
         tz_name = request.query_params.get('tz')
         
+        page = int(request.query_params.get('page', 1))
+        page_size = int(request.query_params.get('page_size', 50))
+
         try:
             summary = DailyAttendanceService.get_daily_summary(
                 target_date, 
                 branch_id=branch_id, 
                 search_query=search_query,
-                tz_name=tz_name
+                tz_name=tz_name,
+                page=page,
+                page_size=page_size
             )
             return Response(summary)
         except Exception as e:

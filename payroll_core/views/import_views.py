@@ -22,16 +22,22 @@ class ImportPreviewView(APIView):
     parser_classes = (MultiPartParser, FormParser)
 
     def post(self, request):
+        print(f"DEBUG: ImportPreviewView POST. FILES: {request.FILES.keys()}")
         service = ImportService()
         file_obj = request.FILES.get('file')
         
         if not file_obj:
+            print("DEBUG: No file found in request.FILES")
             return Response({'error': 'No file uploaded'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
+            print(f"DEBUG: Previewing file: {file_obj.name}, size: {file_obj.size}")
             preview = service.preview_file(file_obj)
             return Response(preview)
         except Exception as e:
+            import traceback
+            traceback.print_exc()
+            print(f"DEBUG: Exception in preview_file: {str(e)}")
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 class ImportValidateView(APIView):
@@ -70,6 +76,9 @@ class ImportExecuteView(APIView):
             result = service.execute_import(file_obj, mapping, model_key)
             return Response(result)
         except Exception as e:
+            import traceback
+            traceback.print_exc()
+            print(f"DEBUG: Exception in execute_import: {str(e)}")
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 

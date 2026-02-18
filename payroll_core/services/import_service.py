@@ -1,8 +1,9 @@
 import pandas as pd
+import numpy as np
 import io
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from django.apps import apps
-from django.db import transaction, IntegrityError
+from django.db import models, transaction, IntegrityError
 from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.utils.translation import gettext as _
 from datetime import datetime
@@ -58,11 +59,16 @@ class ImportService:
         
         return fields
 
-    def preview_file(self, file):
+    def _read_clean_file(self, file):
         """
-        Parses the file and returns headers and a preview of data.
+        Reads the file into a DataFrame and sanitizes it for JSON/Django compatibility.
+        - Replaces Infinity/NaN with None
+        - Converts float columns to object to allow None
         """
         try:
+            if hasattr(file, 'seek'):
+                file.seek(0)
+
             if file.name.endswith('.csv'):
                 df = pd.read_csv(file)
             elif file.name.endswith(('.xls', '.xlsx')):
@@ -70,10 +76,28 @@ class ImportService:
             else:
                 raise ValueError("Unsupported file format. Please upload CSV or Excel.")
 
-            # Replace NaN with None for JSON serialization
-            df = df.where(pd.notnull(df), None)
+            # Replace Infinity with NaN first
+            df.replace([np.inf, -np.inf], np.nan, inplace=True)
             
-            headers = list(df.columns)
+            # Convert to object to allow None (instead of NaN) which is JSON compliant
+            # This preserves Timestamps as objects but converts floats/ints to objects
+            df = df.astype(object).where(pd.notnull(df), None)
+            
+            return df
+        except Exception as e:
+             # logging is good practice but let's just re-raise for now as per existing pattern
+             raise e
+
+    def preview_file(self, file):
+        """
+        Parses the file and returns headers and a preview of data.
+        """
+        try:
+            df = self._read_clean_file(file)
+            
+            headers = [str(c) for c in df.columns]
+            
+            # For preview, we can just return the dict since None is handled
             preview_data = df.head(5).to_dict(orient='records')
             
             return {
@@ -85,6 +109,103 @@ class ImportService:
             logger.error(f"Error previewing file: {str(e)}")
             raise
 
+    def _resolve_foreign_keys(self, model, data):
+        """
+        Resolves foreign key fields in the data dict.
+        Input data might contain ID (int), Code (str), or Name (str).
+        We try to find the related instance.
+        """
+        resolved_data = data.copy()
+        
+        for field in model._meta.get_fields():
+            if not field.is_relation or field.many_to_many or field.name not in data:
+                continue
+                
+            value = data[field.name]
+            if value is None:
+                continue
+                
+            related_model = field.related_model
+            
+            # If value is already an instance, skip
+            if isinstance(value, related_model):
+                continue
+                
+            # Try 1: Is it a PK?
+            if isinstance(value, int) or (isinstance(value, str) and value.isdigit()):
+                try:
+                    instance = related_model.objects.get(pk=value)
+                    resolved_data[field.name] = instance
+                    continue
+                except related_model.DoesNotExist:
+                    pass # Try other lookups
+
+            # Try 2: Lookup by 'code' if exists
+            if hasattr(related_model, 'code'):
+                try:
+                    instance = related_model.objects.get(code=value)
+                    resolved_data[field.name] = instance
+                    continue
+                except related_model.DoesNotExist:
+                    pass
+            
+            # Try 3: Lookup by 'name' if exists
+            # Note: Name might not be unique, so we might want to filter and take first?
+            # Or strict unique? Let's try strict first, then lenient.
+            if hasattr(related_model, 'name'):
+                try:
+                    instance = related_model.objects.get(name=value)
+                    resolved_data[field.name] = instance
+                    continue
+                except related_model.MultipleObjectsReturned:
+                     # If duplicate names, this is ambiguous.
+                     raise ValueError(f"Multiple {related_model._meta.verbose_name} found with name '{value}'. Please use Code or ID.")
+                except related_model.DoesNotExist:
+                    pass
+            
+            # Try 4: Lookup by specific fields for certain models
+            if related_model.__name__ == 'Employee':
+                 # By National ID
+                try:
+                    instance = related_model.objects.get(national_id=value)
+                    resolved_data[field.name] = instance
+                    continue
+                except related_model.DoesNotExist:
+                    pass
+            
+            # If we reached here, we couldn't resolve it. 
+            # We assume it might be a valid raw ID that exists but we failed to fetch? 
+            # Or we simply leave it and let django validation fail.
+            # But normally we want to replace the raw value with the Instance if found.
+            # If not found, better to fail hard here or let standard validation catch "Must be instance".
+            
+            # Let's check cache/optimize later. For now, simplistic.
+            pass
+            
+        return resolved_data
+
+    def _clean_field_values(self, model, data):
+        """
+        Cleans field values based on strict model constraints.
+        Mainly converts None to "" for CharField/TextField that are not nullable.
+        """
+        cleaned_data = data.copy()
+        
+        for field in model._meta.get_fields():
+            if field.name not in data:
+                continue
+                
+            value = data[field.name]
+            
+            # Handle CharField/TextField with null=False, blank=True
+            if isinstance(field, (models.CharField, models.TextField)):
+                if value is None and not field.null:
+                    cleaned_data[field.name] = ""
+            
+            # Additional cleaners can go here
+            
+        return cleaned_data
+
     def validate_import(self, file, mapping, model_key):
         """
         Dry-run validation of the import.
@@ -94,51 +215,31 @@ class ImportService:
         errors = []
         
         try:
-            # Re-read file to ensure clean state (or pass dataframe if optimized)
-            # For simplicity, we re-read. In prod, we might cache the file.
-            if hasattr(file, 'seek'):
-                file.seek(0)
-
-            if file.name.endswith('.csv'):
-                df = pd.read_csv(file)
-            elif file.name.endswith(('.xls', '.xlsx')):
-                df = pd.read_excel(file)
+            df = self._read_clean_file(file)
             
-            df = df.where(pd.notnull(df), None)
-            
-            # Helper to check foreign keys
-            fk_caches = {} 
-
             for index, row in df.iterrows():
                 row_errors = []
                 data = {}
                 
                 # Build data dict from mapping
                 for csv_col, model_field in mapping.items():
-                    if not model_field: # Skip ignored columns
-                        continue
-                    
+                    if not model_field: continue
                     val = row.get(csv_col)
-                    
-                    # Basic cleaning
-                    if val == "":
-                         val = None
-
+                    if val == "": val = None
                     data[model_field] = val
 
                 # Validate using Model instance
                 try:
-                    # Check Foreign Keys Resolution
-                    for field_name, value in data.items():
-                        field_obj = model._meta.get_field(field_name)
-                        if field_obj.is_relation and value is not None:
-                             # Assumption: FKs are provided as ID or we need a lookup strategy
-                             # For now, let's assume it attempts ID or fails.
-                             # TODO: Implement "Lookup by Code" or "Lookup by Name"
-                             pass
-
-                    instance = model(**data)
+                    # Resolve FKs
+                    resolved_data = self._resolve_foreign_keys(model, data)
+                    
+                    # Clean strict values (None vs "")
+                    cleaned_data = self._clean_field_values(model, resolved_data)
+                    
+                    instance = model(**cleaned_data)
                     instance.full_clean()
+                except ValueError as e:
+                     row_errors.append(str(e))
                 except ValidationError as e:
                     for field, err_list in e.message_dict.items():
                         for err in err_list:
@@ -148,7 +249,7 @@ class ImportService:
 
                 if row_errors:
                     errors.append({
-                        'row': index + 2, # +2 for header and 0-index
+                        'row': index + 2,
                         'errors': row_errors,
                         'data': row.to_dict()
                     })
@@ -168,15 +269,10 @@ class ImportService:
         updated_count = 0
         errors = []
         
-        if hasattr(file, 'seek'):
-            file.seek(0)
-            
-        if file.name.endswith('.csv'):
-            df = pd.read_csv(file)
-        elif file.name.endswith(('.xls', '.xlsx')):
-            df = pd.read_excel(file)
-            
-        df = df.where(pd.notnull(df), None)
+        try:
+           df = self._read_clean_file(file)
+        except Exception as e:
+            raise e
 
         with transaction.atomic():
             for index, row in df.iterrows():
@@ -188,15 +284,19 @@ class ImportService:
                         if val == "": val = None
                         data[model_field] = val
                     
+                    # Resolve FKs
+                    resolved_data = self._resolve_foreign_keys(model, data)
+                    
+                    # Clean strict values (None vs "")
+                    cleaned_data = self._clean_field_values(model, resolved_data)
+
                     # Naive create for now. 
                     # TODO: Implement "Update if exists" logic based on a key (e.g. ID or Code)
-                    model.objects.create(**data)
+                    model.objects.create(**cleaned_data)
                     created_count += 1
                     
                 except Exception as e:
                     errors.append(f"Row {index+2}: {str(e)}")
-                    # Decide if we break or continue. Transaction atomic means all or nothing usually.
-                    # Use savepoint if partial success is desired. 
                     # For now: strict all-or-nothing.
                     raise e
                     

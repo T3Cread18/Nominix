@@ -245,6 +245,27 @@ class BiometricSyncService:
                             mappings[employee_device_id] = employee
                             logger.info(f"Auto-mapeado: device_id='{employee_device_id}' -> {employee.full_name} (CI: {employee.national_id})")
                     
+                    # DEDUPLICATION LOGIC:
+                    # Check if there is already an event for this employee on this device
+                    # within the last 5 minutes.
+                    time_window = timedelta(minutes=5)
+                    min_time = event_data['timestamp'] - time_window
+                    max_time = event_data['timestamp'] + time_window
+                    
+                    # We check for existing events in the DB to avoid re-inserting
+                    # similar events that might be considered "duplicates" by business logic
+                    # even if they have different seconds.
+                    duplicate_exists = AttendanceEvent.objects.filter(
+                        device=device,
+                        employee_device_id=employee_device_id,
+                        timestamp__range=(min_time, max_time)
+                    ).exists()
+                    
+                    if duplicate_exists:
+                        # Skip this event as it is considered a duplicate/bounce
+                        stats['duplicates'] += 1
+                        continue
+
                     event, created = AttendanceEvent.objects.get_or_create(
                         device=device,
                         employee_device_id=employee_device_id,
