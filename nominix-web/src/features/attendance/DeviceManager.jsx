@@ -7,6 +7,7 @@ import DeviceFormModal from './components/DeviceFormModal';
 import SyncButton from './components/SyncButton';
 import SyncOptionsModal from './components/SyncOptionsModal';
 import { CalendarClock } from 'lucide-react';
+import { toast } from 'sonner';
 
 /**
  * DeviceManager - Gestión de dispositivos biométricos.
@@ -28,6 +29,9 @@ const DeviceManager = () => {
             setDevices(Array.isArray(data) ? data : []);
         } catch (err) {
             console.error('Error loading devices:', err);
+            toast.error('Error al cargar dispositivos', {
+                description: err?.response?.data?.error || err.message,
+            });
             setDevices([]);
         } finally {
             setLoading(false);
@@ -61,13 +65,23 @@ const DeviceManager = () => {
     };
 
     const handleViewUsers = async (device) => {
+        const toastId = toast.loading(`Consultando usuarios de "${device.name}"...`);
         try {
             const result = await attendanceService.getDeviceUsers(device.id);
             const users = result.users || result;
             const count = result.total || users.length;
-            alert(`Usuarios en "${device.name}": ${count}\n\n${users.map(u => `• ${u.employee_no} - ${u.name || 'Sin nombre'}`).join('\n') || 'No se encontraron usuarios'}`);
+            toast.success(`${device.name}: ${count} usuario(s) registrado(s)`, {
+                id: toastId,
+                description: users.length > 0
+                    ? users.slice(0, 5).map(u => `${u.employee_no} - ${u.name || 'Sin nombre'}`).join(' · ') + (users.length > 5 ? ` ... y ${users.length - 5} más` : '')
+                    : 'No se encontraron usuarios en este dispositivo.',
+                duration: 8000,
+            });
         } catch (err) {
-            alert(`Error al obtener usuarios: ${err?.response?.data?.error || err.message}`);
+            toast.error(`Error al obtener usuarios de "${device.name}"`, {
+                id: toastId,
+                description: err?.response?.data?.error || err.message,
+            });
         }
     };
 
@@ -86,20 +100,35 @@ const DeviceManager = () => {
     };
 
     const handleSyncConfirm = async (startTime) => {
+        const deviceName = syncTargetDevice?.name || 'Todos los dispositivos';
+        const toastId = toast.loading(`Sincronizando ${deviceName}...`, {
+            description: startTime ? `Desde: ${startTime}` : 'Usando lógica automática (último evento).',
+        });
+
         try {
             let result;
             if (syncTargetDevice) {
-                // Sync specific device
                 result = await attendanceService.syncEvents(syncTargetDevice.id, { start_time: startTime });
             } else {
-                // Sync all
                 result = await attendanceService.syncAll({ start_time: startTime });
             }
-            alert(result?.message || 'Sincronización completada');
+
+            const stats = Array.isArray(result) ? result[0] : result;
+            const newEvents = stats?.new_events ?? 0;
+            const totalDl = stats?.total_downloaded ?? 0;
+
+            toast.success(`${deviceName}: Sincronización completada`, {
+                id: toastId,
+                description: `📥 ${totalDl} descargados · ✅ ${newEvents} nuevos`,
+                duration: 6000,
+            });
             loadDevices();
         } catch (err) {
-            console.error('Custom sync error:', err);
-            alert('Error al sincronizar: ' + (err.response?.data?.error || err.message));
+            toast.error(`Error al sincronizar ${deviceName}`, {
+                id: toastId,
+                description: err.response?.data?.error || err.message,
+                duration: 8000,
+            });
         }
     };
 

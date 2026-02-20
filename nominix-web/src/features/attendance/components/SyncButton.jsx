@@ -1,66 +1,90 @@
 import React, { useState } from 'react';
-import { RefreshCw, Loader2, CheckCircle, XCircle } from 'lucide-react';
+import { RefreshCw, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 /**
- * SyncButton - Botón de sincronización con estados: idle, syncing, success, error.
+ * SyncButton - Botón de sincronización global con toast de sonner.
  */
 const SyncButton = ({ onSync, label = 'Sincronizar Todo', className = '' }) => {
-    const [state, setState] = useState('idle'); // idle | syncing | success | error
-    const [resultMsg, setResultMsg] = useState('');
+    const [syncing, setSyncing] = useState(false);
 
     const handleClick = async () => {
-        if (state === 'syncing') return;
-        setState('syncing');
-        setResultMsg('');
+        if (syncing) return;
+        setSyncing(true);
+
+        const toastId = toast.loading('Sincronizando todos los dispositivos...', {
+            description: 'Esto puede tardar unos segundos dependiendo de la cantidad de dispositivos.',
+        });
+
         try {
             const result = await onSync?.();
-            setState('success');
-            setResultMsg(result?.message || 'Sincronización completada');
+            const results = Array.isArray(result) ? result : [result];
+
+            // Aggregate stats across all devices
+            let totalNew = 0, totalDuplicates = 0, totalDownloaded = 0, totalErrors = 0;
+            const deviceSummaries = [];
+
+            for (const r of results) {
+                if (!r) continue;
+                const newE = r.new_events ?? 0;
+                const dupE = r.duplicates ?? 0;
+                const dlE = r.total_downloaded ?? 0;
+                const errE = (r.errors || []).length;
+                totalNew += newE;
+                totalDuplicates += dupE;
+                totalDownloaded += dlE;
+                totalErrors += errE;
+
+                if (newE > 0 || errE > 0) {
+                    deviceSummaries.push(`${r.device || '?'}: ${newE} nuevos${errE > 0 ? ` (${errE} errores)` : ''}`);
+                }
+            }
+
+            if (totalErrors > 0) {
+                toast.warning('Sincronización completada con advertencias', {
+                    id: toastId,
+                    description: `📥 ${totalDownloaded} descargados · ✅ ${totalNew} nuevos · ⚠️ ${totalErrors} errores\n${deviceSummaries.join(' | ')}`,
+                    duration: 10000,
+                });
+            } else if (totalNew === 0) {
+                toast.info('Sin eventos nuevos', {
+                    id: toastId,
+                    description: `Se consultaron ${results.length} dispositivo(s). No se encontraron eventos nuevos.`,
+                    duration: 5000,
+                });
+            } else {
+                toast.success('Sincronización completada', {
+                    id: toastId,
+                    description: `📥 ${totalDownloaded} descargados · ✅ ${totalNew} nuevos · 🔄 ${totalDuplicates} duplicados`,
+                    duration: 6000,
+                });
+            }
         } catch (err) {
-            setState('error');
-            setResultMsg(err?.response?.data?.error || 'Error al sincronizar');
+            const errorMsg = err?.response?.data?.error || err?.response?.data?.message || err.message;
+            toast.error('Error al sincronizar', {
+                id: toastId,
+                description: errorMsg,
+                duration: 8000,
+            });
         } finally {
-            setTimeout(() => {
-                setState('idle');
-                setResultMsg('');
-            }, 4000);
+            setSyncing(false);
         }
     };
-
-    const stateConfig = {
-        idle: {
-            icon: RefreshCw,
-            text: label,
-            class: 'bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border-blue-500/20',
-        },
-        syncing: {
-            icon: Loader2,
-            text: 'Sincronizando...',
-            class: 'bg-blue-500/10 text-blue-400 border-blue-500/20 cursor-wait',
-        },
-        success: {
-            icon: CheckCircle,
-            text: resultMsg || 'Completado',
-            class: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-        },
-        error: {
-            icon: XCircle,
-            text: resultMsg || 'Error',
-            class: 'bg-red-500/10 text-red-400 border-red-500/20',
-        },
-    };
-
-    const config = stateConfig[state];
-    const Icon = config.icon;
 
     return (
         <button
             onClick={handleClick}
-            disabled={state === 'syncing'}
-            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl border text-xs font-bold uppercase tracking-wider transition-all ${config.class} ${className}`}
+            disabled={syncing}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl border text-xs font-bold uppercase tracking-wider transition-all ${syncing
+                    ? 'bg-blue-500/10 text-blue-400 border-blue-500/20 cursor-wait'
+                    : 'bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border-blue-500/20'
+                } ${className}`}
         >
-            <Icon size={14} className={state === 'syncing' ? 'animate-spin' : ''} />
-            <span className="truncate max-w-[200px]">{config.text}</span>
+            {syncing
+                ? <Loader2 size={14} className="animate-spin" />
+                : <RefreshCw size={14} />
+            }
+            <span className="truncate max-w-[200px]">{syncing ? 'Sincronizando...' : label}</span>
         </button>
     );
 };

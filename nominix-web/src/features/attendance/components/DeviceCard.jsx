@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Card, CardContent } from '../../../components/ui';
 import { Wifi, WifiOff, AlertTriangle, MapPin, Clock, RefreshCw, Settings, Loader2, CheckCircle, XCircle, Users, CalendarClock } from 'lucide-react';
+import { toast } from 'sonner';
 
 /**
  * DeviceCard - Tarjeta visual de un dispositivo biométrico.
@@ -19,7 +20,6 @@ const STATUS_CONFIG = {
 const DeviceCard = ({ device, onTest, onSync, onCustomSync, onEdit, onViewUsers }) => {
     const [testing, setTesting] = useState(false);
     const [syncing, setSyncing] = useState(false);
-    const [testResult, setTestResult] = useState(null);
 
     const status = STATUS_CONFIG[device.status] || STATUS_CONFIG.unknown;
     const StatusIcon = status.icon;
@@ -27,25 +27,82 @@ const DeviceCard = ({ device, onTest, onSync, onCustomSync, onEdit, onViewUsers 
     const handleTest = async () => {
         if (!onTest || testing) return;
         setTesting(true);
-        setTestResult(null);
         try {
             const result = await onTest(device.id);
-            setTestResult({ success: true, message: result?.message || 'Conexión exitosa' });
+            toast.success(`${device.name}: Conexión exitosa`, {
+                description: result?.device_info
+                    ? `Modelo: ${result.device_info.model_name || 'N/A'} · S/N: ${result.device_info.serial_number || 'N/A'}`
+                    : result?.message || 'Dispositivo respondió correctamente.',
+            });
         } catch (err) {
-            setTestResult({ success: false, message: err?.response?.data?.error || 'Error de conexión' });
+            const errorData = err?.response?.data;
+            const errorType = errorData?.error_type;
+            const errorMsg = errorData?.message || errorData?.error || err.message;
+
+            if (errorType === 'auth') {
+                toast.error(`${device.name}: Autenticación fallida`, {
+                    description: `Credenciales incorrectas o dispositivo bloqueado. ${errorMsg}`,
+                });
+            } else if (errorType === 'connection') {
+                toast.error(`${device.name}: Sin conexión`, {
+                    description: `No se puede alcanzar ${device.ip_address}:${device.port}. Verifica que el dispositivo esté encendido y accesible.`,
+                });
+            } else {
+                toast.error(`${device.name}: Error de conexión`, {
+                    description: errorMsg,
+                });
+            }
         } finally {
             setTesting(false);
-            setTimeout(() => setTestResult(null), 5000);
         }
     };
 
     const handleSync = async () => {
         if (!onSync || syncing) return;
         setSyncing(true);
+
+        const toastId = toast.loading(`Sincronizando ${device.name}...`, {
+            description: `Descargando eventos desde ${device.ip_address}`,
+        });
+
         try {
-            await onSync(device.id);
+            const result = await onSync(device.id);
+
+            // Parse sync result stats
+            const stats = Array.isArray(result) ? result[0] : result;
+            const newEvents = stats?.new_events ?? 0;
+            const duplicates = stats?.duplicates ?? 0;
+            const total = stats?.total_downloaded ?? 0;
+            const mapped = stats?.mapped_to_employees ?? 0;
+            const unmapped = stats?.unmapped ?? 0;
+            const errors = stats?.errors || [];
+
+            if (errors.length > 0) {
+                toast.warning(`${device.name}: Sincronización con advertencias`, {
+                    id: toastId,
+                    description: `${newEvents} nuevos, ${duplicates} duplicados. ⚠️ ${errors[0]}`,
+                    duration: 8000,
+                });
+            } else if (newEvents === 0 && total === 0) {
+                toast.info(`${device.name}: Sin eventos nuevos`, {
+                    id: toastId,
+                    description: 'No se encontraron eventos en el rango de fechas consultado.',
+                    duration: 5000,
+                });
+            } else {
+                toast.success(`${device.name}: Sincronización completada`, {
+                    id: toastId,
+                    description: `📥 ${total} descargados · ✅ ${newEvents} nuevos · 🔄 ${duplicates} duplicados${unmapped > 0 ? ` · ⚠️ ${unmapped} sin mapear` : ''}`,
+                    duration: 6000,
+                });
+            }
         } catch (err) {
-            console.error('Sync error:', err);
+            const errorMsg = err?.response?.data?.error || err?.response?.data?.message || err.message;
+            toast.error(`${device.name}: Error al sincronizar`, {
+                id: toastId,
+                description: errorMsg,
+                duration: 8000,
+            });
         } finally {
             setSyncing(false);
         }
@@ -95,17 +152,6 @@ const DeviceCard = ({ device, onTest, onSync, onCustomSync, onEdit, onViewUsers 
                         </div>
                     )}
                 </div>
-
-                {/* Test Result */}
-                {testResult && (
-                    <div className={`flex items-center gap-2 px-3 py-2 rounded-lg mb-3 text-xs font-medium ${testResult.success
-                        ? 'bg-emerald-500/10 text-emerald-400'
-                        : 'bg-red-500/10 text-red-400'
-                        }`}>
-                        {testResult.success ? <CheckCircle size={14} /> : <XCircle size={14} />}
-                        {testResult.message}
-                    </div>
-                )}
 
                 {/* Actions */}
                 <div className="flex items-center gap-2 pt-3 border-t border-white/5">
