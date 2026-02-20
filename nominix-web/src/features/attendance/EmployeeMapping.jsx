@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui';
-import { Link2, UserPlus, Trash2, Search, AlertTriangle, Loader2, CheckCircle, RefreshCw, Wifi, UserCheck, UserX } from 'lucide-react';
+import { Link2, UserPlus, Trash2, Search, AlertTriangle, Loader2, CheckCircle, RefreshCw, Wifi, UserCheck, UserX, ChevronLeft, ChevronRight } from 'lucide-react';
 import attendanceService from '../../services/attendance.service';
 import axiosClient from '../../api/axiosClient';
 
