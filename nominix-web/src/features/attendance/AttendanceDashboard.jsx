@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Fingerprint, LayoutDashboard, Wifi, Link2, CalendarDays, List } from 'lucide-react';
+import { Fingerprint, LayoutDashboard, Wifi, Link2, CalendarDays, Calendar, List } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui';
 import { PageHeader } from '../../components/layout';
 import attendanceService from '../../services/attendance.service';
@@ -12,6 +12,7 @@ import AttendanceStats from './components/AttendanceStats';
 import EventsTable from './components/EventsTable';
 import DeviceEventsViewer from './DeviceEventsViewer';
 import DailyAttendanceView from './DailyAttendanceView';
+import WeeklyAttendanceView from './WeeklyAttendanceView';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui';
 
 /**
@@ -81,7 +82,8 @@ const AttendanceDashboard = () => {
     }, [activeTab]);
 
     const tabs = [
-        { value: 'daily', label: 'Control Diario', icon: CalendarDays },
+        { value: 'daily', label: 'Diario', icon: CalendarDays },
+        { value: 'weekly', label: 'Semanal', icon: Calendar },
         { value: 'log', label: 'Registro', icon: List },
         { value: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
         { value: 'devices', label: 'Dispositivos', icon: Wifi },
@@ -114,6 +116,13 @@ const AttendanceDashboard = () => {
                 <TabsContent value="daily">
                     <div className="mt-4">
                         <DailyAttendanceView />
+                    </div>
+                </TabsContent>
+
+                {/* Tab: Control Semanal */}
+                <TabsContent value="weekly">
+                    <div className="mt-4">
+                        <WeeklyAttendanceView />
                     </div>
                 </TabsContent>
 

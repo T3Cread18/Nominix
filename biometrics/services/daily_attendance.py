@@ -47,6 +47,9 @@ class DailyAttendanceService:
                 Q(national_id__icontains=search_query)
             )
             
+        # Ensure deterministic ordering for stable pagination
+        queryset = queryset.order_by('last_name', 'first_name', 'id')
+            
         total_count = queryset.count()
         
         # Paginación
