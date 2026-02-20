@@ -5,21 +5,30 @@ import attendanceService from '../../services/attendance.service';
 import { useBranches } from '../../hooks/useOrganization';
 
 /**
- * Gets a week's date range (Monday to Sunday) given any date in the week.
+ * Gets a week's date range (Monday to Sunday) given any date string (YYYY-MM-DD).
+ * Creates dates assuming local time at midnight to prevent timezone boundary drifts.
  */
 function getWeekRange(dateStr) {
-    const d = new Date(dateStr + 'T12:00:00');
-    // Ensure getDay() handles 0 as Sunday (we want Monday as start)
-    const day = d.getDay() === 0 ? 7 : d.getDay();
+    const [year, month, day] = dateStr.split('-').map(Number);
+    // Create date at noon local time to avoid timezone edge cases around midnight
+    const d = new Date(year, month - 1, day, 12, 0, 0);
 
+    // getDay() is 0 (Sun) to 6 (Sat). We want Monday=1, Sunday=7.
+    const dayOfWeek = d.getDay() === 0 ? 7 : d.getDay();
+
+    // Go to Monday
     const monday = new Date(d);
-    monday.setDate(d.getDate() - day + 1);
+    monday.setDate(d.getDate() - dayOfWeek + 1);
 
     const dates = [];
     for (let i = 0; i < 7; i++) {
         const next = new Date(monday);
         next.setDate(monday.getDate() + i);
-        dates.push(next.toISOString().split('T')[0]);
+        // Format to YYYY-MM-DD using local methods to preserve the exact date
+        const y = next.getFullYear();
+        const m = String(next.getMonth() + 1).padStart(2, '0');
+        const dd = String(next.getDate()).padStart(2, '0');
+        dates.push(`${y}-${m}-${dd}`);
     }
     return dates;
 }
@@ -111,6 +120,9 @@ const WeeklyAttendanceView = () => {
                     search: search || undefined,
                     page,
                     page_size: pageSize
+                }).catch(err => {
+                    console.warn(`Error fetching ${date}:`, err);
+                    return { count: 0, results: [] };
                 })
             );
 
