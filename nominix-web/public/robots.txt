@@ -1,0 +1,11 @@
+# Nominix Landing Page - robots.txt
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://nominix.net/sitemap.xml
+
+# Disallow admin paths
+User-agent: *
+Disallow: /dashboard
+Disallow: /api/

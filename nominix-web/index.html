@@ -1,16 +1,173 @@
 <!DOCTYPE html>
 <html lang="es">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Nóminix - SaaS de RRHH Vzla</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- SEO Primary Meta Tags -->
+  <title>Nominix — Plataforma de Gestión de RRHH para Venezuela | Nómina, Biometría y Vacaciones</title>
+  <meta name="description"
+    content="Nominix es la plataforma SaaS de Recursos Humanos diseñada para Venezuela. Nómina multimoneda (USD/VES), control biométrico Hikvision, vacaciones LOTTT y más. Desde $1/empleado al mes." />
+  <meta name="keywords"
+    content="nómina Venezuela, RRHH Venezuela, recursos humanos software, control de asistencia biométrico, vacaciones LOTTT, gestión de personal, software nómina multimoneda, Nominix, Vexitech" />
+  <meta name="author" content="Vexitech" />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="https://nominix.net/" />
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://nominix.net/" />
+  <meta property="og:title" content="Nominix — Gestión de RRHH Inteligente para Venezuela" />
+  <meta property="og:description"
+    content="Nómina multimoneda, biometría en tiempo real y cumplimiento LOTTT. Todo unificado en una plataforma rápida, moderna y desde $1/empleado." />
+  <meta property="og:site_name" content="Nominix" />
+  <meta property="og:locale" content="es_VE" />
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Nominix — Gestión de RRHH Inteligente para Venezuela" />
+  <meta name="twitter:description"
+    content="Nómina multimoneda, biometría en tiempo real y cumplimiento LOTTT. Todo unificado en una plataforma rápida, moderna y desde $1/empleado." />
+
+  <!-- Theme & Mobile -->
+  <meta name="theme-color" content="#0A0A0F" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
+    rel="stylesheet">
+
+  <!-- JSON-LD Structured Data -->
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "Nominix",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Web",
+      "description": "Plataforma SaaS de gestión de Recursos Humanos para Venezuela. Nómina multimoneda, control biométrico, vacaciones LOTTT y más.",
+      "url": "https://nominix.net",
+      "offers": {
+        "@type": "Offer",
+        "price": "1.00",
+        "priceCurrency": "USD",
+        "priceSpecification": {
+          "@type": "UnitPriceSpecification",
+          "price": "1.00",
+          "priceCurrency": "USD",
+          "unitText": "empleado/mes",
+          "billingDuration": "P1M"
+        }
+      },
+      "author": {
+        "@type": "Organization",
+        "name": "Vexitech",
+        "email": "info@vexitech.net",
+        "url": "https://nominix.net",
+        "contactPoint": {
+          "@type": "ContactPoint",
+          "telephone": "+58-412-055-0562",
+          "contactType": "sales",
+          "availableLanguage": "Spanish"
+        }
+      },
+      "featureList": [
+        "Nómina multimoneda USD/VES",
+        "Control biométrico Hikvision",
+        "Vacaciones LOTTT automáticas",
+        "Gestión de personal",
+        "Préstamos y deducciones",
+        "Importación masiva Excel",
+        "Multi-empresa SaaS",
+        "Auditoría completa"
+      ]
+    }
+    </script>
+
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "Vexitech",
+      "url": "https://nominix.net",
+      "logo": "https://nominix.net/vite.svg",
+      "email": "info@vexitech.net",
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "telephone": "+58-412-055-0562",
+        "contactType": "sales",
+        "availableLanguage": "Spanish"
+      },
+      "sameAs": []
+    }
+    </script>
+
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "¿Qué incluye el precio por empleado?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Todo. Todos los módulos, todas las funcionalidades, sin restricciones. Pagas solo por la cantidad de empleados activos en tu empresa."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Hay un período de prueba?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Sí, ofrecemos 14 días de prueba gratuita con acceso completo a todos los módulos. No se requiere tarjeta de crédito."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Puedo cancelar en cualquier momento?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Absolutamente. No hay contratos a largo plazo ni penalidades por cancelación. Tu data siempre es tuya."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Cómo se calcula el número de empleados?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Se cuenta la cantidad de empleados activos al momento de la facturación. Empleados inactivos o dados de baja no se cuentan."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Aceptan pagos en bolívares?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Sí, aceptamos pagos en USD y VES (al tipo de cambio BCV del día). También aceptamos transferencias bancarias y Zelle."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Incluye soporte para implementación?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Sí, incluimos asistencia en la configuración inicial, migración de datos y capacitación básica sin costo adicional."
+          }
+        }
+      ]
+    }
+    </script>
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.jsx"></script>
+</body>
+
 </html>

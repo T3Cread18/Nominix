@@ -7,6 +7,9 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 // --- LAYOUTS ---
 import { DashboardLayout, TenantAdminLayout } from './components/layout';
 
+// --- LANDING PAGE ---
+import LandingPage from './features/landing/LandingPage';
+
 // --- IMPORTACIÓN DE MÓDULOS (Páginas) ---
 import PersonnelManager from './features/hr/PersonnelManager';
 import EmployeeFormPage from './features/hr/EmployeeFormPage';
@@ -26,16 +29,31 @@ import ImportWizard from './features/import/ImportWizard';
 /**
  * App - Componente principal de la aplicación.
  * 
- * Refactorizado para usar:
- * - DashboardLayout con React Router Outlet (elimina duplicación de nav/footer)
- * - Rutas anidadas para mejor organización
- * - Navbar y PageHeader extraídos a componentes reutilizables
+ * Implementa enrutamiento basado en dominios:
+ * - Dominio raíz (localhost, nominix.net) -> Landing Page
+ * - Subdominios (admin.*, tenant.*) -> Aplicación SaaS
  */
 function App() {
     const { user, loading, tenant } = useAuth();
     const location = useLocation();
 
     const isTenantAdminPath = location.pathname.startsWith('/tenants');
+
+    // Detectar dominio
+    const hostname = window.location.hostname;
+    // Lista de dominios que muestran la Landing Page
+    const isLandingDomain =
+        hostname === 'localhost' ||
+        hostname === 'nominix.net' ||
+        hostname === 'www.nominix.net';
+
+    // Si estamos en el dominio principal y en la raíz, mostrar Landing Page
+    // (Permitimos /tenants o rutas específicas si fuera necesario, pero por defecto Landing)
+    if (isLandingDomain && !isTenantAdminPath && location.pathname === '/') {
+        return <LandingPage />;
+    }
+
+    // --- LÓGICA DE APLICACIÓN SAAS (Subdominios) ---
 
     // Loading state
     if (loading) {
@@ -56,9 +74,13 @@ function App() {
         return <LoginPage />;
     }
 
-    // Proteger contra acceso a apps de inquilino desde el dominio público
+    // Proteger contra acceso a apps de inquilino desde el dominio público (si se coló)
+    // Aunque ahora con la Landing Page esto es menos probable, mantenemos la seguridad
     const isPublicSchema = tenant?.schema_name === 'public';
+    // Si es esquema público y NO es admin path, redirigir a selección de tenant o landing
     if (isPublicSchema && !isTenantAdminPath) {
+        // Opción: Redirigir a landing si intenta entrar a app desde public
+        if (isLandingDomain) return <LandingPage />;
         return <Navigate to="/tenants" replace />;
     }
 
