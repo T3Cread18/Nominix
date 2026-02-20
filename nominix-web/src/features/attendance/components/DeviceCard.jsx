@@ -11,10 +11,10 @@ import { toast } from 'sonner';
  */
 
 const STATUS_CONFIG = {
-    online: { icon: Wifi, label: 'En línea', color: 'text-emerald-400', dot: 'bg-emerald-400' },
-    offline: { icon: WifiOff, label: 'Fuera de línea', color: 'text-red-400', dot: 'bg-red-400' },
-    error: { icon: AlertTriangle, label: 'Error', color: 'text-amber-400', dot: 'bg-amber-400' },
-    unknown: { icon: WifiOff, label: 'Desconocido', color: 'text-gray-400', dot: 'bg-gray-400' },
+    online: { icon: Wifi, label: 'EN LÍNEA', color: 'text-emerald-500', bgColor: 'bg-emerald-50 border-emerald-100', dot: 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' },
+    offline: { icon: WifiOff, label: 'OFFLINE', color: 'text-red-500', bgColor: 'bg-red-50 border-red-100', dot: 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]' },
+    error: { icon: AlertTriangle, label: 'ERROR', color: 'text-amber-500', bgColor: 'bg-amber-50 border-amber-100', dot: 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]' },
+    unknown: { icon: WifiOff, label: 'DESCONOCIDO', color: 'text-gray-500', bgColor: 'bg-gray-50 border-gray-200', dot: 'bg-gray-400' },
 };
 
 const DeviceCard = ({ device, onTest, onSync, onCustomSync, onEdit, onViewUsers }) => {
@@ -121,11 +121,23 @@ const DeviceCard = ({ device, onTest, onSync, onCustomSync, onEdit, onViewUsers 
                             {device.model_name || device.device_type_display || 'Hikvision'}
                         </p>
                     </div>
-                    <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg bg-white/5 ${status.color}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${status.dot} animate-pulse`} />
-                        <span className="text-[9px] font-bold uppercase tracking-wider">
-                            {status.label}
-                        </span>
+                    <div className="relative group/status flex items-center justify-end">
+                        <div className={`flex items-center justify-center min-w-[100px] h-[26px] gap-2 px-3 rounded-lg border shadow-sm transition-all duration-300 ${status.color} ${status.bgColor} ${status.borderColor}`}>
+                            <span className={`w-2 h-2 rounded-full ${status.dot} ${device.status === 'online' ? 'animate-pulse' : ''}`} />
+                            <span className="text-[10px] font-white font-bold tracking-widest leading-none mt-px">
+                                {status.label}
+                            </span>
+                        </div>
+                        {device.status === 'error' && device.last_error_message && (
+                            <div className="absolute right-0 top-full mt-2 w-64 p-3 rounded-xl bg-red-950/90 border border-red-900/50 shadow-xl opacity-0 invisible group-hover/status:opacity-100 group-hover/status:visible transition-all z-50 pointer-events-none break-words">
+                                <div className="flex items-start gap-2">
+                                    <AlertTriangle size={14} className="text-red-400 shrink-0 mt-0.5" />
+                                    <p className="text-[11px] font-medium text-red-200 leading-relaxed">
+                                        {device.last_error_message}
+                                    </p>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
 

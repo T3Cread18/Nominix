@@ -43,6 +43,10 @@ class HikvisionClient:
     TIMEOUT = 30  # Timeout en segundos para requests (alto para dispositivos remotos)
     
     def __init__(self, ip: str, port: int, username: str, password: str, device_timezone: str = 'UTC'):
+        self._ip = ip
+        self._port = port
+        self._username = username
+        self._password = password
         self.base_url = f"http://{ip}:{port}"
         self.auth = HTTPDigestAuth(username, password)
         self.device_timezone = device_timezone
@@ -76,9 +80,10 @@ class HikvisionClient:
                         f"Tiempo de espera: {retry_time} segundos."
                     )
                 
+                # Para depurar porqué Hikvision rechaza el query
                 raise HikvisionAuthError(
-                    f"Autenticación fallida con el dispositivo en {self.base_url}. "
-                    "Verifica usuario y contraseña."
+                    f"401 Unauthorized en {path}. "
+                    "Puede que el dispositivo rechace fechas muy antiguas o la sesión expiró."
                 )
             
             # Algunos endpoints retornan 200 OK pero con error en el cuerpo (JSON)
@@ -190,6 +195,7 @@ class HikvisionClient:
         start_position: Optional[int] = None,
         major_event: int = 0,  # 0 = Todos los eventos
         minor_event: int = 0,  # 0 = Todos
+        search_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Buscar eventos de acceso en el dispositivo.
@@ -210,28 +216,47 @@ class HikvisionClient:
                 - total: int, total de eventos encontrados.
                 - events: list[dict], lista de eventos parseados.
         """
-        # Formato de fecha ISAPI: 2026-02-10T00:00:00+00:00
-        # Si los datetimes son aware, convertir a UTC para la query ISAPI.
-        # Si son naive, asumir que representan la hora local del dispositivo.
+        # Formato de fecha ISAPI: 2026-02-10T00:00:00-04:00
+        # Convertimos timezone de Django a formato ISO con offset
         def format_isapi_time(dt):
-            if dt.tzinfo is not None:
-                # Convertir a UTC y formatear
-                from datetime import timezone as dt_tz
-                utc_dt = dt.astimezone(dt_tz.utc)
-                return utc_dt.strftime('%Y-%m-%dT%H:%M:%S+00:00')
+            import pytz
+            
+            if dt.tzinfo is None:
+                # Si es naive, lo hacemos aware usando la timezone del dispositivo
+                try:
+                    tz = pytz.timezone(self.device_timezone)
+                    dt = tz.localize(dt)
+                except pytz.UnknownTimeZoneError:
+                    dt = pytz.UTC.localize(dt)
+            elif dt.tzinfo != pytz.timezone(self.device_timezone):
+                # Si viene en otra zona (ej UTC), convertirlo a la del dispositivo
+                try:
+                    tz = pytz.timezone(self.device_timezone)
+                    dt = dt.astimezone(tz)
+                except pytz.UnknownTimeZoneError:
+                    pass
+            
+            # strftime('%z') da "+0000" pero ISAPI quiere "+00:00"
+            offset = dt.strftime('%z')
+            if offset:
+                offset_fmt = f"{offset[:3]}:{offset[3:]}"
             else:
-                # Naive: enviar tal cual (hora local del dispositivo)
-                return dt.strftime('%Y-%m-%dT%H:%M:%S+00:00')
+                offset_fmt = "+00:00"
+                
+            return dt.strftime('%Y-%m-%dT%H:%M:%S') + offset_fmt
         
         start_str = format_isapi_time(start_time)
         end_str = format_isapi_time(end_time)
         
         # Calculate position
         position = start_position if start_position is not None else (page_no * page_size)
+        
+        # Consistent searchID is required for pagination across the same historical query
+        final_search_id = search_id if search_id else f"s_{int(datetime.now().timestamp())}"
 
         payload = {
             "AcsEventCond": {
-                "searchID": f"search_{int(datetime.now().timestamp())}",
+                "searchID": final_search_id,
                 "searchResultPosition": position,
                 "maxResults": page_size,
                 "major": major_event,
@@ -267,13 +292,15 @@ class HikvisionClient:
         start_time: datetime,
         end_time: datetime,
         page_size: int = 100,
-        max_requests: int = 200,
+        max_requests: int = 5000,  # 5000 requests * 100 events = 500k events max
     ) -> List[Dict[str, Any]]:
         """
         Buscar TODOS los eventos de acceso paginando automáticamente.
         
-        Itera ajustando start_position basado en los resultados recibidos
-        para manejar dispositivos que retornan menos resultados de los solicitados.
+        ESTRATEGIA: Crear un HikvisionClient NUEVO por cada página.
+        Esto imita exactamente el comportamiento del endpoint de 'raw events'
+        que funciona perfectamente. Cada petición obtiene una sesión HTTP fresca
+        con un nonce counter limpio, evitando el overflow de Digest Auth de Hikvision.
         
         Args:
             start_time: Fecha/hora de inicio.
@@ -284,16 +311,44 @@ class HikvisionClient:
         Returns:
             Lista plana de todos los eventos encontrados.
         """
+        import time
         all_events = []
         position = 0
         
-        for _ in range(max_requests):
-            result = self.search_events(
-                start_time=start_time,
-                end_time=end_time,
-                start_position=position,
-                page_size=page_size,
-            )
+        # ID de búsqueda corto (max 16 chars para evitar bugs de Hikvision firmware)
+        search_id = f"s_{int(time.time())}"
+        
+        for i in range(max_requests):
+            try:
+                # Crear un cliente FRESCO para cada página.
+                # Esto es la clave: cada cliente crea su propia requests.Session,
+                # lo que resetea el Nonce Count de Digest Auth a 0.
+                fresh_client = HikvisionClient(
+                    ip=self._ip,
+                    port=self._port,
+                    username=self._username,
+                    password=self._password,
+                    device_timezone=self.device_timezone,
+                )
+                
+                result = fresh_client.search_events(
+                    start_time=start_time,
+                    end_time=end_time,
+                    start_position=position,
+                    page_size=page_size,
+                    search_id=search_id,
+                )
+            except HikvisionAuthError as e:
+                if i > 0:
+                    logger.warning(
+                        f"401 en página {i} (pos {position}): {e}. "
+                        f"Retornando {len(all_events)} eventos extraídos."
+                    )
+                    break
+                else:
+                    raise HikvisionAuthError(
+                        f"Falló al iniciar la extracción (Fecha: {start_time}): {e}"
+                    )
             
             events = result.get('events', [])
             total = result.get('total', 0)
@@ -307,11 +362,14 @@ class HikvisionClient:
             # Si hemos recuperado el total declarado (o más), terminamos.
             if total > 0 and len(all_events) >= total:
                 break
-                
-            # Si el total declarado es 0 pero llegaron eventos (caso raro), seguimos.
-            # El break principal es 'if not events' o 'limit reached'.
+            
+            # Anti-Hammering: Pausa entre páginas para no sobrecargar el dispositivo
+            time.sleep(0.3)
         
-        logger.info(f"search_events_all: {len(all_events)} eventos descargados (Total reportado: {total if 'total' in locals() else '?'})")
+        logger.info(
+            f"search_events_all: {len(all_events)} eventos descargados "
+            f"(Total reportado: {total if 'total' in locals() else '?'})"
+        )
         return all_events
 
     def _parse_event(self, raw_event: dict) -> Dict[str, Any]:

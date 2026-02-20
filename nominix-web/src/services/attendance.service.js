@@ -56,13 +56,17 @@ const attendanceService = {
 
     /** Sincroniza eventos de un dispositivo */
     syncEvents: async (id, data = {}) => {
-        const response = await axiosClient.post(`/biometric/devices/${id}/sync_events/`, data);
+        const response = await axiosClient.post(`/biometric/devices/${id}/sync_events/`, data, {
+            timeout: 300000, // 5 minutos — la sincronización masiva puede tardar
+        });
         return response.data;
     },
 
     /** Sincroniza todos los dispositivos */
     syncAll: async (data = {}) => {
-        const response = await axiosClient.post('/biometric/devices/sync_all/', data);
+        const response = await axiosClient.post('/biometric/devices/sync_all/', data, {
+            timeout: 300000, // 5 minutos
+        });
         return response.data;
     },
 

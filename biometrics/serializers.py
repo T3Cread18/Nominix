@@ -38,13 +38,13 @@ class BiometricDeviceSerializer(serializers.ModelSerializer):
             'id', 'name', 'device_type', 'device_type_name', 'protocol',
             'ip_address', 'port', 'username', 'password',
             'serial_number', 'firmware_version', 'model_name', 'location',
-            'is_active', 'last_sync', 'last_event_time', 'status', 'status_detail',
+            'is_active', 'last_sync', 'last_event_time', 'status', 'status_detail', 'last_error_message',
             'total_events', 'mapped_employees',
             'created_at', 'updated_at',
         ]
         read_only_fields = [
             'id', 'serial_number', 'firmware_version', 'model_name',
-            'last_sync', 'last_event_time', 'status', 'status_detail',
+            'last_sync', 'last_event_time', 'status', 'status_detail', 'last_error_message',
             'created_at', 'updated_at',
         ]
         extra_kwargs = {

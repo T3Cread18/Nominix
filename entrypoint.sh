@@ -21,4 +21,4 @@ python scripts/init_superadmin.py
 
 # Iniciar Gunicorn
 echo "Iniciando servidor Gunicorn..."
-exec gunicorn --bind 0.0.0.0:8000 --workers 3 rrhh_saas.wsgi:application
+exec gunicorn --bind 0.0.0.0:8000 --workers 3 --timeout 300 rrhh_saas.wsgi:application

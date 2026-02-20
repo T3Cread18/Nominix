@@ -23,6 +23,12 @@ const SyncOptionsModal = ({ isOpen, onClose, onConfirm, title = "Sincronización
         onClose();
     };
 
+    const handleSyncAllHistory = () => {
+        // Enviar fecha antigua razonable (2010) para evitar bugs de firmware Hikvision con fechas muy viejas
+        onConfirm('2010-01-01T00:00:00');
+        onClose();
+    };
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="w-full max-w-sm bg-slate-900 border border-white/10 rounded-xl shadow-2xl p-6 space-y-4">
@@ -63,19 +69,28 @@ const SyncOptionsModal = ({ isOpen, onClose, onConfirm, title = "Sincronización
                         </div>
                     </div>
 
-                    <div className="flex justify-end gap-2 pt-2">
+                    <div className="flex flex-col gap-3 pt-3 mt-4 border-t border-white/10">
+                        <div className="flex justify-end gap-2">
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                className="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 text-sm font-medium transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="submit"
+                                className="px-4 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm font-bold transition-colors shadow-lg shadow-blue-500/20"
+                            >
+                                Sincronizar desde Fecha
+                            </button>
+                        </div>
                         <button
                             type="button"
-                            onClick={onClose}
-                            className="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 text-sm font-medium transition-colors"
+                            onClick={handleSyncAllHistory}
+                            className="w-full px-4 py-2 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/20 text-sm font-bold transition-colors"
                         >
-                            Cancelar
-                        </button>
-                        <button
-                            type="submit"
-                            className="px-4 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm font-bold transition-colors shadow-lg shadow-blue-500/20"
-                        >
-                            Sincronizar
+                            Sincronizar TODO el Historial (Lento)
                         </button>
                     </div>
                 </form>

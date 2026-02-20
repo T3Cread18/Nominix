@@ -134,6 +134,12 @@ class BiometricDevice(models.Model):
         default='unknown',
         verbose_name='Estado'
     )
+    last_error_message = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name='Último mensaje de error',
+        help_text='Detalle técnico del último fallo de conexión o sincronización'
+    )
     status_detail = models.TextField(
         blank=True, 
         default='',
@@ -156,24 +162,27 @@ class BiometricDevice(models.Model):
         """Marcar dispositivo como en línea y actualizar info."""
         self.status = 'online'
         self.status_detail = ''
+        self.last_error_message = None
         if device_info:
             self.serial_number = device_info.get('serial_number', self.serial_number)
             self.firmware_version = device_info.get('firmware_version', self.firmware_version)
             self.model_name = device_info.get('model_name', self.model_name)
-        self.save(update_fields=['status', 'status_detail', 'serial_number', 
+        self.save(update_fields=['status', 'status_detail', 'last_error_message', 'serial_number', 
                                   'firmware_version', 'model_name', 'updated_at'])
 
     def mark_offline(self, error_message=''):
         """Marcar dispositivo como fuera de línea."""
         self.status = 'offline'
         self.status_detail = error_message
-        self.save(update_fields=['status', 'status_detail', 'updated_at'])
+        self.last_error_message = error_message
+        self.save(update_fields=['status', 'status_detail', 'last_error_message', 'updated_at'])
 
     def mark_error(self, error_message):
         """Marcar dispositivo con error."""
         self.status = 'error'
         self.status_detail = error_message
-        self.save(update_fields=['status', 'status_detail', 'updated_at'])
+        self.last_error_message = error_message
+        self.save(update_fields=['status', 'status_detail', 'last_error_message', 'updated_at'])
 
 
 class AttendanceEvent(models.Model):
