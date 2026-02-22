@@ -517,7 +517,7 @@ class PayrollPeriodViewSet(viewsets.ModelViewSet):
         """
         period = self.get_object()
         # Usamos select_related para optimizar la DB
-        payslips = period.payslips.select_related('employee').all()
+        payslips = period.receipts.select_related('employee').all()
 
         if not payslips.exists():
             return Response({"error": "No hay recibos generados para este periodo."}, status=404)
@@ -546,7 +546,7 @@ class PayrollPeriodViewSet(viewsets.ModelViewSet):
             
             # Cálculos previos seguros
             monto_ves = p.net_pay_ves or Decimal(0)
-            tasa = p.exchange_rate_applied or Decimal(0)
+            tasa = p.exchange_rate_snapshot or Decimal(0)
             monto_usd = (monto_ves / tasa).quantize(Decimal('0.01')) if tasa > 0 else Decimal(0)
 
             # Preparamos la fila
@@ -566,20 +566,20 @@ class PayrollPeriodViewSet(viewsets.ModelViewSet):
             # 4. DEFINICIÓN DE FORMATOS POR CELDA (La magia ocurre aquí)
             current_row = ws.max_row
             
-            # Columna E (Número de Cuenta): Forzar formato Texto para evitar notación científica
-            cell_acc = ws.cell(row=current_row, column=5)
+            # Columna F (Número de Cuenta): Forzar formato Texto para evitar notación científica
+            cell_acc = ws.cell(row=current_row, column=6)
             cell_acc.number_format = '@'  # '@' significa Texto en Excel
             
-            # Columna F (Monto VES): Formato numérico con separadores
-            cell_ves = ws.cell(row=current_row, column=6)
+            # Columna G (Monto VES): Formato numérico con separadores
+            cell_ves = ws.cell(row=current_row, column=7)
             cell_ves.number_format = '#,##0.00' 
 
-            # Columna G (Tasa): Formato con más decimales si es necesario
-            cell_rate = ws.cell(row=current_row, column=7)
+            # Columna H (Tasa): Formato con más decimales si es necesario
+            cell_rate = ws.cell(row=current_row, column=8)
             cell_rate.number_format = '#,##0.0000'
 
-            # Columna H (USD): Formato numérico
-            cell_usd = ws.cell(row=current_row, column=8)
+            # Columna I (USD): Formato numérico
+            cell_usd = ws.cell(row=current_row, column=9)
             cell_usd.number_format = '#,##0.00'
 
         # 5. Ajustar ancho de columnas automáticamente (Opcional pero útil)

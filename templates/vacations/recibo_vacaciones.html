@@ -212,14 +212,21 @@
                 <div class="col">
                     <span class="label">Salario Base:</span>
                     {% if receipt_currency == 'USD' or receipt_currency == 'DUAL' %}
-                    {% if salary_basis_used == 'BASE_ONLY' and base_total_salary > 0 %}
                     ${{ monthly_salary|floatformat:2}}
-                    {% else %}
-                    ${{ monthly_salary|floatformat:2}}
-                    {% endif %}
                     {% endif %}
                     {% if receipt_currency == 'VES' %}
-                    Bs. {{ monthly_salary_ves|default:monthly_salary|floatformat:2}}
+                    Bs. {{ monthly_salary_ves|floatformat:2}}
+                    {% endif %}
+                </div>
+            </div>
+            <div class="row">
+                <div class="col">
+                    <span class="label">Salario Diario:</span>
+                    {% if receipt_currency == 'USD' or receipt_currency == 'DUAL' %}
+                    ${{ daily_salary|floatformat:2}}
+                    {% endif %}
+                    {% if receipt_currency == 'VES' %}
+                    Bs. {{ daily_salary_ves|floatformat:2}}
                     {% endif %}
                 </div>
             </div>
@@ -235,13 +242,6 @@
                     <span class="label">Reincorporación:</span> {{ return_date|date:"d/m/Y" }}
                 </div>
             </div>
-            {% if exchange_rate and receipt_currency == 'DUAL' or receipt_currency == 'VES' %}
-            <div class="row">
-                <div class="col">
-                    <span class="label">Tasa Cambio:</span> Bs. {{ exchange_rate|floatformat:2 }}
-                </div>
-            </div>
-            {% endif %}
         </div>
 
         <!-- TABLA DE CONCEPTOS -->
@@ -250,7 +250,10 @@
                 <tr>
                     <th style="width: 40%">Concepto</th>
                     <th style="width: 10%; text-align: center;">Días/%</th>
-                    {% if receipt_currency == 'DUAL' %}
+                    {% if use_lines %}
+                    <th style="width: 25%; text-align: right;">Asignación (Bs.)</th>
+                    <th style="width: 25%; text-align: right;">Deducción (Bs.)</th>
+                    {% elif receipt_currency == 'DUAL' %}
                     <th style="width: 25%; text-align: right;">Asignación ($/Bs)</th>
                     <th style="width: 25%; text-align: right;">Deducción ($/Bs)</th>
                     {% elif receipt_currency == 'VES' %}
@@ -263,6 +266,36 @@
                 </tr>
             </thead>
             <tbody>
+                {% if use_lines %}
+                <!-- =============================================== -->
+                <!-- MODO LÍNEAS (datos inmutables de BD en VES)     -->
+                <!-- =============================================== -->
+
+                <!-- ASIGNACIONES -->
+                {% for line in earning_lines %}
+                <tr>
+                    <td>{{ line.concept_name }}</td>
+                    <td style="text-align: center;">{{ line.days }}</td>
+                    <td class="amount">{{ line.amount_ves|floatformat:2 }}</td>
+                    <td class="amount"></td>
+                </tr>
+                {% endfor %}
+
+                <!-- DEDUCCIONES -->
+                {% for line in deduction_lines %}
+                <tr>
+                    <td>{{ line.concept_name }}</td>
+                    <td style="text-align: center;">{{ line.percentage|floatformat:2 }}%</td>
+                    <td class="amount"></td>
+                    <td class="amount">{{ line.amount_ves|floatformat:2 }}</td>
+                </tr>
+                {% endfor %}
+
+                {% else %}
+                <!-- =============================================== -->
+                <!-- MODO LEGACY (recálculo en vivo, multi-moneda)   -->
+                <!-- =============================================== -->
+
                 <!-- ASIGNACIONES -->
                 <!-- Vacaciones -->
                 <tr>
@@ -364,6 +397,7 @@
                         {% endif %}
                     </td>
                 </tr>
+                {% endif %}
             </tbody>
         </table>
 
@@ -373,7 +407,9 @@
                 <tr>
                     <td style="border: none; width: 50%;">Total Asignaciones:</td>
                     <td class="amount" style="border: none;">
-                        {% if receipt_currency == 'DUAL' %}
+                        {% if use_lines %}
+                        Bs. {{ gross_total_ves|floatformat:2 }}
+                        {% elif receipt_currency == 'DUAL' %}
                         $ {{ gross_total|floatformat:2 }} / Bs. {{ gross_total_ves|floatformat:2 }}
                         {% elif receipt_currency == 'VES' %}
                         Bs. {{ gross_total_ves|floatformat:2 }}
@@ -383,7 +419,9 @@
                     </td>
                     <td style="border: none; width: 30%;">Total Deducciones:</td>
                     <td class="amount" style="border: none;">
-                        {% if receipt_currency == 'DUAL' %}
+                        {% if use_lines %}
+                        Bs. {{ total_deductions_ves|floatformat:2 }}
+                        {% elif receipt_currency == 'DUAL' %}
                         $ {{ total_deductions|floatformat:2 }} / Bs. {{ total_deductions_ves|floatformat:2 }}
                         {% elif receipt_currency == 'VES' %}
                         Bs. {{ total_deductions_ves|floatformat:2 }}
@@ -395,7 +433,9 @@
                 <tr style="font-size: 12px; border-top: 1px solid #ccc;">
                     <td colspan="2" style="border: none; padding-top: 10px;">NETO A PAGAR:</td>
                     <td colspan="2" class="amount net-pay" style="border: none; padding-top: 10px;">
-                        {% if receipt_currency == 'DUAL' %}
+                        {% if use_lines %}
+                        Bs. {{ net_total_ves|floatformat:2 }}
+                        {% elif receipt_currency == 'DUAL' %}
                         $ {{ net_total|floatformat:2 }}
                         <div style="font-size: 10px; color: #666;">Bs. {{ net_total_ves|floatformat:2 }}</div>
                         {% elif receipt_currency == 'VES' %}

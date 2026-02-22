@@ -806,12 +806,18 @@ class VacationRequestViewSet(viewsets.ModelViewSet):
         Genera y descarga el recibo de vacaciones en PDF.
         Solo para solicitudes APPROVED o PROCESSED.
         
+        ESTRATEGIA:
+        - Si la solicitud tiene un VacationPayment guardado (PROCESSED),
+          usa los montos INMUTABLES de la BD (VacationPaymentLine).
+        - Si solo está APPROVED (sin pago), recalcula en vivo.
+        
         Returns:
             Archivo PDF como descarga.
         """
         from django.template.loader import render_to_string
         from django.http import HttpResponse
         from weasyprint import HTML
+        from .models import VacationPayment
         
         vacation_request = self.get_object()
         
@@ -835,76 +841,133 @@ class VacationRequestViewSet(viewsets.ModelViewSet):
             # Obtener configuración de empresa
             from payroll_core.models import Company
             company = Company.objects.first()
-            
-            # Obtener tasa de cambio usando utilidad centralizada
-            from payroll_core.services import get_usd_exchange_rate
-            exchange_rate = get_usd_exchange_rate()
-            
-            # Calcular valores (o usar del pago si existe)
-            calculation = VacationEngine.calculate_complete_payment(
-                contract=contract,
-                start_date=vacation_request.start_date,
-                days_to_enjoy=vacation_request.days_requested,
-                company=company,
-                exchange_rate=exchange_rate
-            )
-            
-            # Determinar moneda del recibo según configuración
             receipt_currency = company.vacation_receipt_currency if company else 'USD'
             
-            # Preparar contexto para el template
-            context = {
-                'employee': employee,
-                'contract': contract,
-                'years_of_service': calculation['years_of_service'],
-                'monthly_salary': calculation['monthly_salary'],
-                'daily_salary': calculation['daily_salary'],
-                # Fechas
-                'start_date': calculation['start_date'],
-                'end_date': calculation['end_date'],
-                'return_date': calculation['return_date'],
-                'payment_date': timezone.now().date(),
-                # Días
-                'vacation_days': calculation['vacation_days'],
-                'rest_days': calculation['rest_days'],
-                'holiday_days': calculation['holiday_days'],
-                'bonus_days': calculation['bonus_days'],
-                # Montos USD
-                'vacation_amount': calculation['vacation_amount'],
-                'rest_amount': calculation['rest_amount'],
-                'holiday_amount': calculation['holiday_amount'],
-                'bonus_amount': calculation['bonus_amount'],
-                'gross_total': calculation['gross_total'],
-                # Deducciones
-                'ivss_amount': calculation['ivss_amount'],
-                'faov_amount': calculation['faov_amount'],
-                'rpe_amount': calculation['rpe_amount'],
-                'total_deductions': calculation['total_deductions'],
-                # Neto
-                'net_total': calculation['net_total'],
-                # Montos VES (si hay tasa)
-                'exchange_rate': calculation.get('exchange_rate'),
-                'daily_salary_ves': calculation.get('daily_salary_ves'),
-                'gross_total_ves': calculation.get('gross_total_ves'),
-                'total_deductions_ves': calculation.get('total_deductions_ves'),
-                'net_total_ves': calculation.get('net_total_ves'),
+            # ============================================================
+            # DETERMINAR FUENTE DE DATOS
+            # ============================================================
+            payment = getattr(vacation_request, 'payment', None)
+            
+            if payment:
+                # ========================================================
+                # CASO 1: PAYMENT EXISTE — USAR DATOS INMUTABLES DE BD
+                # ========================================================
+                earning_lines = list(payment.lines.filter(kind='EARNING').order_by('concept_code'))
+                deduction_lines = list(payment.lines.filter(kind='DEDUCTION').order_by('concept_code'))
                 
-                # Desglose VES
-                'vacation_amount_ves': calculation.get('vacation_amount_ves'),
-                'rest_amount_ves': calculation.get('rest_amount_ves'),
-                'holiday_amount_ves': calculation.get('holiday_amount_ves'),
-                'bonus_amount_ves': calculation.get('bonus_amount_ves'),
-                'ivss_amount_ves': calculation.get('ivss_amount_ves'),
-                'faov_amount_ves': calculation.get('faov_amount_ves'),
-                'rpe_amount_ves': calculation.get('rpe_amount_ves'),
-                # Configuración moneda
-                'receipt_currency': receipt_currency,
-                # Meta
-                'generation_date': timezone.now(),
-                'company_name': company.name if company else 'Nóminix',
-                'company_rif': company.rif if company else '',
-                'company': company,
-            }
+                # Calcular totales de líneas
+                total_earnings_ves = sum(line.amount_ves for line in earning_lines)
+                total_deductions_ves = sum(line.amount_ves for line in deduction_lines)
+                
+                # Calcular USD refs si existen
+                total_earnings_usd = sum(line.amount_usd_ref for line in earning_lines if line.amount_usd_ref)
+                total_deductions_usd = None  # Deducciones siempre en VES
+                
+                context = {
+                    'employee': employee,
+                    'contract': contract,
+                    'years_of_service': employee.seniority_years,
+                    'monthly_salary': payment.daily_salary * 30,
+                    'daily_salary': payment.daily_salary,
+                    # Salario en VES (inmutable)
+                    'monthly_salary_ves': (payment.daily_salary * 30 * payment.exchange_rate) if payment.currency == 'USD' else (payment.daily_salary * 30),
+                    'daily_salary_ves': (payment.daily_salary * payment.exchange_rate) if payment.currency == 'USD' else payment.daily_salary,
+                    # Fechas
+                    'start_date': vacation_request.start_date,
+                    'end_date': vacation_request.end_date,
+                    'return_date': vacation_request.return_date,
+                    'payment_date': payment.payment_date,
+                    # Moneda y tasa (snapshot)
+                    'receipt_currency': receipt_currency,
+                    'exchange_rate': payment.exchange_rate,
+                    'currency': payment.currency,
+                    # Líneas del recibo (inmutables)
+                    'earning_lines': earning_lines,
+                    'deduction_lines': deduction_lines,
+                    'use_lines': True,
+                    # Totales VES (inmutables)
+                    'gross_total_ves': payment.gross_amount_ves,
+                    'total_deductions_ves': payment.total_deductions_ves,
+                    'net_total_ves': payment.net_amount_ves,
+                    # Totales moneda original
+                    'gross_total': payment.gross_amount,
+                    'total_deductions': payment.total_deductions,
+                    'net_total': payment.net_amount,
+                    # USD refs
+                    'total_earnings_usd': total_earnings_usd,
+                    # Meta
+                    'generation_date': timezone.now(),
+                    'company_name': company.name if company else 'Nóminix',
+                    'company_rif': company.rif if company else '',
+                    'company': company,
+                }
+            else:
+                # ========================================================
+                # CASO 2: SIN PAYMENT — RECALCULAR EN VIVO (solo APPROVED)
+                # ========================================================
+                from payroll_core.services import get_usd_exchange_rate
+                exchange_rate = get_usd_exchange_rate()
+                
+                calculation = VacationEngine.calculate_complete_payment(
+                    contract=contract,
+                    start_date=vacation_request.start_date,
+                    days_to_enjoy=vacation_request.days_requested,
+                    company=company,
+                    exchange_rate=exchange_rate
+                )
+                
+                context = {
+                    'employee': employee,
+                    'contract': contract,
+                    'years_of_service': calculation['years_of_service'],
+                    'monthly_salary': calculation['monthly_salary'],
+                    'daily_salary': calculation['daily_salary'],
+                    # Fechas
+                    'start_date': calculation['start_date'],
+                    'end_date': calculation['end_date'],
+                    'return_date': calculation['return_date'],
+                    'payment_date': timezone.now().date(),
+                    # Días
+                    'vacation_days': calculation['vacation_days'],
+                    'rest_days': calculation['rest_days'],
+                    'holiday_days': calculation['holiday_days'],
+                    'bonus_days': calculation['bonus_days'],
+                    # Montos
+                    'vacation_amount': calculation['vacation_amount'],
+                    'rest_amount': calculation['rest_amount'],
+                    'holiday_amount': calculation['holiday_amount'],
+                    'bonus_amount': calculation['bonus_amount'],
+                    'gross_total': calculation['gross_total'],
+                    # Deducciones
+                    'ivss_amount': calculation['ivss_amount'],
+                    'faov_amount': calculation['faov_amount'],
+                    'rpe_amount': calculation['rpe_amount'],
+                    'total_deductions': calculation['total_deductions'],
+                    # Neto
+                    'net_total': calculation['net_total'],
+                    # Montos VES
+                    'exchange_rate': calculation.get('exchange_rate'),
+                    'daily_salary_ves': calculation.get('daily_salary_ves'),
+                    'gross_total_ves': calculation.get('gross_total_ves'),
+                    'total_deductions_ves': calculation.get('total_deductions_ves'),
+                    'net_total_ves': calculation.get('net_total_ves'),
+                    # Desglose VES
+                    'vacation_amount_ves': calculation.get('vacation_amount_ves'),
+                    'rest_amount_ves': calculation.get('rest_amount_ves'),
+                    'holiday_amount_ves': calculation.get('holiday_amount_ves'),
+                    'bonus_amount_ves': calculation.get('bonus_amount_ves'),
+                    'ivss_amount_ves': calculation.get('ivss_amount_ves'),
+                    'faov_amount_ves': calculation.get('faov_amount_ves'),
+                    'rpe_amount_ves': calculation.get('rpe_amount_ves'),
+                    # Configuración
+                    'receipt_currency': receipt_currency,
+                    'use_lines': False,
+                    # Meta
+                    'generation_date': timezone.now(),
+                    'company_name': company.name if company else 'Nóminix',
+                    'company_rif': company.rif if company else '',
+                    'company': company,
+                }
             
             # Renderizar HTML
             html_content = render_to_string('vacations/recibo_vacaciones.html', context)

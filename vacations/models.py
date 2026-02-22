@@ -679,6 +679,44 @@ class VacationPayment(models.Model):
         verbose_name='Neto a Pagar'
     )
     
+    # ======================================================================
+    # MONEDA Y TASA (Nuevos campos para auditoría inmutable)
+    # ======================================================================
+    
+    currency = models.CharField(
+        max_length=3,
+        default='VES',
+        verbose_name='Moneda del Cálculo',
+        help_text='Moneda original del salario (USD o VES)'
+    )
+    exchange_rate = models.DecimalField(
+        max_digits=18,
+        decimal_places=6,
+        default=Decimal('1.000000'),
+        verbose_name='Tasa de Cambio',
+        help_text='Tasa USD→VES usada al momento del pago'
+    )
+    
+    # Totales inmutables en VES (siempre calculados y guardados en Bs)
+    gross_amount_ves = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        verbose_name='Bruto (VES)'
+    )
+    total_deductions_ves = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        verbose_name='Deducciones (VES)'
+    )
+    net_amount_ves = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        verbose_name='Neto (VES)'
+    )
+    
     # Archivo PDF (opcional)
     receipt_pdf = models.FileField(
         upload_to='vacations/receipts/',
@@ -720,6 +758,9 @@ class VacationPayment(models.Model):
         """
         Crea un registro de pago a partir de un cálculo de VacationEngine.
         
+        También crea las líneas de detalle (VacationPaymentLine) con todos
+        los montos guardados en VES (inmutables).
+        
         Args:
             vacation_request: Instancia de VacationRequest
             calculation: Dict retornado por VacationEngine.calculate_complete_payment()
@@ -727,14 +768,22 @@ class VacationPayment(models.Model):
             payment_date: Fecha de pago (opcional, default: today)
         
         Returns:
-            Instancia de VacationPayment creada
+            Instancia de VacationPayment creada (con lines)
         """
         from django.utils import timezone
         
         if payment_date is None:
             payment_date = timezone.now().date()
         
-        return cls.objects.create(
+        currency = calculation.get('currency', 'VES')
+        exchange_rate = Decimal(str(calculation.get('exchange_rate', 1)))
+        
+        # Obtener montos VES inmutables del cálculo
+        gross_ves = calculation.get('gross_total_ves', calculation['gross_total'])
+        deductions_ves = calculation.get('total_deductions_ves', calculation['total_deductions'])
+        net_ves = calculation.get('net_total_ves', calculation['net_total'])
+        
+        payment = cls.objects.create(
             vacation_request=vacation_request,
             payment_date=payment_date,
             daily_salary=calculation['daily_salary'],
@@ -752,6 +801,169 @@ class VacationPayment(models.Model):
             rpe_deduction=calculation['rpe_amount'],
             total_deductions=calculation['total_deductions'],
             net_amount=calculation['net_total'],
+            # Nuevos campos
+            currency=currency,
+            exchange_rate=exchange_rate,
+            gross_amount_ves=gross_ves,
+            total_deductions_ves=deductions_ves,
+            net_amount_ves=net_ves,
             calculation_trace=calculation['calculation_trace'],
             created_by=created_by
         )
+        
+        # ================================================================
+        # CREAR LÍNEAS DE DETALLE (Receipt Lines)
+        # ================================================================
+        daily_salary = calculation['daily_salary']
+        
+        # Helper: obtener monto VES de un campo
+        def to_ves(field_name):
+            ves_key = f"{field_name}_ves"
+            if ves_key in calculation:
+                return Decimal(str(calculation[ves_key]))
+            # Si no hay _ves, usar el valor directo (ya está en VES)
+            return Decimal(str(calculation.get(field_name, 0)))
+        
+        # Helper: obtener referencia USD
+        def to_usd_ref(field_name):
+            usd_key = f"{field_name}_usd"
+            if usd_key in calculation:
+                return Decimal(str(calculation[usd_key]))
+            return None
+        
+        lines = []
+        
+        # --- ASIGNACIONES ---
+        earning_concepts = [
+            ('VAC_SALARY', 'Salario de Vacaciones (Art. 190)', 'vacation_amount', calculation['vacation_days']),
+            ('VAC_REST', 'Días de Descanso', 'rest_amount', calculation['rest_days']),
+            ('VAC_HOLIDAY', 'Días Feriados', 'holiday_amount', calculation['holiday_days']),
+            ('VAC_BONUS', 'Bono Vacacional (Art. 192)', 'bonus_amount', calculation['bonus_days']),
+        ]
+        
+        for code, name, field, days in earning_concepts:
+            if days > 0:  # Solo crear líneas con días > 0
+                lines.append(VacationPaymentLine(
+                    payment=payment,
+                    concept_code=code,
+                    concept_name=name,
+                    kind='EARNING',
+                    days=days,
+                    daily_rate=daily_salary,
+                    amount_ves=to_ves(field),
+                    amount_usd_ref=to_usd_ref(field),
+                ))
+        
+        # --- DEDUCCIONES (siempre en VES) ---
+        deduction_concepts = [
+            ('DED_IVSS', 'IVSS (4%)', 'ivss_amount', Decimal('4.00')),
+            ('DED_FAOV', 'FAOV (1%)', 'faov_amount', Decimal('1.00')),
+            ('DED_RPE', 'RPE (0.5%)', 'rpe_amount', Decimal('0.50')),
+        ]
+        
+        for code, name, field, pct in deduction_concepts:
+            amount = calculation.get(f"{field}_ves", calculation.get(field, Decimal('0')))
+            if amount and Decimal(str(amount)) > 0:
+                lines.append(VacationPaymentLine(
+                    payment=payment,
+                    concept_code=code,
+                    concept_name=name,
+                    kind='DEDUCTION',
+                    days=0,
+                    daily_rate=Decimal('0'),
+                    amount_ves=Decimal(str(amount)),
+                    amount_usd_ref=None,
+                    percentage=pct,
+                ))
+        
+        if lines:
+            VacationPaymentLine.objects.bulk_create(lines)
+        
+        return payment
+
+
+class VacationPaymentLine(models.Model):
+    """
+    Línea de Detalle de Pago de Vacaciones.
+    
+    Sigue el mismo patrón que PayrollReceiptLine para normalizar
+    los conceptos de asignaciones y deducciones.
+    
+    Todos los montos amount_ves son INMUTABLES en Bolívares.
+    El campo amount_usd_ref es solo referencial.
+    """
+    
+    class LineKind(models.TextChoices):
+        EARNING = 'EARNING', 'Asignación'
+        DEDUCTION = 'DEDUCTION', 'Deducción'
+    
+    payment = models.ForeignKey(
+        VacationPayment,
+        on_delete=models.CASCADE,
+        related_name='lines',
+        verbose_name='Pago'
+    )
+    
+    concept_code = models.CharField(
+        max_length=20,
+        verbose_name='Código Concepto',
+        help_text='Ej: VAC_SALARY, VAC_BONUS, DED_IVSS'
+    )
+    concept_name = models.CharField(
+        max_length=150,
+        verbose_name='Nombre Concepto',
+        help_text='Descripción legible del concepto'
+    )
+    kind = models.CharField(
+        max_length=20,
+        choices=LineKind.choices,
+        verbose_name='Tipo'
+    )
+    
+    days = models.IntegerField(
+        default=0,
+        verbose_name='Días',
+        help_text='Cantidad de días aplicados (0 para deducciones)'
+    )
+    daily_rate = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        verbose_name='Tasa Diaria',
+        help_text='Salario diario usado para este concepto'
+    )
+    
+    # Monto INMUTABLE en VES
+    amount_ves = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        verbose_name='Monto (VES)',
+        help_text='Monto inmutable en Bolívares'
+    )
+    
+    # Referencia en USD (informativo, puede ser null)
+    amount_usd_ref = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name='Monto Ref. (USD)',
+        help_text='Referencia en USD al momento del cálculo'
+    )
+    
+    percentage = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        verbose_name='Porcentaje',
+        help_text='Porcentaje aplicado (para deducciones)'
+    )
+    
+    class Meta:
+        verbose_name = 'Detalle de Pago Vacacional'
+        verbose_name_plural = 'Detalles de Pago Vacacional'
+        ordering = ['kind', 'concept_code']
+    
+    def __str__(self):
+        return f"{self.concept_code}: {self.amount_ves} VES"

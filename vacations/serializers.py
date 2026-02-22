@@ -153,11 +153,39 @@ class VacationSummarySerializer(serializers.Serializer):
     error = serializers.CharField(required=False, allow_blank=True)
 
 
+class VacationPaymentLineSerializer(serializers.ModelSerializer):
+    """
+    Serializador para líneas de detalle del pago de vacaciones.
+    """
+    kind_display = serializers.SerializerMethodField()
+
+    class Meta:
+        from vacations.models import VacationPaymentLine
+        model = VacationPaymentLine
+        fields = [
+            'id',
+            'concept_code',
+            'concept_name',
+            'kind',
+            'kind_display',
+            'days',
+            'daily_rate',
+            'amount_ves',
+            'amount_usd_ref',
+            'percentage',
+        ]
+        read_only_fields = fields
+
+    def get_kind_display(self, obj):
+        return obj.get_kind_display()
+
+
 class VacationPaymentSerializer(serializers.ModelSerializer):
     """
     Serializador para VacationPayment.
     
     Todos los campos son de solo lectura ya que VacationPayment es inmutable.
+    Incluye líneas de detalle (receipt lines) como nested serializer.
     """
     
     # Campos computados
@@ -165,6 +193,7 @@ class VacationPaymentSerializer(serializers.ModelSerializer):
     employee_document = serializers.SerializerMethodField()
     request_start_date = serializers.SerializerMethodField()
     request_end_date = serializers.SerializerMethodField()
+    lines = VacationPaymentLineSerializer(many=True, read_only=True)
     
     class Meta:
         from vacations.models import VacationPayment
@@ -183,7 +212,7 @@ class VacationPaymentSerializer(serializers.ModelSerializer):
             'rest_days',
             'holiday_days',
             'bonus_days',
-            # Montos devengados
+            # Montos devengados (moneda original)
             'vacation_amount',
             'rest_amount',
             'holiday_amount',
@@ -196,6 +225,14 @@ class VacationPaymentSerializer(serializers.ModelSerializer):
             'total_deductions',
             # Neto
             'net_amount',
+            # Moneda y totales VES inmutables
+            'currency',
+            'exchange_rate',
+            'gross_amount_ves',
+            'total_deductions_ves',
+            'net_amount_ves',
+            # Líneas de detalle (receipt lines)
+            'lines',
             # Auditoría
             'calculation_trace',
             'created_at',
