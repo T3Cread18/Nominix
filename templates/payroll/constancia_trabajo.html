@@ -112,10 +112,10 @@
 
 <body>
     <div class="header">
-        <div class="company-name">{{ company_name }}</div>
-        <div class="company-info">RIF: {{ company_rif }}</div>
-        {% if company_address %}
-        <div class="company-info">{{ company_address }}</div>
+        <div class="company-name">{{ branch_name }}</div>
+        <div class="company-info">RIF: {{ branch_rif }}</div>
+        {% if branch_address %}
+        <div class="company-info">{{ branch_address }}</div>
         {% endif %}
     </div>
 
@@ -123,8 +123,8 @@
 
     <div class="body-text">
         Quien suscribe, en mi carácter de Representante Legal de
-        <span class="highlight">{{ company_name }}</span>, identificada con el
-        RIF <strong>{{ company_rif }}</strong>, hace constar por medio de la presente que
+        <span class="highlight">{{ branch_name }}</span>, identificada con el
+        RIF <strong>{{ branch_rif }}</strong>, hace constar por medio de la presente que
         el(la) ciudadano(a) <span class="highlight">{{ employee_name }}</span>,
         titular de la Cédula de Identidad N° <strong>{{ employee_cedula }}</strong>,
         presta sus servicios en esta empresa desde el
@@ -133,9 +133,6 @@
         {% if department %}
         en el departamento de <strong>{{ department }}</strong>
         {% endif %}
-        {% if branch %}
-        , sede <strong>{{ branch }}</strong>
-        {% endif %}.
     </div>
 
     <div class="body-text">
@@ -152,20 +149,14 @@
     </div>
 
     <div class="closing">
-        Constancia que se expide a petición de la parte interesada, en
-        {{ city }}, a los {{ day }} días del mes de {{ month_name }} de {{ year }}.
+        Constancia que se expide a petición de la parte interesada, a los {{ day }} días del mes de {{ month_name }} de
+        {{ year }}.
     </div>
 
     <div class="signature-section">
         <div class="signature-line">
-            <div class="signer-name">{{ signer_name }}</div>
             <div class="signer-title">{{ signer_title }}</div>
-            <div class="signer-title">{{ company_name }}</div>
         </div>
-    </div>
-
-    <div class="footer">
-        {{ company_name }} | RIF: {{ company_rif }} | Documento generado electrónicamente
     </div>
 </body>
 
