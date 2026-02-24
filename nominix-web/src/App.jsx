@@ -22,6 +22,8 @@ import VacationManager from './features/vacations/VacationManager';
 import VacationSettings from './features/vacations/VacationSettings';
 import { AttendanceDashboard } from './features/attendance';
 import ImportWizard from './features/import/ImportWizard';
+import DeclarationsPanel from './features/declarations/DeclarationsPanel';
+import ReportsPanel from './features/reports/ReportsPanel';
 
 /**
  * App - Componente principal de la aplicación.
@@ -106,6 +108,12 @@ function App() {
 
                 {/* Módulo: Importación */}
                 <Route path="import" element={<ImportWizard />} />
+
+                {/* Módulo: Declaraciones Gubernamentales */}
+                <Route path="declarations" element={<DeclarationsPanel />} />
+
+                {/* Módulo: Reportes */}
+                <Route path="reports" element={<ReportsPanel />} />
 
                 {/* Fallback */}
                 <Route path="*" element={<Navigate to="/" replace />} />

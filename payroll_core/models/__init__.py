@@ -8,6 +8,8 @@ Este paquete contiene los modelos divididos por dominio:
 - concepts: PayrollConcept, EmployeeConcept
 - payroll: PayrollPeriod, Payslip, PayslipDetail, PayrollNovelty
 - social_benefits: InterestRateBCV, SocialBenefitsLedger, SocialBenefitsSettlement
+- salary_history: SalaryHistory
+- government_filings: ISLRRetentionTable, ISLRRetention, LPPSSDeclaration, INCESDeclaration
 """
 
 # Importar desde módulos individuales
@@ -19,9 +21,13 @@ from .work_schedule import WorkSchedule, EmployeeDailyShift
 from .concepts import PayrollConcept, EmployeeConcept
 from .payroll import PayrollPeriod, PayrollReceipt, PayrollReceiptLine, PayrollNovelty
 from .loans import Loan, LoanPayment
-from .payroll import PayrollPeriod, PayrollReceipt, PayrollReceiptLine, PayrollNovelty
-from .loans import Loan, LoanPayment
 from .social_benefits import SocialBenefitsLedger, SocialBenefitsSettlement
+from .salary_history import SalaryHistory
+from .government_filings import (
+    ISLRRetentionTable, ISLRRetention,
+    LPPSSDeclaration, LPPSSDeclarationLine,
+    INCESDeclaration,
+)
 
 # Exponer todos los modelos a nivel de paquete para compatibilidad
 __all__ = [
@@ -56,5 +62,12 @@ __all__ = [
     'InterestRateBCV',
     'SocialBenefitsLedger',
     'SocialBenefitsSettlement',
+    # Salary History
+    'SalaryHistory',
+    # Government Filings
+    'ISLRRetentionTable',
+    'ISLRRetention',
+    'LPPSSDeclaration',
+    'LPPSSDeclarationLine',
+    'INCESDeclaration',
 ]
-

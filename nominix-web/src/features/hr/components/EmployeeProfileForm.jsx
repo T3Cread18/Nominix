@@ -117,6 +117,11 @@ const EmployeeProfileForm = ({
                             {...register('email')}
                         />
                         <InputField
+                            label="RIF"
+                            {...register('rif')}
+                            placeholder="V-12345678-9"
+                        />
+                        <InputField
                             label="Teléfono"
                             {...register('phone')}
                         />

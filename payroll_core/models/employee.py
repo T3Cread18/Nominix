@@ -58,6 +58,21 @@ class Employee(models.Model):
         verbose_name='Apellidos'
     )
     
+    # Campos desglosados para archivos planos IVSS/FAOV
+    second_name = models.CharField(
+        max_length=50,
+        blank=True,
+        verbose_name='Segundo Nombre',
+        help_text='Requerido para archivos planos FAOV/IVSS'
+    )
+    
+    second_last_name = models.CharField(
+        max_length=50,
+        blank=True,
+        verbose_name='Segundo Apellido',
+        help_text='Requerido para archivos planos FAOV/IVSS'
+    )
+    
     email: models.EmailField = models.EmailField(
         unique=True,
         verbose_name='Correo Electrónico',
@@ -95,6 +110,18 @@ class Employee(models.Model):
     address: models.TextField = models.TextField(
         blank=True,
         verbose_name='Dirección'
+    )
+    
+    class Nationality(models.TextChoices):
+        VENEZUELAN = 'V', 'Venezolano(a)'
+        FOREIGNER = 'E', 'Extranjero(a)'
+    
+    nationality = models.CharField(
+        max_length=1,
+        choices=Nationality.choices,
+        default=Nationality.VENEZUELAN,
+        verbose_name='Nacionalidad',
+        help_text='V=Venezolano, E=Extranjero. Requerido para IVSS/FAOV'
     )
     
     photo = models.ImageField(
@@ -535,7 +562,18 @@ class LaborContract(models.Model):
     def save(self, *args, **kwargs) -> None:
         """
         Al activar un contrato, desactiva los demás del mismo empleado.
+        También registra cambios salariales en SalaryHistory.
         """
+        # Capturar salario anterior para SalaryHistory
+        _previous_salary = None
+        _is_new = self.pk is None
+        if not _is_new:
+            try:
+                old = LaborContract.objects.get(pk=self.pk)
+                _previous_salary = old.monthly_salary
+            except LaborContract.DoesNotExist:
+                _is_new = True
+        
         if self.is_active:
             LaborContract.objects.filter(
                 employee=self.employee, 
@@ -557,3 +595,14 @@ class LaborContract(models.Model):
                 self.department = self.job_position.department
         
         super().save(*args, **kwargs)
+        
+        # Registrar en SalaryHistory si hubo cambio salarial
+        from .salary_history import SalaryHistory
+        current_salary = self.monthly_salary
+        if _is_new or (_previous_salary is not None and _previous_salary != current_salary):
+            reason = 'Registro inicial' if _is_new else 'Cambio salarial'
+            SalaryHistory.record_change(
+                contract=self,
+                previous_amount=_previous_salary,
+                reason=reason,
+            )

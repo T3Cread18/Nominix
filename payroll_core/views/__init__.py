@@ -36,6 +36,9 @@ from ..serializers import (
 )
 from ..engine import PayrollEngine
 
+# Import vacations
+from vacations.models import VacationPayment, VacationRequest
+
 # Import new views
 from .import_views import *
 
@@ -332,6 +335,93 @@ class EmployeeViewSet(viewsets.ModelViewSet):
                 {"error": f"Error interno de cálculo: {str(e)}"}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+    @action(detail=True, methods=['get'], url_path='payment-history')
+    def payment_history(self, request, pk=None):
+        """
+        GET /api/employees/{id}/payment-history/
+        Retorna un historial unificado de pagos (Nómina, Vacaciones, Anticipos, Liquidación).
+        """
+        employee = self.get_object()
+        history = []
+
+        # 1. Nómina Regular (PayrollReceipt)
+        receipts = PayrollReceipt.objects.filter(employee=employee).select_related('period').order_by('-period__payment_date')
+        for r in receipts:
+            history.append({
+                'id': f'payroll_{r.id}',
+                'original_id': r.id,
+                'type': 'PAYROLL',
+                'type_label': 'Nómina',
+                'date': r.period.payment_date if r.period else r.created_at.date(),
+                'description': (r.period.name if r.period else f'Periodo {r.period_id} (Eliminado)'),
+                'amount_ves': r.net_pay_ves,
+                'amount_usd': getattr(r, 'net_pay_usd_ref', Decimal('0.00')),
+                'download_url': f'payslips/{r.id}/export-pdf/'
+            })
+
+        # 2. Vacaciones (VacationPayment)
+        from django.db.models import Prefetch
+        vacations = VacationPayment.objects.filter(vacation_request__employee=employee).select_related('vacation_request').order_by('-payment_date')
+        for v in vacations:
+            req = v.vacation_request
+            history.append({
+                'id': f'vacation_{v.id}',
+                'original_id': v.id,
+                'type': 'VACATION',
+                'type_label': 'Vacaciones',
+                'date': v.payment_date,
+                'description': f'Disfrute {req.start_date} al {req.end_date} ({req.days_requested} días)',
+                'amount_ves': v.net_amount_ves,
+                'amount_usd': (v.net_amount_ves / v.exchange_rate) if v.exchange_rate and v.exchange_rate > 0 else Decimal('0.00'),
+                'download_url': f'vacations/{req.id}/export-pdf/' 
+            })
+
+        # 3. Prestaciones - Anticipos (SocialBenefitsLedger)
+        advances = SocialBenefitsLedger.objects.filter(
+            employee=employee, 
+            transaction_type=SocialBenefitsLedger.TransactionType.ANTICIPO
+        ).order_by('-transaction_date')
+        for a in advances:
+            # Los anticipos están como cargos (negativos) en el ledger, los mostramos positivos como pago
+            amount = abs(a.amount) if a.amount else Decimal('0.00')
+            history.append({
+                'id': f'advance_{a.id}',
+                'original_id': a.id,
+                'type': 'BENEFITS_ADVANCE',
+                'type_label': 'Anticipo Prestaciones',
+                'date': a.transaction_date,
+                'description': a.period_description or 'Anticipo',
+                'amount_ves': amount,
+                'amount_usd': Decimal('0.00'), # Suponiendo VES para anticipos
+                'download_url': None # Sin URL de recibo PDF por ahora
+            })
+
+        # 4. Liquidaciones (SocialBenefitsSettlement)
+        # Identificando empleado por field employee_national_id ya que no hay ForeignKey directa a Employee, 
+        # o a través del contract
+        settlements = SocialBenefitsSettlement.objects.filter(
+            contract__employee=employee,
+            status=SocialBenefitsSettlement.SettlementStatus.PAID
+        ).order_by('-settlement_date')
+        
+        for s in settlements:
+            history.append({
+                'id': f'settlement_{s.id}',
+                'original_id': s.id,
+                'type': 'SETTLEMENT',
+                'type_label': 'Liquidación Final',
+                'date': s.settlement_date,
+                'description': 'Cierre de Relación Laboral',
+                'amount_ves': s.settlement_amount,
+                'amount_usd': Decimal('0.00'),
+                'download_url': f'contracts/{s.contract_id}/export-settlement-pdf/'
+            })
+
+        # Ordenar todo por fecha descendente
+        history.sort(key=lambda x: x['date'], reverse=True)
+
+        return Response(history)
 
     def update(self, request, *args, **kwargs):
         partial = True # Forzamos parcial para que no borre datos no enviados
@@ -966,6 +1056,61 @@ class SocialBenefitsViewSet(viewsets.ReadOnlyModelViewSet):
                 {'error': f'Error calculando liquidación: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+    @action(detail=False, methods=['get'], url_path='export-simulation-pdf')
+    def export_simulation_pdf(self, request):
+        """
+        GET /api/social-benefits/export-simulation-pdf/?contract_id=X
+        Genera el cuadro comparativo en formato PDF.
+        """
+        import weasyprint
+        from django.template.loader import render_to_string
+        from django.http import HttpResponse
+
+        contract_id = request.query_params.get('contract_id')
+        termination_date_str = request.query_params.get('termination_date')
+        
+        if not contract_id:
+            return Response({'error': 'Se requiere contract_id'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            contract = LaborContract.objects.get(pk=contract_id)
+        except LaborContract.DoesNotExist:
+            return Response({'error': 'Contrato no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+            
+        if termination_date_str:
+            from datetime import datetime
+            try:
+                termination_date = datetime.strptime(termination_date_str, '%Y-%m-%d').date()
+            except ValueError:
+                return Response({'error': 'Formato de fecha inválido. YYYY-MM-DD'}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            termination_date = timezone.now().date()
+            
+        from ..services.social_benefits_engine import calculate_final_settlement
+        
+        try:
+            comparison = calculate_final_settlement(contract, termination_date)
+            
+            context = {
+                'employee': contract.employee,
+                'contract': contract,
+                'comparison': comparison,
+                'termination_date': termination_date,
+                'simulation_date': timezone.now().date(),
+                'tenant_name': request.tenant.name if hasattr(request, 'tenant') else "Empresa Demo",
+                'tenant_rif': request.tenant.rif if hasattr(request, 'tenant') else "J-00000000-0",
+            }
+
+            html_string = render_to_string('payroll/cuadro_liquidacion.html', context)
+            pdf_file = weasyprint.HTML(string=html_string).write_pdf()
+
+            response = HttpResponse(pdf_file, content_type='application/pdf')
+            filename = f"cuadro_liquidacion_{contract.employee.national_id}.pdf"
+            response['Content-Disposition'] = f'attachment; filename="{filename}"'
+            return response
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @action(detail=False, methods=['post'], url_path='request-advance')
     def request_advance(self, request):

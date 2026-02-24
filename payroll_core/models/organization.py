@@ -503,6 +503,89 @@ class PayrollPolicy(models.Model):
         help_text="Cómo se acumulan los días de vacaciones"
     )
 
+    # ==========================================================================
+    # PARÁMETROS GUBERNAMENTALES (No-Code)
+    # ==========================================================================
+    
+    minimum_wage_ves = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        default=Decimal('130.00'),
+        verbose_name="Salario Mínimo (Bs.)",
+        help_text="Salario mínimo mensual vigente en VES. Usado como tope IVSS."
+    )
+    
+    imii_usd = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal('130.00'),
+        verbose_name="IMII (USD)",
+        help_text="Ingreso Mínimo Integral Indexado en USD. Piso para LPPSS."
+    )
+    
+    cestaticket_amount_usd = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal('40.00'),
+        verbose_name="Cestaticket (USD)",
+        help_text="Monto legal del cestaticket en USD."
+    )
+    
+    ut_value_ves = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal('9.00'),
+        verbose_name="Valor UT (Bs.)",
+        help_text="Valor de la Unidad Tributaria vigente. Usado para cálculos ISLR."
+    )
+    
+    # Tasas de deducciones (porcentajes, configurables)
+    ivss_employee_rate = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal('4.00'),
+        verbose_name="IVSS Empleado (%)",
+        help_text="Porcentaje de IVSS a cargo del trabajador"
+    )
+    
+    rpe_employee_rate = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal('0.50'),
+        verbose_name="RPE Empleado (%)",
+        help_text="Paro Forzoso a cargo del trabajador"
+    )
+    
+    faov_employee_rate = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal('1.00'),
+        verbose_name="FAOV Empleado (%)",
+        help_text="FAOV (Vivienda) a cargo del trabajador"
+    )
+    
+    lppss_rate = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal('9.00'),
+        verbose_name="LPPSS (%)",
+        help_text="Contribución Especial de Pensiones (LPPSS). Actualmente 9%."
+    )
+    
+    inces_employer_rate = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal('2.00'),
+        verbose_name="INCES Patronal (%)",
+        help_text="Contribución patronal INCES. Actualmente 2%."
+    )
+    
+    ivss_salary_cap_multiplier = models.PositiveSmallIntegerField(
+        default=5,
+        verbose_name="Tope IVSS (x SM)",
+        help_text="El IVSS se calcula sobre un máximo de N salarios mínimos"
+    )
+
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:

@@ -220,17 +220,29 @@ export const useDeleteConcept = (options = {}) => {
 
 export const usePayrollReceipts = (filters = {}, options = {}) => {
     return useQuery({
-        queryKey: payrollKeys.receiptList(filters),
+        queryKey: ['payrollReceipts', filters],
         queryFn: async () => {
             const params = new URLSearchParams();
             if (filters.period) params.append('period', filters.period);
             if (filters.employee) params.append('employee', filters.employee);
 
-            const response = await axiosClient.get(`/payroll-receipts/?${params.toString()}`);
+            const response = await axiosClient.get(`/payslips/?${params.toString()}`);
             return response.data;
         },
         staleTime: 5 * 60 * 1000,
-        ...options,
+    });
+};
+
+export const useUnifiedPaymentHistory = (filters = {}) => {
+    return useQuery({
+        queryKey: ['unifiedPaymentHistory', filters],
+        queryFn: async () => {
+            if (!filters.employee) return [];
+            const response = await axiosClient.get(`/employees/${filters.employee}/payment-history/`);
+            return response.data;
+        },
+        enabled: !!filters.employee,
+        staleTime: 5 * 60 * 1000,
     });
 };
 

@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { cn } from '../../utils/cn';
 import {
     LogOut, Loader2, Calculator, Users, ClipboardList,
-    Settings, ShieldCheck, FileSpreadsheet, PieChart, Banknote, Calendar, Fingerprint
+    Settings, ShieldCheck, FileSpreadsheet, PieChart, Banknote, Calendar, Fingerprint, Shield
 } from 'lucide-react';
 
 /**
@@ -33,6 +33,7 @@ const Navbar = () => {
     const secondaryNavItems = [
         { path: '/import', icon: FileSpreadsheet, label: 'Importar' },
         { path: '/loans', icon: Banknote, label: 'Préstamos' },
+        { path: '/declarations', icon: Shield, label: 'Ley y Gob' },
         { path: '/reports', icon: PieChart, label: 'Reportes' },
     ];
 

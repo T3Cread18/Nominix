@@ -17,6 +17,11 @@ from .views import (
     ImportFieldsView, ImportPreviewView, ImportValidateView, ImportExecuteView
 )
 from .views.import_views import ImportTemplateView
+from .views.export_views import (
+    IVSSExportView, FAOVExportView, ISLRXMLExportView,
+    LPPSSCalculateView, INCESCalculateView,
+    ConstanciaTrabajoView, PayrollExcelReportView,
+)
 
 
 
@@ -64,5 +69,15 @@ urlpatterns = [
     path('import/<str:model_key>/execute/', ImportExecuteView.as_view(), name='import-execute'),
     path('import/<str:model_key>/execute/', ImportExecuteView.as_view(), name='import-execute'),
     
+    # Government Exports & Declarations
+    path('exports/ivss/', IVSSExportView.as_view(), name='export-ivss'),
+    path('exports/faov/', FAOVExportView.as_view(), name='export-faov'),
+    path('exports/islr-xml/', ISLRXMLExportView.as_view(), name='export-islr-xml'),
+    path('declarations/lppss/calculate/', LPPSSCalculateView.as_view(), name='lppss-calculate'),
+    path('declarations/inces/calculate/', INCESCalculateView.as_view(), name='inces-calculate'),
+    
+    # Reports
+    path('reports/constancia-trabajo/<int:employee_id>/', ConstanciaTrabajoView.as_view(), name='constancia-trabajo'),
+    path('reports/excel/<int:period_id>/', PayrollExcelReportView.as_view(), name='payroll-excel-report'),
 
 ]

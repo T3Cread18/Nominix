@@ -98,14 +98,29 @@ const payrollService = {
     /**
      * Descarga el PDF individual de un recibo.
      */
-    downloadSinglePayslipPdf: async (payslipId, employeeName) => {
+    downloadSinglePayslipPdf: async (receiptId, empName) => {
         try {
-            const response = await axiosClient.get(`/payslips/${payslipId}/export-pdf/`, {
+            const response = await axiosClient.get(`/payslips/${receiptId}/download-pdf/`, {
                 responseType: 'blob'
             });
-            triggerFileDownload(response.data, `recibo_${employeeName || payslipId}.pdf`);
+            triggerFileDownload(response.data, `recibo_${empName}_${receiptId}.pdf`);
         } catch (error) {
             console.error("Error descargando recibo individual", error);
+            throw error;
+        }
+    },
+
+    /**
+     * Descarga un archivo genérico desde una URL expuesta por el backend.
+     */
+    downloadFromUrl: async (url, filename) => {
+        try {
+            const response = await axiosClient.get(url, {
+                responseType: 'blob'
+            });
+            triggerFileDownload(response.data, filename);
+        } catch (error) {
+            console.error("Error descargando archivo", error);
             throw error;
         }
     },

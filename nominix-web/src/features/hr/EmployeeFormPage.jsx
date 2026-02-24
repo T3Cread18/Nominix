@@ -16,7 +16,7 @@ import axiosClient from '../../api/axiosClient';
 
 import {
     ArrowLeft, Save, Briefcase, Calculator,
-    User, UserX, UserCheck, Shield
+    User, UserX, UserCheck, Shield, FileText
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 
@@ -31,6 +31,7 @@ import EmployeeProfileForm from './components/EmployeeProfileForm';
 import LaborContractsManager from './contracts/LaborContractsManager';
 import EmployeeConcepts from './EmployeeConcepts';
 import ManageSocialBenefits from '../social-benefits/ManageSocialBenefits';
+import EmployeePayslipHistory from './components/EmployeePayslipHistory';
 
 const EmployeeFormPage = () => {
     const { id } = useParams();
@@ -290,6 +291,7 @@ const EmployeeFormPage = () => {
                 <Tabs defaultValue="profile" className="w-full">
                     <TabsList className="mb-8">
                         <TabsTrigger value="profile" icon={User}>Datos Personales</TabsTrigger>
+                        {isEditing && <TabsTrigger value="history" icon={FileText}>Historial de Pagos</TabsTrigger>}
                         {isEditing && <TabsTrigger value="benefits" icon={Shield}>Prestaciones</TabsTrigger>}
                         {isEditing && <TabsTrigger value="contract" icon={Briefcase}>Contrato & Laboral</TabsTrigger>}
                         {isEditing && <TabsTrigger value="payroll" icon={Calculator}>Conceptos</TabsTrigger>}
@@ -315,6 +317,14 @@ const EmployeeFormPage = () => {
 
                     {isEditing && (
                         <>
+                            <TabsContent value="history">
+                                <div className="bg-white p-8 rounded-[2rem] border border-gray-100">
+                                    <EmployeePayslipHistory
+                                        employeeId={id}
+                                        employeeData={employee}
+                                    />
+                                </div>
+                            </TabsContent>
                             <TabsContent value="contract">
                                 <div className="bg-white p-8 rounded-[2rem] border border-gray-100">
                                     <LaborContractsManager

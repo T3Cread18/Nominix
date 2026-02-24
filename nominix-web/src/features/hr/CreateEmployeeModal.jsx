@@ -12,10 +12,12 @@ const CreateEmployeeModal = ({ isOpen, onClose, onSuccess }) => {
         first_name: '',
         last_name: '',
         national_id: '',
+        rif: '',
         email: '',
         position: '',
         branch: '',
         department: '',
+        rif: '',
         hire_date: new Date().toISOString().split('T')[0]
     });
     const [error, setError] = useState(null);
@@ -128,6 +130,14 @@ const CreateEmployeeModal = ({ isOpen, onClose, onSuccess }) => {
                             required
                             placeholder="V-12345678"
                         />
+                        {/* RIF */}
+                        <InputField
+                            label="RIF"
+                            name="rif"
+                            value={formData.rif}
+                            onChange={handleChange}
+                            placeholder="V-12345678-0"
+                        />
 
                         {/* Email */}
                         <InputField
@@ -137,6 +147,15 @@ const CreateEmployeeModal = ({ isOpen, onClose, onSuccess }) => {
                             onChange={handleChange}
                             type="email"
                             placeholder="juan@correo.com"
+                        />
+
+                        {/* RIF */}
+                        <InputField
+                            label="RIF"
+                            name="rif"
+                            value={formData.rif}
+                            onChange={handleChange}
+                            placeholder="V-12345678-9"
                         />
                     </div>
 

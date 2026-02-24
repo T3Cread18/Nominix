@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Cuadro Comparativo de Liquidación</title>
+    <style>
+        @page {
+            size: letter;
+            margin: 1cm;
+        }
+
+        body {
+            font-family: 'Helvetica', sans-serif;
+            font-size: 11px;
+            color: #333;
+        }
+
+        .header {
+            border-bottom: 2px solid #0052FF;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+            display: table;
+            width: 100%;
+        }
+
+        .header-left {
+            display: table-cell;
+            width: 60%;
+            vertical-align: top;
+        }
+
+        .header-right {
+            display: table-cell;
+            width: 40%;
+            text-align: right;
+            vertical-align: top;
+        }
+
+        .company-name {
+            font-size: 14px;
+            font-weight: bold;
+            text-transform: uppercase;
+            color: #0052FF;
+        }
+
+        .receipt-title {
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+
+        .grid-info {
+            display: table;
+            width: 100%;
+            margin-bottom: 20px;
+            font-size: 10px;
+        }
+
+        .row {
+            display: table-row;
+        }
+
+        .col {
+            display: table-cell;
+            padding: 3px 0;
+            width: 50%;
+        }
+
+        .label {
+            font-weight: bold;
+            color: #666;
+            width: 140px;
+            display: inline-block;
+        }
+
+        .highlight {
+            background-color: #FFF3CD;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-weight: bold;
+        }
+
+        .receipt-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            border: 1px solid #dee2e6;
+        }
+
+        .receipt-table th {
+            background-color: #0052FF;
+            color: white;
+            padding: 8px;
+            font-size: 10px;
+            text-transform: uppercase;
+            border: 1px solid #0041cc;
+            text-align: center;
+        }
+
+        .receipt-table td {
+            padding: 6px 8px;
+            border-bottom: 1px solid #eee;
+            border-left: 1px solid #eee;
+            border-right: 1px solid #eee;
+            font-size: 11px;
+        }
+
+        .amount {
+            text-align: right;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+        }
+
+        .winner {
+            background-color: #E8F5E9;
+            font-weight: bold;
+            color: #1B5E20;
+        }
+
+        .loser {
+            color: #757575;
+        }
+
+        .totals {
+            margin-top: 15px;
+            background-color: #F0F4FF;
+            padding: 15px;
+            border-radius: 5px;
+        }
+
+        .net-pay {
+            font-size: 16px;
+            font-weight: bold;
+            color: #0052FF;
+        }
+
+        .firmas {
+            margin-top: 50px;
+            width: 100%;
+            display: table;
+        }
+
+        .linea-firma {
+            display: table-cell;
+            text-align: center;
+            width: 50%;
+            padding: 0 5%;
+        }
+
+        .linea-firma div {
+            border-top: 1px solid #000;
+            padding-top: 5px;
+            font-size: 9px;
+            width: 80%;
+            margin: 0 auto;
+        }
+
+        .footer {
+            margin-top: 30px;
+            text-align: center;
+            font-size: 8px;
+            color: #999;
+            border-top: 1px solid #eee;
+            padding-top: 5px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <div class="header-left">
+            <div class="company-name">{{ tenant_name }}</div>
+            <div>RIF: {{ tenant_rif }}</div>
+        </div>
+        <div class="header-right">
+            <div class="receipt-title">Cuadro Comparativo de Liquidación</div>
+            <div>Base Legal: LOTTT Artículo 142</div>
+            <div>Fecha: {{ simulation_date|date:"d/m/Y" }}</div>
+        </div>
+    </div>
+
+    <!-- DATOS DEL TRABAJADOR Y SALARIOS -->
+    <div class="grid-info">
+        <div class="row">
+            <div class="col"><span class="label">Trabajador:</span> {{ employee.full_name }}</div>
+            <div class="col"><span class="label">Cédula:</span> {{ employee.national_id }}</div>
+        </div>
+        <div class="row">
+            <div class="col"><span class="label">Cargo:</span> {{ contract.position }}</div>
+            <div class="col"><span class="label">Último Salario Diario:</span> Bs. {{
+                comparison.retroactive.daily_salary_integral|floatformat:2 }}</div>
+        </div>
+        <div class="row">
+            <div class="col"><span class="label">Fecha Ingreso:</span> {{ contract.hire_date|date:"d/m/Y" }}</div>
+            <div class="col"><span class="label">Días Antigüedad Totales:</span> {{ comparison.retroactive.total_days }}
+                días</div>
+        </div>
+        <div class="row">
+            <div class="col"><span class="label">Fecha Egreso (Calculada):</span> {{ termination_date|date:"d/m/Y" }}
+            </div>
+            <div class="col">
+                <span class="label">Tiempo de Servicio:</span>
+                <span class="highlight">{{ comparison.years_of_service }} años, {{ comparison.months_of_service }}
+                    meses</span>
+            </div>
+        </div>
+    </div>
+
+    <h3 style="color: #0052FF; font-size: 12px; margin-bottom: 10px;">Cálculos Previos a Comparación</h3>
+
+    <table class="receipt-table" style="margin-bottom: 30px;">
+        <thead>
+            <tr>
+                <th style="width: 50%;">SISTEMA A: LOTTT 142 (a y b) - Garantía Acumulada</th>
+                <th style="width: 50%;">SISTEMA B: LOTTT 142 (c) - Cálculos Retroactivos</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td style="vertical-align: top;">
+                    <table style="width: 100%; font-size: 10px;">
+                        <tr>
+                            <td>Días Acumulados Trimestrales 142a:</td>
+                            <td class="amount">{{ comparison.guarantee.accumulated_days }}</td>
+                        </tr>
+                        <tr>
+                            <td>Días Adicionales Acumulados 142b:</td>
+                            <td class="amount">+ {{ comparison.guarantee.accumulated_additional_days }}</td>
+                        </tr>
+                        <tr>
+                            <td style="font-weight: bold; border-top: 1px dotted #ccc; padding-top: 5px;">Total Días
+                                Garantía:</td>
+                            <td class="amount"
+                                style="font-weight: bold; border-top: 1px dotted #ccc; padding-top: 5px;">{{
+                                comparison.guarantee.total_accumulated_days }}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding-top: 10px;">Monto Acumulado (Histórico):</td>
+                            <td class="amount" style="padding-top: 10px;">Bs. {{
+                                comparison.guarantee.ledger_balance|floatformat:2 }}</td>
+                        </tr>
+                    </table>
+                </td>
+                <td style="vertical-align: top;">
+                    <table style="width: 100%; font-size: 10px;">
+                        <tr>
+                            <td>Último Salario Integral Diario:</td>
+                            <td class="amount">Bs. {{ comparison.retroactive.daily_salary_integral|floatformat:2 }}</td>
+                        </tr>
+                        <tr>
+                            <td>Meses de Servicio:</td>
+                            <td class="amount">{{ comparison.months_of_service }} x 30 días</td>
+                        </tr>
+                        <tr>
+                            <td>Días Base Cálculo Retroactivo (142c):</td>
+                            <td class="amount">{{ comparison.retroactive.total_days }} días</td>
+                        </tr>
+                        <tr>
+                            <td style="padding-top: 10px;">Fórmula:</td>
+                            <td class="amount" style="padding-top: 10px;">({{ comparison.retroactive.total_days }} × {{
+                                comparison.retroactive.daily_salary_integral|floatformat:2 }})</td>
+                        </tr>
+                        <tr>
+                            <td>Sub-Total Retroactivo:</td>
+                            <td class="amount">Bs. {{ comparison.retroactive.calculated_amount|floatformat:2 }}</td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3 style="color: #0052FF; font-size: 12px; margin-bottom: 10px; border-top: 1px solid #ccc; padding-top: 15px;">
+        Decisión (Artículo 142 LOTTT): Debe pagarse el mayor</h3>
+
+    <table class="receipt-table">
+        <tbody>
+            <tr class="{% if comparison.decision == 'GUARANTEE' %}winner{% else %}loser{% endif %}">
+                <td style="width: 60%; font-weight: bold;">
+                    Total Literal a) y b) (Garantía Acumulada)
+                </td>
+                <td class="amount {% if comparison.decision == 'GUARANTEE' %}net-pay{% endif %}" style="width: 40%;">
+                    Bs. {{ comparison.guarantee.ledger_balance|floatformat:2 }}
+                </td>
+            </tr>
+            <tr class="{% if comparison.decision == 'RETROACTIVE' %}winner{% else %}loser{% endif %}">
+                <td style="font-weight: bold;">
+                    Total Literal c) (Cálculo Retroactivo Último Sueldo)
+                </td>
+                <td class="amount {% if comparison.decision == 'RETROACTIVE' %}net-pay{% endif %}">
+                    Bs. {{ comparison.retroactive.calculated_amount|floatformat:2 }}
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- TOTALES -->
+    <div class="totals">
+        <table style="width: 100%; border: none;">
+            <tr>
+                <td style="border: none; width: 60%; font-size: 14px; font-weight: bold; color: #333;">MONTO
+                    SELECCIONADO POR LEY:</td>
+                <td class="amount net-pay" style="border: none; width: 40%;">Bs. {{
+                    comparison.final_amount_ves|floatformat:2 }}</td>
+            </tr>
+            <tr>
+                <td colspan="2" style="border: none; padding-top: 5px; font-size: 9px; color: #666;">
+                    * Este monto no incluye los intereses sobre prestaciones sociales, los cuales se calculan y entregan
+                    en un reporte por separado. Tampoco incluye deducciones por anticipos previos, que se descontarán en
+                    el asiento contable final.
+                </td>
+            </tr>
+        </table>
+    </div>
+
+    <!-- FIRMAS -->
+    <div class="firmas">
+        <div class="linea-firma">
+            <div>Por la Empresa<br>{{ tenant_name }}</div>
+        </div>
+        <div class="linea-firma">
+            <div>Recibí Conforme Explicación<br>{{ employee.full_name }} - C.I. {{ employee.national_id }}</div>
+        </div>
+    </div>
+
+    <div class="footer">
+        Generado por Nóminix SaaS - Impreso el {% now "d/m/Y H:i" %}
+    </div>
+</body>
+
+</html>
