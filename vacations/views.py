@@ -17,10 +17,11 @@ logger = logging.getLogger(__name__)
 from django.db import transaction
 from django.utils import timezone
 
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from rest_framework.permissions import DjangoModelPermissions
 
 from django_filters.rest_framework import DjangoFilterBackend
 
@@ -61,6 +62,7 @@ class VacationRequestViewSet(viewsets.ModelViewSet):
         'employee', 'contract'
     ).all()
     serializer_class = VacationRequestSerializer
+    permission_classes = [permissions.IsAuthenticated, DjangoModelPermissions]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['employee', 'status', 'vacation_type']
     parser_classes = [JSONParser, MultiPartParser, FormParser]
@@ -1004,6 +1006,7 @@ class VacationBalanceViewSet(viewsets.ReadOnlyModelViewSet):
         'employee', 'related_request'
     ).all()
     serializer_class = VacationBalanceSerializer
+    permission_classes = [permissions.IsAuthenticated, DjangoModelPermissions]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['employee', 'transaction_type', 'period_year']
     
@@ -1055,6 +1058,7 @@ class HolidayViewSet(viewsets.ModelViewSet):
     
     queryset = Holiday.objects.all()
     serializer_class = HolidaySerializer
+    permission_classes = [permissions.IsAuthenticated, DjangoModelPermissions]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['is_national', 'is_recurring']
     

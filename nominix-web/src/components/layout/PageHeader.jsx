@@ -68,7 +68,6 @@ const PageHeader = ({
  * Permite definir título y subtítulo por path.
  */
 const pageHeaders = {
-    '/': { title: 'Administración de Personal', subtitle: 'Gestión de RRHH' },
     '/personnel': { title: 'Administración de Personal', subtitle: 'Gestión de RRHH' },
     '/payroll': { title: 'Dashboard de Nómina', subtitle: 'Procesamiento' },
     '/catalog': { title: 'Catálogo de Conceptos', subtitle: 'Configuración' },

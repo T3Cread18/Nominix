@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { History, ChevronDown, ChevronUp, Loader2, AlertCircle, Search } from 'lucide-react';
+import { History, ChevronDown, ChevronUp, Loader2, AlertCircle, Search, RefreshCw } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { Card, Button, InputField } from '../components/ui';
+import { cn } from '../utils/cn';
 
 const fetchAuditLogs = async (page = 1, searchUser = '', token) => {
     // Construir la URL base de forma segura, concatenando strings en lugar de usar new URL()
@@ -132,89 +134,85 @@ const AuditLogsManager = () => {
     const totalPages = Math.ceil(totalCount / rowsPerPage);
 
     return (
-        <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
+        <div className="max-w-7xl mx-auto py-6 sm:py-8 px-4 sm:px-6 lg:px-8 space-y-6">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
                 <div className="flex items-center gap-3">
-                    <div className="p-2 bg-indigo-100 rounded-lg">
+                    <div className="p-2 bg-indigo-50 rounded-xl">
                         <History className="text-indigo-600" size={28} />
                     </div>
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900 leading-tight">Bitácora de Auditoría</h1>
-                        <p className="text-sm text-gray-500 mt-1">
-                            Registro de todas las modificaciones realizadas a los datos críticos del sistema.
+                        <h1 className="text-xl sm:text-2xl font-black text-slate-800 tracking-tight">Bitácora de Auditoría</h1>
+                        <p className="text-[10px] sm:text-sm text-slate-400 font-bold uppercase tracking-widest mt-1">
+                            Control de cambios y trazabilidad del sistema
                         </p>
                     </div>
                 </div>
 
-                <form onSubmit={handleSearch} className="flex gap-2">
-                    <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <Search size={16} className="text-gray-400" />
-                        </div>
-                        <input
-                            type="text"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            placeholder="Buscar por usuario / email..."
-                            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                        />
+                <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
+                    <InputField
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        placeholder="Buscar usuario..."
+                        icon={Search}
+                        className="w-full sm:w-64"
+                    />
+                    <div className="flex gap-2">
+                        <Button type="submit" className="flex-1 sm:flex-initial">
+                            Filtrar
+                        </Button>
+                        {searchUser && (
+                            <Button
+                                variant="secondary"
+                                onClick={() => {
+                                    setSearchTerm('');
+                                    setSearchUser('');
+                                    setPage(1);
+                                }}
+                            >
+                                Limpiar
+                            </Button>
+                        )}
                     </div>
-                    <button
-                        type="submit"
-                        className="px-4 py-2 bg-indigo-600 text-white rounded-md text-sm font-medium hover:bg-indigo-700 transition-colors"
-                    >
-                        Filtrar
-                    </button>
-                    {searchUser && (
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setSearchTerm('');
-                                setSearchUser('');
-                                setPage(1);
-                            }}
-                            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-200 transition-colors"
-                        >
-                            Limpiar
-                        </button>
-                    )}
                 </form>
             </div>
 
             {error && (
-                <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3 text-red-700">
+                <div className="p-4 bg-red-50 border border-red-100 rounded-2xl flex items-start gap-3 text-red-700 animate-in fade-in slide-in-from-top-2">
                     <AlertCircle size={20} className="mt-0.5" />
                     <div>
-                        <h3 className="font-semibold text-sm">Error al cargar bitácora</h3>
-                        <p className="text-sm mt-1">{error}</p>
+                        <h3 className="font-bold text-sm">Error al cargar bitácora</h3>
+                        <p className="text-xs mt-1">{error}</p>
                     </div>
                 </div>
             )}
 
-            <div className="mt-8 bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden flex flex-col h-[70vh]">
-                <div className="overflow-auto flex-1 relative">
-                    <table className="w-full text-left text-sm">
-                        <thead className="bg-gray-50 border-b border-gray-200 text-xs uppercase font-semibold text-gray-600 sticky top-0 z-10">
-                            <tr>
-                                <th className="p-3">Fecha y Hora</th>
-                                <th className="p-3">Usuario</th>
-                                <th className="p-3">Acción</th>
-                                <th className="p-3">Registro Afectado</th>
-                                <th className="p-3 w-1/3">Detalle de Cambios (Delta)</th>
+            <Card className="!p-0 overflow-hidden flex flex-col h-[70vh]">
+                <div className="overflow-auto flex-1 custom-scrollbar">
+                    <table className="w-full text-left border-separate border-spacing-0">
+                        <thead className="sticky top-0 z-10">
+                            <tr className="bg-slate-50/80 backdrop-blur-md">
+                                <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Fecha y Hora</th>
+                                <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Usuario</th>
+                                <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Acción</th>
+                                <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Registro</th>
+                                <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 w-1/3">Cambios (Delta)</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100">
+                        <tbody className="divide-y divide-slate-50">
                             {loading ? (
                                 <tr>
-                                    <td colSpan={5} className="p-10 text-center text-gray-500">
-                                        <Loader2 className="animate-spin mx-auto mb-3" size={32} />
-                                        Cargando registros...
+                                    <td colSpan={5} className="p-20 text-center">
+                                        <div className="flex flex-col items-center gap-3">
+                                            <Loader2 className="animate-spin text-nominix-electric" size={32} />
+                                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Cargando bitácora...</p>
+                                        </div>
                                     </td>
                                 </tr>
                             ) : logs.length === 0 ? (
                                 <tr>
-                                    <td colSpan={5} className="p-10 text-center text-gray-500">
-                                        No hay registros de auditoría disponibles en esta página.
+                                    <td colSpan={5} className="p-20 text-center text-slate-400">
+                                        <History size={48} className="mx-auto mb-4 opacity-10" />
+                                        <p className="text-xs font-black uppercase tracking-widest">No se encontraron registros</p>
                                     </td>
                                 </tr>
                             ) : (
@@ -227,28 +225,32 @@ const AuditLogsManager = () => {
                 </div>
 
                 {/* Pagination Footer */}
-                <div className="border-t border-gray-200 bg-gray-50 p-4 flex items-center justify-between">
-                    <div className="text-sm text-gray-600">
-                        Mostrando <span className="font-medium">{logs.length > 0 ? (page - 1) * rowsPerPage + 1 : 0}</span> a <span className="font-medium">{Math.min(page * rowsPerPage, totalCount)}</span> de <span className="font-medium">{totalCount}</span> resultados
+                <div className="border-t border-slate-100 bg-slate-50/50 p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                        Mostrando <span className="text-slate-600">{logs.length > 0 ? (page - 1) * rowsPerPage + 1 : 0}</span>-
+                        <span className="text-slate-600">{Math.min(page * rowsPerPage, totalCount)}</span> de
+                        <span className="text-slate-600"> {totalCount}</span>
                     </div>
                     <div className="flex gap-2">
-                        <button
+                        <Button
+                            size="sm"
+                            variant="secondary"
                             onClick={() => setPage(p => Math.max(1, p - 1))}
                             disabled={page === 1 || loading}
-                            className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
                             Anterior
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant="secondary"
                             onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                             disabled={page >= totalPages || loading}
-                            className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
                             Siguiente
-                        </button>
+                        </Button>
                     </div>
                 </div>
-            </div>
+            </Card>
         </div>
     );
 };

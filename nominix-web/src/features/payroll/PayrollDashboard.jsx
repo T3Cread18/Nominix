@@ -13,9 +13,13 @@ import {
     Loader2,
     Calendar,
     ChevronRight,
-    RefreshCw
+    RefreshCw,
+    Play,
+    CheckCircle2
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
+import { Badge } from '../../components/ui';
+import RequirePermission from '../../context/RequirePermission';
 
 /**
  * PayrollDashboard - Dashboard unificado de gestión de nómina
@@ -112,8 +116,8 @@ const PayrollDashboard = () => {
         <div className="min-h-screen bg-nominix-smoke">
             {/* === HEADER === */}
             <div className="bg-white border-b border-gray-100 sticky top-0 z-40">
-                <div className="max-w-7xl mx-auto px-6 lg:px-10">
-                    <div className="flex items-center justify-between py-6">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10">
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between py-4 sm:py-6 gap-6">
                         <div>
                             <h1 className="text-2xl font-black text-nominix-dark flex items-center gap-3">
                                 <div className="p-2 bg-nominix-electric/10 rounded-xl">
@@ -127,20 +131,21 @@ const PayrollDashboard = () => {
                         </div>
 
                         {/* Quick Stats */}
-                        <div className="flex items-center gap-6">
-                            <div className="text-right">
-                                <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">Colaboradores</p>
-                                <p className="text-lg font-black text-nominix-dark">{stats.employees}</p>
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:flex items-center gap-4 sm:gap-6 w-full lg:w-auto">
+                            <div className="text-left lg:text-right">
+                                <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest leading-none mb-1">Colaboradores</p>
+                                <p className="text-base sm:text-lg font-black text-nominix-dark leading-none">{stats.employees}</p>
                             </div>
-                            <div className="h-8 w-px bg-gray-100"></div>
-                            <div className="text-right">
-                                <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">Periodos Abiertos</p>
-                                <p className="text-lg font-black text-green-600">{stats.openPeriods}</p>
+                            <div className="hidden lg:block h-8 w-px bg-gray-100"></div>
+                            <div className="text-left lg:text-right">
+                                <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest leading-none mb-1">Abiertos</p>
+                                <p className="text-base sm:text-lg font-black text-green-600 leading-none">{stats.openPeriods}</p>
                             </div>
-                            <div className="h-8 w-px bg-gray-100"></div>
-                            <div className="text-right">
-                                <div className="flex items-center gap-1 justify-end">
-                                    <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">Tasa BCV</p>
+                            <div className="hidden lg:block h-8 w-px bg-gray-100"></div>
+
+                            <div className="text-left lg:text-right col-span-2 md:col-span-1">
+                                <div className="flex items-center gap-1 justify-start lg:justify-end">
+                                    <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mb-1">Tasa BCV</p>
                                     <button
                                         onClick={loadExchangeRate}
                                         className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
@@ -149,7 +154,7 @@ const PayrollDashboard = () => {
                                         <RefreshCw size={10} className={cn("text-gray-400", loadingRate && "animate-spin")} />
                                     </button>
                                 </div>
-                                <p className="text-lg font-black text-nominix-electric">
+                                <p className="text-base sm:text-lg font-black text-nominix-electric leading-none">
                                     {loadingRate ? '...' : `Bs. ${stats.lastRate.toFixed(2)}`}
                                 </p>
                             </div>
@@ -157,20 +162,20 @@ const PayrollDashboard = () => {
                     </div>
 
                     {/* === TABS === */}
-                    <div className="flex gap-1 -mb-px">
+                    <div className="flex gap-1 -mb-px overflow-x-auto no-scrollbar">
                         {tabs.map(tab => (
                             <button
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
                                 className={cn(
-                                    "flex items-center gap-2 px-6 py-4 border-b-2 transition-all",
+                                    "flex items-center gap-2 px-4 sm:px-6 py-4 border-b-2 transition-all whitespace-nowrap",
                                     activeTab === tab.id
                                         ? "border-nominix-electric text-nominix-electric bg-nominix-electric/5"
                                         : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50"
                                 )}
                             >
                                 <tab.icon size={16} />
-                                <span className="text-xs font-black uppercase tracking-widest">{tab.label}</span>
+                                <span className="text-[10px] sm:text-xs font-black uppercase tracking-widest">{tab.label}</span>
                             </button>
                         ))}
                     </div>
@@ -179,8 +184,8 @@ const PayrollDashboard = () => {
 
             {/* === PERIOD SELECTOR (Para Novedades y Detalle) === */}
             {(activeTab === 'novelties' || activeTab === 'detail') && selectedPeriod && (
-                <div className="max-w-7xl mx-auto px-6 lg:px-10 py-4">
-                    <div className="bg-gradient-to-r from-nominix-dark to-slate-800 rounded-2xl p-5 flex items-center justify-between text-white transition-all shadow-lg hover:shadow-nominix-electric/20">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-4">
+                    <div className="bg-gradient-to-r from-nominix-dark to-slate-800 rounded-2xl p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between text-white transition-all shadow-lg hover:shadow-nominix-electric/20 gap-4">
                         <div className="flex items-center gap-4">
                             <div className="p-3 bg-white/10 rounded-xl backdrop-blur-sm">
                                 <Calendar size={20} className="text-nominix-electric" />
@@ -227,7 +232,7 @@ const PayrollDashboard = () => {
             )}
 
             {/* === CONTENT === */}
-            <div className="max-w-7xl mx-auto px-6 lg:px-10 py-6">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-4 sm:py-6">
                 {activeTab === 'novelties' && (
                     <NovedadesGrid
                         initialPeriods={periods}

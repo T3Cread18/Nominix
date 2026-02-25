@@ -79,8 +79,37 @@ export const AuthProvider = ({ children }) => {
         setTenant(null);
     };
 
+    /**
+     * Helper para verificar si el usuario tiene un permiso específico (Local)
+     * @param {string} permissionCodename - Ej: 'payroll_core.add_employee'
+     */
+    const hasPermission = (permissionCodename) => {
+        if (!user) return false;
+        if (user.is_superuser) return true; // El superusuario lo puede todo
+
+        // El backend envía user.all_permissions como una lista de strings
+        if (Array.isArray(user.all_permissions)) {
+            return user.all_permissions.includes(permissionCodename);
+        }
+        return false;
+    };
+
+    /**
+     * Helper para verificar si el usuario pertenece a un rol específico
+     * @param {string} roleName - Ej: 'Administrador'
+     */
+    const hasRole = (roleName) => {
+        if (!user) return false;
+        if (user.is_superuser) return true;
+
+        if (Array.isArray(user.groups_data)) {
+            return user.groups_data.some(group => group.name === roleName);
+        }
+        return false;
+    };
+
     return (
-        <AuthContext.Provider value={{ user, tenant, loading, login, logout, checkAuth }}>
+        <AuthContext.Provider value={{ user, tenant, loading, login, logout, checkAuth, hasPermission, hasRole }}>
             {children}
         </AuthContext.Provider>
     );

@@ -3,6 +3,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import Navbar from './Navbar';
 import { PageHeader, getPageHeader } from './PageHeader';
 import { Toaster } from 'sonner';
+import { cn } from '../../utils/cn';
 
 /**
  * DashboardLayout - Layout principal de la aplicación.
@@ -42,7 +43,11 @@ const DashboardLayout = ({
             <Navbar />
 
             {/* Contenido Principal */}
-            <main className={`flex-1 py-10 mx-auto px-4 lg:px-8 w-full max-w-${maxWidth} ${className || ''}`}>
+            <main className={cn(
+                "flex-1 py-6 sm:py-10 mx-auto px-4 sm:px-6 lg:px-8 w-full",
+                `max-w-${maxWidth}`,
+                className
+            )}>
                 {/* Header automático basado en ruta */}
                 {shouldShowAutoHeader && (
                     <PageHeader

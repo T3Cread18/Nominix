@@ -1,9 +1,8 @@
-
 import React from 'react';
-import { UserPlus, Search, Building2, X, Shirt } from 'lucide-react';
-import Button from '../../../components/ui/Button';
-import InputField from '../../../components/ui/InputField';
-import SelectField from '../../../components/ui/SelectField';
+import { Search, Plus, Filter, Building2, Shirt } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { InputField, Button, SelectField } from '../../../components/ui';
+import RequirePermission from '../../../context/RequirePermission';
 
 const HeaderToolbar = ({
     searchTerm,
@@ -11,20 +10,21 @@ const HeaderToolbar = ({
     selectedBranch,
     setSelectedBranch,
     branches,
-    onNewClick,
     onEndowmentsClick
 }) => {
+    const navigate = useNavigate();
+
     return (
-        <div className="p-6 border-b border-gray-50 bg-white/50 backdrop-blur-sm z-20">
-            <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6">
+        <div className="p-4 sm:p-6 border-b border-gray-50 bg-white/50 backdrop-blur-sm z-20">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
                 <div>
-                    <h3 className="text-2xl font-black text-slate-800 tracking-tight">Personal</h3>
-                    <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest mt-1">
+                    <h3 className="text-xl sm:text-2xl font-black text-slate-800 tracking-tight">Personal</h3>
+                    <p className="text-[10px] sm:text-[11px] text-slate-400 font-bold uppercase tracking-widest mt-1">
                         Gestión de Talento Humano
                     </p>
                 </div>
 
-                <div className="flex flex-col sm:flex-row items-center gap-3 w-full xl:w-auto">
+                <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
 
                     {/* SELECTOR DE SEDE */}
                     <div className="w-full sm:w-48">
@@ -51,23 +51,36 @@ const HeaderToolbar = ({
                     </div>
 
                     {/* BOTÓN DOTACIONES */}
-                    <Button
-                        onClick={onEndowmentsClick}
-                        icon={Shirt}
-                        variant="secondary"
-                        className="w-full sm:w-auto"
-                    >
-                        <span className="hidden sm:inline">Dotaciones</span>
-                    </Button>
+                    <RequirePermission permission="payroll_core.view_endowmentevent">
+                        <Button
+                            onClick={onEndowmentsClick}
+                            icon={Shirt}
+                            variant="secondary"
+                            className="w-full sm:w-auto"
+                        >
+                            <span className="hidden sm:inline">Dotaciones</span>
+                        </Button>
+                    </RequirePermission>
 
-                    {/* BOTÓN NUEVO */}
-                    <Button
-                        onClick={onNewClick}
-                        icon={UserPlus}
-                        className="w-full sm:w-auto shadow-xl shadow-slate-200"
-                    >
-                        <span className="hidden sm:inline">Nuevo</span>
-                    </Button>
+                    {/* BOTONES ACCION (NUEVO, FILTRAR) */}
+                    <div className="flex flex-row gap-2 w-full md:w-auto">
+                        <RequirePermission permission="payroll_core.add_employee">
+                            <Button
+                                onClick={() => navigate('/personnel/create')}
+                                className="flex-1 md:flex-none justify-center py-2.5 px-4"
+                                icon={Plus}
+                            >
+                                <span className="hidden sm:inline">Nuevo Empleado</span>
+                                <span className="sm:hidden">Nuevo</span>
+                            </Button>
+                        </RequirePermission>
+                        <Button
+                            variant="secondary"
+                            className="flex-none px-3 py-2.5"
+                            icon={Filter}
+                            title="Filtrar"
+                        />
+                    </div>
                 </div>
             </div>
         </div>

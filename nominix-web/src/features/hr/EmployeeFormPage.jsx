@@ -25,6 +25,7 @@ import Tabs, { TabsList, TabsTrigger, TabsContent } from '../../components/ui/Ta
 import Button from '../../components/ui/Button';
 import { PageLoader } from '../../components/ui/Skeleton';
 import ConfirmationModal from '../../components/ConfirmationModal';
+import RequirePermission from '../../context/RequirePermission';
 
 // Subcomponents
 import EmployeeProfileForm from './components/EmployeeProfileForm';
@@ -291,10 +292,26 @@ const EmployeeFormPage = () => {
                 <Tabs defaultValue="profile" className="w-full">
                     <TabsList className="mb-8">
                         <TabsTrigger value="profile" icon={User}>Datos Personales</TabsTrigger>
-                        {isEditing && <TabsTrigger value="history" icon={FileText}>Historial de Pagos</TabsTrigger>}
-                        {isEditing && <TabsTrigger value="benefits" icon={Shield}>Prestaciones</TabsTrigger>}
-                        {isEditing && <TabsTrigger value="contract" icon={Briefcase}>Contrato & Laboral</TabsTrigger>}
-                        {isEditing && <TabsTrigger value="payroll" icon={Calculator}>Conceptos</TabsTrigger>}
+                        {isEditing && (
+                            <RequirePermission permission="payroll_core.view_payrollreceipt">
+                                <TabsTrigger value="history" icon={FileText}>Historial de Pagos</TabsTrigger>
+                            </RequirePermission>
+                        )}
+                        {isEditing && (
+                            <RequirePermission permission="social_benefits.view_socialbenefitcalculation">
+                                <TabsTrigger value="benefits" icon={Shield}>Prestaciones</TabsTrigger>
+                            </RequirePermission>
+                        )}
+                        {isEditing && (
+                            <RequirePermission permission="payroll_core.view_laborcontract">
+                                <TabsTrigger value="contract" icon={Briefcase}>Contrato & Laboral</TabsTrigger>
+                            </RequirePermission>
+                        )}
+                        {isEditing && (
+                            <RequirePermission permission="payroll_core.view_employeeconcept">
+                                <TabsTrigger value="payroll" icon={Calculator}>Conceptos</TabsTrigger>
+                            </RequirePermission>
+                        )}
                     </TabsList>
 
                     <TabsContent value="profile">
@@ -317,38 +334,49 @@ const EmployeeFormPage = () => {
 
                     {isEditing && (
                         <>
-                            <TabsContent value="history">
-                                <div className="bg-white p-8 rounded-[2rem] border border-gray-100">
-                                    <EmployeePayslipHistory
-                                        employeeId={id}
-                                        employeeData={employee}
-                                    />
-                                </div>
-                            </TabsContent>
-                            <TabsContent value="contract">
-                                <div className="bg-white p-8 rounded-[2rem] border border-gray-100">
-                                    <LaborContractsManager
-                                        employeeId={id}
-                                        employeeData={employee}
-                                    />
-                                </div>
-                            </TabsContent>
-                            <TabsContent value="benefits">
-                                <div className="bg-white p-8 rounded-[2rem] border border-gray-100">
-                                    <ManageSocialBenefits
-                                        employeeId={id}
-                                        employeeData={employee}
-                                        contracts={contracts}
-                                    />
-                                </div>
-                            </TabsContent>
-                            <TabsContent value="payroll">
-                                <div className="bg-white p-8 rounded-[2rem] border border-gray-100">
-                                    <EmployeeConcepts
-                                        employeeId={id}
-                                    />
-                                </div>
-                            </TabsContent>
+                            <RequirePermission permission="payroll_core.view_payrollreceipt">
+                                <TabsContent value="history">
+                                    <div className="bg-white p-8 rounded-[2rem] border border-gray-100">
+                                        <EmployeePayslipHistory
+                                            employeeId={id}
+                                            employeeData={employee}
+                                        />
+                                    </div>
+                                </TabsContent>
+                            </RequirePermission>
+
+                            <RequirePermission permission="payroll_core.view_laborcontract">
+                                <TabsContent value="contract">
+                                    <div className="bg-white p-8 rounded-[2rem] border border-gray-100">
+                                        <LaborContractsManager
+                                            employeeId={id}
+                                            employeeData={employee}
+                                        />
+                                    </div>
+                                </TabsContent>
+                            </RequirePermission>
+
+                            <RequirePermission permission="social_benefits.view_socialbenefitcalculation">
+                                <TabsContent value="benefits">
+                                    <div className="bg-white p-8 rounded-[2rem] border border-gray-100">
+                                        <ManageSocialBenefits
+                                            employeeId={id}
+                                            employeeData={employee}
+                                            contracts={contracts}
+                                        />
+                                    </div>
+                                </TabsContent>
+                            </RequirePermission>
+
+                            <RequirePermission permission="payroll_core.view_employeeconcept">
+                                <TabsContent value="payroll">
+                                    <div className="bg-white p-8 rounded-[2rem] border border-gray-100">
+                                        <EmployeeConcepts
+                                            employeeId={id}
+                                        />
+                                    </div>
+                                </TabsContent>
+                            </RequirePermission>
                         </>
                     )}
                 </Tabs>

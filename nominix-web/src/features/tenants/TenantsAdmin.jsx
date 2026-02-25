@@ -401,6 +401,7 @@ const RenewModal = ({ tenant, onClose, onRenewed }) => {
 
 const TenantUsersModal = ({ tenant, onClose }) => {
     const [users, setUsers] = useState([]);
+    const [allRoles, setAllRoles] = useState([]);
     const [loading, setLoading] = useState(true);
     const [view, setView] = useState('list'); // list, create, edit
     const [editingUser, setEditingUser] = useState(null);
@@ -414,12 +415,23 @@ const TenantUsersModal = ({ tenant, onClose }) => {
         last_name: '',
         is_staff: false,
         is_superuser: false,
-        is_active: true
+        is_active: true,
+        role_ids: []
     });
 
     useEffect(() => {
         fetchUsers();
+        fetchRoles();
     }, [tenant.id]);
+
+    const fetchRoles = async () => {
+        try {
+            const res = await axiosClient.get(`/tenants/${tenant.id}/roles/`);
+            setAllRoles(res.data);
+        } catch (error) {
+            console.error('Error cargando roles del tenant');
+        }
+    };
 
     const fetchUsers = async () => {
         setLoading(true);
@@ -475,7 +487,8 @@ const TenantUsersModal = ({ tenant, onClose }) => {
             last_name: user.last_name,
             is_staff: user.is_staff,
             is_superuser: user.is_superuser,
-            is_active: user.is_active
+            is_active: user.is_active,
+            role_ids: user.groups || []
         });
         setView('edit');
     };
@@ -484,7 +497,8 @@ const TenantUsersModal = ({ tenant, onClose }) => {
         setForm({
             username: '', email: '', password: '',
             first_name: '', last_name: '',
-            is_staff: false, is_superuser: false, is_active: true
+            is_staff: false, is_superuser: false, is_active: true,
+            role_ids: []
         });
         setView('create');
     }
@@ -544,6 +558,11 @@ const TenantUsersModal = ({ tenant, onClose }) => {
                                     <span className={cn("text-[9px] px-2 py-0.5 rounded font-black uppercase tracking-widest", u.is_active ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500")}>
                                         {u.is_active ? 'Activo' : 'Inactivo'}
                                     </span>
+                                    {u.roles?.map(role => (
+                                        <span key={role.id} className="text-[9px] px-2 py-0.5 rounded font-black uppercase tracking-widest bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                                            {role.name}
+                                        </span>
+                                    ))}
                                 </div>
                             </div>
                         ))}
@@ -594,6 +613,31 @@ const TenantUsersModal = ({ tenant, onClose }) => {
                                 <input type="checkbox" checked={form.is_superuser} onChange={e => setForm({ ...form, is_superuser: e.target.checked })} className="accent-nominix-electric w-4 h-4" />
                                 <span className="text-xs font-bold text-gray-300">Superuser</span>
                             </label>
+                        </div>
+
+                        <div className="space-y-2 border-t border-white/5 pt-4">
+                            <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Roles Asignados</label>
+                            <div className="grid grid-cols-2 gap-2">
+                                {allRoles.map(role => (
+                                    <label key={role.id} className="flex items-center gap-2 cursor-pointer bg-black/10 px-3 py-2 rounded-xl border border-white/5 hover:border-nominix-electric/30 transition-all select-none">
+                                        <input
+                                            type="checkbox"
+                                            checked={form.role_ids.includes(role.id)}
+                                            onChange={e => {
+                                                const ids = e.target.checked
+                                                    ? [...form.role_ids, role.id]
+                                                    : form.role_ids.filter(id => id !== role.id);
+                                                setForm({ ...form, role_ids: ids });
+                                            }}
+                                            className="accent-nominix-electric w-4 h-4"
+                                        />
+                                        <span className="text-xs text-gray-300">{role.name}</span>
+                                    </label>
+                                ))}
+                                {allRoles.length === 0 && (
+                                    <p className="col-span-2 text-xs text-gray-500 italic">No hay roles definidos en este tenant. Créalos primero en la configuración del tenant.</p>
+                                )}
+                            </div>
                         </div>
 
                         <div className="flex gap-3 pt-4">

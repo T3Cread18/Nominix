@@ -19,6 +19,7 @@ import {
 import { cn } from '../../utils/cn';
 import ConceptFormBuilder from './components/ConceptFormBuilder'; // Importar el Builder
 import { useQueryClient } from '@tanstack/react-query'; // Para invalidar caché si fuera necesario desde el padre
+import RequirePermission from '../../context/RequirePermission';
 
 const ConceptCatalog = () => {
     const [concepts, setConcepts] = useState([]);
@@ -122,12 +123,14 @@ const ConceptCatalog = () => {
                             <p className="text-[11px] text-gray-400 font-black uppercase tracking-[0.4em] mt-1">Diccionario Maestro de Reglas Salariales</p>
                         </div>
                     </div>
-                    <button
-                        onClick={handleOpenCreate}
-                        className="flex items-center gap-3 px-8 py-5 bg-nominix-dark text-white rounded-[1.2rem] text-[11px] font-black uppercase tracking-widest hover:bg-black transition-all shadow-2xl shadow-nominix-dark/10 active:scale-95"
-                    >
-                        <Plus size={20} /> Nuevo Concepto
-                    </button>
+                    <RequirePermission permission="payroll_core.add_payrollconcept">
+                        <button
+                            onClick={handleOpenCreate}
+                            className="flex items-center gap-3 px-8 py-5 bg-nominix-dark text-white rounded-[1.2rem] text-[11px] font-black uppercase tracking-widest hover:bg-black transition-all shadow-2xl shadow-nominix-dark/10 active:scale-95"
+                        >
+                            <Plus size={20} /> Nuevo Concepto
+                        </button>
+                    </RequirePermission>
                 </div>
 
                 {/* Summary Bar */}

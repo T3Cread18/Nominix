@@ -1,17 +1,24 @@
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, permissions
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.db import transaction
 from django.utils import timezone
 from ..models import EndowmentEvent, Employee, Branch
 from ..serializers import EndowmentEventSerializer
+from rest_framework.permissions import DjangoModelPermissions
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import filters
 
 class EndowmentEventViewSet(viewsets.ModelViewSet):
     """
     ViewSet para listar y crear eventos de dotación.
     """
-    queryset = EndowmentEvent.objects.all()
+    queryset = EndowmentEvent.objects.all().order_by('-date')
     serializer_class = EndowmentEventSerializer
+    permission_classes = [permissions.IsAuthenticated, DjangoModelPermissions]
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    filterset_fields = ['employee', 'endowment_type', 'status']
+    ordering_fields = ['date', 'employee__first_name']
     
     def get_queryset(self):
         queryset = super().get_queryset()

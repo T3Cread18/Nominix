@@ -76,7 +76,7 @@ const PersonnelManager = () => {
     const totalPages = Math.ceil((employeeData?.count || 0) / 20) || 1;
 
     return (
-        <div className="relative h-[calc(100vh-100px)]">
+        <div className="relative min-h-[600px] lg:h-[calc(100vh-110px)]">
             <ConfirmationModal
                 isOpen={confirmState.isOpen}
                 onClose={() => setConfirmState(prev => ({ ...prev, isOpen: false }))}

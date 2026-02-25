@@ -1,7 +1,8 @@
 from django.db import transaction
-from rest_framework import views, viewsets, response, status, filters
+from rest_framework import views, viewsets, response, status, filters, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.permissions import DjangoModelPermissions
 from django.utils import timezone
 import openpyxl
 from openpyxl.styles import Font, Alignment
@@ -44,24 +45,24 @@ from .import_views import *
 from .endowment_views import EndowmentEventViewSet
 from .audit_views import AuditLogView
 
-class CurrencyViewSet(viewsets.ModelViewSet):
+class BaseSettingsViewSet(viewsets.ModelViewSet):
+    """
+    Subclase base para los viewsets de configuración (Cargos, Sedes, etc)
+    Aplica protección IsAuthenticated por defecto a las configuraciones
+    """
+    permission_classes = [permissions.IsAuthenticated, DjangoModelPermissions]
+
+class CurrencyViewSet(BaseSettingsViewSet):
     queryset = Currency.objects.all()
     serializer_class = CurrencySerializer
 
-class PayrollReceiptViewSet(viewsets.ModelViewSet):
-    queryset = PayrollReceipt.objects.all()
-    serializer_class = PayrollReceiptSerializer
-    
-    def get_queryset(self):
-        queryset = PayrollReceipt.objects.all()
-        period_id = self.request.query_params.get('period', None)
-        if period_id:
-            queryset = queryset.filter(period_id=period_id)
-        return queryset
+# PayrollReceiptViewSet is defined later with full export functionality (around line 700)
+# Removing this duplicate simple definition to avoid confusion.
 
 class PayrollConceptViewSet(viewsets.ModelViewSet):
     queryset = PayrollConcept.objects.all()
     serializer_class = PayrollConceptSerializer
+    permission_classes = [permissions.IsAuthenticated, DjangoModelPermissions]
     filterset_fields = ['kind', 'active']
 
     def perform_destroy(self, instance):
@@ -75,9 +76,10 @@ class PayrollConceptViewSet(viewsets.ModelViewSet):
 class EmployeeConceptViewSet(viewsets.ModelViewSet):
     queryset = EmployeeConcept.objects.all()
     serializer_class = EmployeeConceptSerializer
-    filterset_fields = ['employee', 'is_active']
+    permission_classes = [permissions.IsAuthenticated, DjangoModelPermissions]
+    filterset_fields = ['employee', 'concept', 'is_active']
 
-class BranchViewSet(viewsets.ModelViewSet):
+class BranchViewSet(BaseSettingsViewSet):
     queryset = Branch.objects.all()
     serializer_class = BranchSerializer
 
@@ -239,18 +241,18 @@ class LatestExchangeRateView(APIView):
 class LaborContractViewSet(viewsets.ModelViewSet):
     queryset = LaborContract.objects.all()
     serializer_class = LaborContractSerializer
+    permission_classes = [permissions.IsAuthenticated, DjangoModelPermissions]
     filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['employee', 'is_active', 'branch']
+    filterset_fields = ['employee', 'is_active', 'contract_type', 'branch']
 
-class DepartmentViewSet(viewsets.ModelViewSet):
+class DepartmentViewSet(BaseSettingsViewSet):
     queryset = Department.objects.all()
     serializer_class = DepartmentSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     search_fields = ['name']
-    search_fields = ['name']
     filterset_fields = ['branch']
 
-class JobPositionViewSet(viewsets.ModelViewSet):
+class JobPositionViewSet(BaseSettingsViewSet):
     queryset = JobPosition.objects.all()
     serializer_class = JobPositionSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
@@ -261,6 +263,7 @@ class JobPositionViewSet(viewsets.ModelViewSet):
 class EmployeeViewSet(viewsets.ModelViewSet):
     queryset = Employee.objects.all()
     serializer_class = EmployeeSerializer
+    permission_classes = [permissions.IsAuthenticated, DjangoModelPermissions]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     search_fields = ['first_name', 'last_name', 'national_id']
     filterset_fields = ['is_active', 'branch']
@@ -446,9 +449,11 @@ class EmployeeViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+
 class PayrollPeriodViewSet(viewsets.ModelViewSet):
     queryset = PayrollPeriod.objects.all()
     serializer_class = PayrollPeriodSerializer
+    permission_classes = [permissions.IsAuthenticated, DjangoModelPermissions]
 
     @action(detail=True, methods=['get', 'post'], url_path='preview-payroll')
     def preview_payroll(self, request, pk=None):
@@ -699,6 +704,7 @@ class PayrollReceiptViewSet(viewsets.ReadOnlyModelViewSet):
     """
     queryset = PayrollReceipt.objects.all()
     serializer_class = PayrollReceiptSerializer
+    permission_classes = [permissions.IsAuthenticated, DjangoModelPermissions]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['period', 'employee', 'currency_code']
 
@@ -803,6 +809,7 @@ class PayrollNoveltyViewSet(viewsets.ModelViewSet):
     """
     queryset = PayrollNovelty.objects.all()
     serializer_class = PayrollNoveltySerializer
+    permission_classes = [permissions.IsAuthenticated, DjangoModelPermissions]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['employee', 'period', 'concept_code']
 
@@ -896,9 +903,17 @@ class CompanyConfigView(views.APIView):
             return response.Response(serializer.data)
         return response.Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+class CompanyViewSet(viewsets.ModelViewSet):
+    queryset = Company.objects.all()
+    serializer_class = CompanySerializer
+    permission_classes = [permissions.IsAuthenticated, DjangoModelPermissions]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    search_fields = ['name', 'rif'] # Corrected search fields for Company
+
 class LoanViewSet(viewsets.ModelViewSet):
     queryset = Loan.objects.all()
     serializer_class = LoanSerializer
+    permission_classes = [permissions.IsAuthenticated, DjangoModelPermissions]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ['employee', 'status', 'currency', 'frequency']
     search_fields = ['employee__first_name', 'employee__last_name', 'employee__national_id', 'description']
@@ -906,8 +921,16 @@ class LoanViewSet(viewsets.ModelViewSet):
 class LoanPaymentViewSet(viewsets.ModelViewSet):
     queryset = LoanPayment.objects.all()
     serializer_class = LoanPaymentSerializer
+    permission_classes = [permissions.IsAuthenticated, DjangoModelPermissions]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['loan', 'payslip']
+
+class SocialBenefitsSettlementViewSet(viewsets.ModelViewSet):
+    queryset = SocialBenefitsSettlement.objects.all()
+    serializer_class = SocialBenefitsSettlementSerializer
+    permission_classes = [permissions.IsAuthenticated, DjangoModelPermissions]
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['contract', 'status'] # Corrected filterset_fields for SocialBenefitsSettlement
 
 class PayrollVariablesView(APIView):
     """
@@ -934,7 +957,7 @@ class ValidateFormulaView(APIView):
 # SOCIAL BENEFITS VIEWSET (Prestaciones Sociales)
 # =============================================================================
 
-class SocialBenefitsViewSet(viewsets.ReadOnlyModelViewSet):
+class SocialBenefitsViewSet(viewsets.ModelViewSet):
     """
     ViewSet para gestión de Prestaciones Sociales.
     
@@ -947,6 +970,7 @@ class SocialBenefitsViewSet(viewsets.ReadOnlyModelViewSet):
     """
     queryset = SocialBenefitsLedger.objects.all()
     serializer_class = SocialBenefitsLedgerSerializer
+    permission_classes = [permissions.IsAuthenticated, DjangoModelPermissions]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['employee', 'contract', 'transaction_type']
 
@@ -1268,5 +1292,6 @@ class InterestRateBCVViewSet(viewsets.ModelViewSet):
     """
     queryset = InterestRateBCV.objects.all()
     serializer_class = InterestRateBCVSerializer
+    permission_classes = [permissions.IsAuthenticated, DjangoModelPermissions]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['year', 'month']

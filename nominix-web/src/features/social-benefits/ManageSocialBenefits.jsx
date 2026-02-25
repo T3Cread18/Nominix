@@ -8,6 +8,7 @@ import Button from '../../components/ui/Button';
 import SocialBenefitsLedger from './SocialBenefitsLedger';
 import AdvanceRequestModal from './AdvanceRequestModal';
 import SettlementSimulator from './SettlementSimulator';
+import RequirePermission from '../../context/RequirePermission';
 
 const ManageSocialBenefits = ({ employeeId, employeeData, contracts = [] }) => {
     const [isAdvanceModalOpen, setIsAdvanceModalOpen] = useState(false);
@@ -44,45 +45,57 @@ const ManageSocialBenefits = ({ employeeId, employeeData, contracts = [] }) => {
                 </div>
 
                 <div className="flex items-center gap-3">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        icon={Send}
-                        onClick={() => setIsAdvanceModalOpen(true)}
-                    >
-                        Solicitar Anticipo
-                    </Button>
-                    <Button
-                        variant="dark"
-                        size="sm"
-                        icon={Download}
-                        disabled
-                    >
-                        Exportar Estado
-                    </Button>
+                    <RequirePermission permission="social_benefits.add_advancerequest">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            icon={Send}
+                            onClick={() => setIsAdvanceModalOpen(true)}
+                        >
+                            Solicitar Anticipo
+                        </Button>
+                    </RequirePermission>
+                    <RequirePermission permission="social_benefits.view_socialbenefitcalculation">
+                        <Button
+                            variant="dark"
+                            size="sm"
+                            icon={Download}
+                            disabled
+                        >
+                            Exportar Estado
+                        </Button>
+                    </RequirePermission>
                 </div>
             </div>
 
             <Tabs defaultValue="ledger" className="w-full">
                 <TabsList className="mb-6 bg-gray-100/50 p-1 rounded-2xl w-full sm:w-auto">
-                    <TabsTrigger value="ledger" icon={History} size="sm">Historial (Ledger)</TabsTrigger>
-                    <TabsTrigger value="simulator" icon={Calculator} size="sm">Simulador de Liquidación</TabsTrigger>
+                    <RequirePermission permission="social_benefits.view_socialbenefitcalculation">
+                        <TabsTrigger value="ledger" icon={History} size="sm">Historial (Ledger)</TabsTrigger>
+                    </RequirePermission>
+                    <RequirePermission permission="social_benefits.view_socialbenefitcalculation">
+                        <TabsTrigger value="simulator" icon={Calculator} size="sm">Simulador de Liquidación</TabsTrigger>
+                    </RequirePermission>
                 </TabsList>
 
-                <TabsContent value="ledger">
-                    <SocialBenefitsLedger
-                        employeeId={employeeId}
-                        contractId={contractId}
-                    />
-                </TabsContent>
+                <RequirePermission permission="social_benefits.view_socialbenefitcalculation">
+                    <TabsContent value="ledger">
+                        <SocialBenefitsLedger
+                            employeeId={employeeId}
+                            contractId={contractId}
+                        />
+                    </TabsContent>
+                </RequirePermission>
 
-                <TabsContent value="simulator">
-                    <SettlementSimulator
-                        employeeId={employeeId}
-                        contractId={contractId}
-                        hireDate={activeContract?.hire_date}
-                    />
-                </TabsContent>
+                <RequirePermission permission="social_benefits.view_socialbenefitcalculation">
+                    <TabsContent value="simulator">
+                        <SettlementSimulator
+                            employeeId={employeeId}
+                            contractId={contractId}
+                            hireDate={activeContract?.hire_date}
+                        />
+                    </TabsContent>
+                </RequirePermission>
             </Tabs>
 
             {/* Modales */}

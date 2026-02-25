@@ -3,6 +3,7 @@ import { Fingerprint, LayoutDashboard, Wifi, Link2, CalendarDays, Calendar, List
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui';
 import { PageHeader } from '../../components/layout';
 import attendanceService from '../../services/attendance.service';
+import RequirePermission from '../../context/RequirePermission';
 
 // Vistas
 import AttendanceLog from './AttendanceLog';
@@ -101,81 +102,118 @@ const AttendanceDashboard = () => {
 
             <Tabs value={activeTab} onValueChange={setActiveTab}>
                 <TabsList>
-                    {tabs.map((tab) => (
-                        <TabsTrigger
-                            key={tab.value}
-                            value={tab.value}
-                            icon={tab.icon}
-                        >
-                            {tab.label}
-                        </TabsTrigger>
-                    ))}
+                    {/* Control Diario y Semanal */}
+                    <RequirePermission permission="attendance.view_attendanceevent">
+                        <TabsTrigger value="daily" icon={CalendarDays}>Diario</TabsTrigger>
+                    </RequirePermission>
+                    <RequirePermission permission="attendance.view_attendanceevent">
+                        <TabsTrigger value="weekly" icon={Calendar}>Semanal</TabsTrigger>
+                    </RequirePermission>
+
+                    {/* Eventos RAW */}
+                    <RequirePermission permission="attendance.view_attendanceevent">
+                        <TabsTrigger value="log" icon={List}>Registro</TabsTrigger>
+                    </RequirePermission>
+
+                    {/* Dashboard */}
+                    <RequirePermission permission="attendance.view_attendanceevent">
+                        <TabsTrigger value="dashboard" icon={LayoutDashboard}>Dashboard</TabsTrigger>
+                    </RequirePermission>
+
+                    {/* Dispositivos Biométricos */}
+                    <RequirePermission permission="attendance.view_biometricdevice">
+                        <TabsTrigger value="devices" icon={Wifi}>Dispositivos</TabsTrigger>
+                    </RequirePermission>
+
+                    {/* Mapeo */}
+                    <RequirePermission permission="attendance.view_employeedevicemapping">
+                        <TabsTrigger value="mapping" icon={Link2}>Mapeo</TabsTrigger>
+                    </RequirePermission>
+
+                    {/* Raw Device Events */}
+                    <RequirePermission permission="attendance.view_attendanceevent">
+                        <TabsTrigger value="device_events" icon={Fingerprint}>Eventos (Raw)</TabsTrigger>
+                    </RequirePermission>
                 </TabsList>
 
                 {/* Tab: Control Diario */}
-                <TabsContent value="daily">
-                    <div className="mt-4">
-                        <DailyAttendanceView />
-                    </div>
-                </TabsContent>
+                <RequirePermission permission="attendance.view_attendanceevent">
+                    <TabsContent value="daily">
+                        <div className="mt-4">
+                            <DailyAttendanceView />
+                        </div>
+                    </TabsContent>
+                </RequirePermission>
 
                 {/* Tab: Control Semanal */}
-                <TabsContent value="weekly">
-                    <div className="mt-4">
-                        <WeeklyAttendanceView />
-                    </div>
-                </TabsContent>
+                <RequirePermission permission="attendance.view_attendanceevent">
+                    <TabsContent value="weekly">
+                        <div className="mt-4">
+                            <WeeklyAttendanceView />
+                        </div>
+                    </TabsContent>
+                </RequirePermission>
 
                 {/* Tab: Registro de Marcajes (con paginación) */}
-                <TabsContent value="log">
-                    <div className="mt-4">
-                        <AttendanceLog />
-                    </div>
-                </TabsContent>
+                <RequirePermission permission="attendance.view_attendanceevent">
+                    <TabsContent value="log">
+                        <div className="mt-4">
+                            <AttendanceLog />
+                        </div>
+                    </TabsContent>
+                </RequirePermission>
 
                 {/* Tab: Dashboard */}
-                <TabsContent value="dashboard">
-                    <div className="space-y-4 mt-4">
-                        <AttendanceStats stats={stats} />
+                <RequirePermission permission="attendance.view_attendanceevent">
+                    <TabsContent value="dashboard">
+                        <div className="space-y-4 mt-4">
+                            <AttendanceStats stats={stats} />
 
-                        <Card className="border-0">
-                            <CardHeader className="border-b border-white/5 pb-3">
-                                <CardTitle className="text-sm">
-                                    Marcajes de Hoy
-                                    {!loadingDashboard && (
-                                        <span className="ml-2 text-gray-400 font-normal">
-                                            ({recentEvents.length} evento{recentEvents.length !== 1 ? 's' : ''})
-                                        </span>
-                                    )}
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="p-0">
-                                <EventsTable events={recentEvents} loading={loadingDashboard} />
-                            </CardContent>
-                        </Card>
-                    </div>
-                </TabsContent>
+                            <Card className="border-0">
+                                <CardHeader className="border-b border-white/5 pb-3">
+                                    <CardTitle className="text-sm">
+                                        Marcajes de Hoy
+                                        {!loadingDashboard && (
+                                            <span className="ml-2 text-gray-400 font-normal">
+                                                ({recentEvents.length} evento{recentEvents.length !== 1 ? 's' : ''})
+                                            </span>
+                                        )}
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="p-0">
+                                    <EventsTable events={recentEvents} loading={loadingDashboard} />
+                                </CardContent>
+                            </Card>
+                        </div>
+                    </TabsContent>
+                </RequirePermission>
 
                 {/* Tab: Dispositivos */}
-                <TabsContent value="devices">
-                    <div className="mt-4">
-                        <DeviceManager />
-                    </div>
-                </TabsContent>
+                <RequirePermission permission="attendance.view_biometricdevice">
+                    <TabsContent value="devices">
+                        <div className="mt-4">
+                            <DeviceManager />
+                        </div>
+                    </TabsContent>
+                </RequirePermission>
 
                 {/* Tab: Mapeo */}
-                <TabsContent value="mapping">
-                    <div className="mt-4">
-                        <EmployeeMapping />
-                    </div>
-                </TabsContent>
+                <RequirePermission permission="attendance.view_employeedevicemapping">
+                    <TabsContent value="mapping">
+                        <div className="mt-4">
+                            <EmployeeMapping />
+                        </div>
+                    </TabsContent>
+                </RequirePermission>
 
                 {/* Tab: Eventos del Dispositivo */}
-                <TabsContent value="device_events">
-                    <div className="mt-4">
-                        <DeviceEventsViewer />
-                    </div>
-                </TabsContent>
+                <RequirePermission permission="attendance.view_attendanceevent">
+                    <TabsContent value="device_events">
+                        <div className="mt-4">
+                            <DeviceEventsViewer />
+                        </div>
+                    </TabsContent>
+                </RequirePermission>
             </Tabs>
         </div>
     );

@@ -3,10 +3,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import axiosClient from '../../api/axiosClient';
 import {
     Plus, Search, Banknote, Calendar, TrendingUp, AlertCircle, CheckCircle2,
-    XCircle, Clock, PieChart
+    XCircle, Clock, PieChart, Download
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import LoanFormModal from './LoanFormModal';
+import RequirePermission from '../../context/RequirePermission';
 
 const LoanManager = () => {
     const [loans, setLoans] = useState([]);
@@ -86,12 +87,19 @@ const LoanManager = () => {
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-nominix-electric" size={16} />
                     </div>
 
-                    <button
-                        onClick={() => setIsModalOpen(true)}
-                        className="flex items-center justify-center gap-2 px-6 py-2.5 bg-nominix-dark text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all shadow-lg shadow-slate-200 active:scale-95 whitespace-nowrap"
-                    >
-                        <Plus size={16} /> Nuevo Préstamo
-                    </button>
+                    <div className="flex flex-row gap-2 w-full lg:w-auto mt-4 lg:mt-0">
+                        <RequirePermission permission="payroll_core.add_loan">
+                            <button
+                                onClick={() => setIsModalOpen(true)}
+                                className="flex-1 lg:flex-none flex items-center justify-center gap-2 px-6 py-3.5 bg-nominix-dark hover:bg-black text-white rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all shadow-xl shadow-nominix-dark/10 active:scale-95"
+                            >
+                                <Plus size={16} /> Solicitar Préstamo
+                            </button>
+                        </RequirePermission>
+                        <button className="flex-none flex items-center justify-center p-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl transition-colors">
+                            <Download size={20} />
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -111,6 +119,19 @@ const LoanManager = () => {
                                         {getStatusIcon(loan.status)} {loan.status}
                                     </span>
                                 </div>
+
+                                {loan.status === 'DRAFT' && ( // Assuming 'DRAFT' is the status that needs approval/rejection
+                                    <RequirePermission permission="payroll_core.change_loan">
+                                        <div className="flex gap-2 mb-4"> {/* Added mb-4 for spacing */}
+                                            <button className="flex-1 lg:flex-none flex items-center justify-center gap-2 px-6 py-3.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 text-[11px] font-black uppercase tracking-widest rounded-xl transition-colors">
+                                                <CheckCircle2 size={16} /> Autorizar
+                                            </button>
+                                            <button className="flex-1 lg:flex-none flex items-center justify-center gap-2 px-6 py-3.5 bg-red-50 text-red-600 hover:bg-red-100 text-[11px] font-black uppercase tracking-widest rounded-xl transition-colors">
+                                                <XCircle size={16} /> Rechazar
+                                            </button>
+                                        </div>
+                                    </RequirePermission>
+                                )}
 
                                 <h3 className="font-bold text-slate-800 text-lg mb-1 group-hover:text-nominix-electric transition-colors truncate">
                                     {loan.employee_data?.first_name} {loan.employee_data?.last_name}

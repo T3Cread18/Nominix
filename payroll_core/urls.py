@@ -12,7 +12,8 @@ from .views import (
     PayrollVariablesView, ValidateFormulaView, JobPositionViewSet,
     ConceptConfigMetadataView, PayrollPolicyView,
     # Social Benefits
-    SocialBenefitsViewSet, InterestRateBCVViewSet, ExchangeRateViewSet,
+    SocialBenefitsViewSet, SocialBenefitsSettlementViewSet,
+    InterestRateBCVViewSet, ExchangeRateViewSet,
     # Endowments
     EndowmentEventViewSet,
     # Import Views
@@ -26,6 +27,7 @@ from .views.export_views import (
     EndowmentSizesExportView
 )
 from .views.audit_views import AuditLogView
+from .views.dashboard import DashboardMetricsView, DashboardTasksView, DashboardEventsView
 
 
 
@@ -49,6 +51,7 @@ router.register(r'loans', LoanViewSet, basename='loan')
 router.register(r'loan-payments', LoanPaymentViewSet, basename='loan-payment')
 # Social Benefits Routes
 router.register(r'social-benefits', SocialBenefitsViewSet, basename='social-benefits')
+router.register(r'social-benefits-settlements', SocialBenefitsSettlementViewSet, basename='social-benefits-settlement')
 router.register(r'bcv-rates', InterestRateBCVViewSet, basename='bcv-rate')
 router.register(r'exchange-rates', ExchangeRateViewSet, basename='exchange-rate')
 router.register(r'endowments', EndowmentEventViewSet, basename='endowment')
@@ -58,6 +61,11 @@ router.register(r'endowments', EndowmentEventViewSet, basename='endowment')
 urlpatterns = [
     # Template Route (Separate - moved to top to avoid conflicts)
     path('templates/<str:model_key>/', ImportTemplateView.as_view(), name='import-template'),
+
+    # Dashboard Routes
+    path('dashboard/metrics/', DashboardMetricsView.as_view(), name='dashboard-metrics'),
+    path('dashboard/tasks/', DashboardTasksView.as_view(), name='dashboard-tasks'),
+    path('dashboard/events/', DashboardEventsView.as_view(), name='dashboard-events'),
 
     path('company/config/', CompanyConfigView.as_view(), name='company-config'),
     path('company/policies/', PayrollPolicyView.as_view(), name='payroll-policy'),

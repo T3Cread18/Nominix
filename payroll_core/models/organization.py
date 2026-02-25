@@ -383,6 +383,22 @@ class Company(models.Model):
     class Meta:
         verbose_name = "Configuración de Empresa"
         verbose_name_plural = "Configuración de Empresa"
+        permissions = [
+            ("view_menu_personnel", "Can view Menú Personal"),
+            ("view_menu_payroll", "Can view Menú Nómina"),
+            ("view_menu_catalog", "Can view Menú Conceptos"),
+            ("view_menu_closures", "Can view Menú Cierres"),
+            ("view_menu_vacations", "Can view Menú Vacaciones"),
+            ("view_menu_attendance", "Can view Menú Asistencia"),
+            ("view_menu_config", "Can view Menú Configuración"),
+            ("view_menu_loans", "Can view Menú Préstamos"),
+            ("view_menu_reports", "Can view Menú Reportes"),
+            ("view_menu_declarations", "Can view Menú Ley y Gobierno"),
+            ("view_menu_roles", "Can view Menú Roles de Sistema"),
+            ("view_dashboard_metrics", "Ver Widget de Métricas (KPIs)"),
+            ("view_dashboard_tasks", "Ver Widget de Tareas Pendientes"),
+            ("view_dashboard_events", "Ver Widget de Cumpleaños y Eventos"),
+        ]
 
     def __str__(self):
         return self.name

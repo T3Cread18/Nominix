@@ -363,7 +363,7 @@ const OrganizationManager = () => {
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
             {/* COLUMNA IZQUIERDA: DEPARTAMENTOS */}
-            <div className="lg:col-span-1 bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden flex flex-col h-[600px]">
+            <div className="lg:col-span-1 bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden flex flex-col h-[500px] lg:h-[600px]">
                 <div className="p-6 border-b border-gray-50 bg-gray-50/50 space-y-4">
                     {/* Selector de Sede */}
                     <div className="space-y-1">
@@ -425,7 +425,7 @@ const OrganizationManager = () => {
             </div>
 
             {/* COLUMNA DERECHA: CARGOS (JOB POSITIONS) */}
-            <div className="lg:col-span-2 bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden flex flex-col h-[600px]">
+            <div className="lg:col-span-2 bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden flex flex-col h-[500px] lg:h-[600px]">
                 {selectedDept ? (
                     <JobPositionsList
                         department={selectedDept}

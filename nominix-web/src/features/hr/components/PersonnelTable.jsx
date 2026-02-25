@@ -1,4 +1,3 @@
-
 import React from 'react';
 import {
     Filter, CheckCircle2, XCircle, Trash2, Edit3,
@@ -7,6 +6,7 @@ import {
 import { cn } from '../../../utils/cn';
 import Avatar from '../../../components/ui/Avatar';
 import { SkeletonTable } from '../../../components/ui/Skeleton';
+import RequirePermission from '../../../context/RequirePermission';
 
 // Helper local para fotos (si es necesario, aunque Avatar maneja src)
 const getPhotoUrl = (path) => {
@@ -38,11 +38,11 @@ const PersonnelTable = ({
             <table className="w-full text-left border-separate border-spacing-0">
                 <thead className="sticky top-0 z-10">
                     <tr className="bg-white/80 backdrop-blur-md shadow-sm">
-                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Colaborador</th>
+                        <th className="px-4 sm:px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Colaborador</th>
                         <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 hidden md:table-cell">Cargo & Área</th>
                         <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 hidden lg:table-cell">Ubicación</th>
-                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Estado</th>
-                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 text-right">Acciones</th>
+                        <th className="px-4 sm:px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Estado</th>
+                        <th className="px-4 sm:px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 text-right">Acciones</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50 bg-white">
@@ -107,18 +107,22 @@ const PersonnelTable = ({
                                 </span>
                             </td>
 
-                            <td className="px-6 py-4 text-right">
-                                <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-all translate-x-2 group-hover:translate-x-0">
-                                    <button className="p-2 hover:bg-white rounded-lg text-slate-400 hover:text-nominix-electric border border-transparent hover:border-slate-100 shadow-sm transition-all">
-                                        <Edit3 size={16} />
-                                    </button>
+                            <td className="px-4 sm:px-6 py-4 text-right">
+                                <div className="flex items-center justify-end gap-1 md:opacity-0 md:group-hover:opacity-100 transition-all md:translate-x-2 md:group-hover:translate-x-0">
+                                    <RequirePermission permission="payroll_core.change_employee">
+                                        <button className="p-2 hover:bg-white rounded-lg text-slate-400 hover:text-nominix-electric border border-transparent hover:border-slate-100 shadow-sm transition-all">
+                                            <Edit3 size={16} />
+                                        </button>
+                                    </RequirePermission>
 
-                                    <button
-                                        onClick={(e) => onRequestDelete(e, emp.id)}
-                                        className="p-2 hover:bg-red-50 rounded-lg text-slate-400 hover:text-red-500 border border-transparent hover:border-red-100 transition-all"
-                                    >
-                                        <Trash2 size={16} />
-                                    </button>
+                                    <RequirePermission permission="payroll_core.delete_employee">
+                                        <button
+                                            onClick={(e) => onRequestDelete(e, emp.id)}
+                                            className="p-2 hover:bg-red-50 rounded-lg text-slate-400 hover:text-red-500 border border-transparent hover:border-red-100 transition-all"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </RequirePermission>
                                 </div>
                             </td>
                         </tr>
