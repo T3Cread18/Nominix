@@ -116,7 +116,7 @@ const EmployeeConcepts = ({ employeeId }) => {
     const onDeleteConcept = async (id) => {
         if (!window.confirm("¿Eliminar esta asignación?")) return;
         try {
-            await deleteMutation.mutateAsync(id);
+            await deleteMutation.mutateAsync({ id, employeeId });
             toast.success("Asignación eliminada");
         } catch (error) {
             toast.error("Error al eliminar");

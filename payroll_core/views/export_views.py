@@ -223,3 +223,71 @@ class PayrollExcelReportView(APIView):
             return response
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class EndowmentSizesExportView(APIView):
+    """
+    GET /api/payroll/exports/endowment-sizes/
+    ?branch=<branch_id> (Opcional)
+    
+    Descarga reporte Excel con las tallas del personal.
+    """
+    
+    def get(self, request):
+        import openpyxl
+        from openpyxl.styles import Font
+        from payroll_core.models import Employee
+        
+        branch_id = request.query_params.get('branch')
+        
+        employees = Employee.objects.filter(is_active=True).select_related('branch')
+        if branch_id:
+            employees = employees.filter(branch_id=branch_id)
+            
+        # 1. Configuración del archivo Excel
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = 'attachment; filename="tallas_personal.xlsx"'
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Tallas de Personal"
+
+        # 2. Encabezados
+        headers = ['Nombres', 'Apellidos', 'Cédula de Identidad', 'Sede', 'Talla Camisa', 'Talla Pantalón', 'Talla Calzado', 'Última Dotación']
+        ws.append(headers)
+
+        # Estilo para encabezados (Negrita)
+        for cell in ws[1]:
+            cell.font = Font(bold=True)
+
+        # 3. Iterar datos
+        for emp in employees:
+            row = [
+                emp.first_name,
+                emp.last_name,
+                emp.national_id,
+                emp.branch.name if emp.branch else 'N/D',
+                emp.shirt_size or 'N/D',
+                emp.pants_size or 'N/D',
+                emp.shoe_size or 'N/D',
+                emp.last_endowment_date.strftime('%Y-%m-%d') if emp.last_endowment_date else 'N/D'
+            ]
+            ws.append(row)
+
+        # 4. Ajustar ancho de columnas automáticamente (Opcional pero útil)
+        for col in ws.columns:
+            max_length = 0
+            column = col[0].column_letter # Get the column name
+            for cell in col:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = (max_length + 2)
+            ws.column_dimensions[column].width = adjusted_width
+
+        # 5. Guardar en la respuesta
+        wb.save(response)
+        return response

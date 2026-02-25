@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { UserPlus, Search, Building2, X } from 'lucide-react';
+import { UserPlus, Search, Building2, X, Shirt } from 'lucide-react';
 import Button from '../../../components/ui/Button';
 import InputField from '../../../components/ui/InputField';
 import SelectField from '../../../components/ui/SelectField';
@@ -11,7 +11,8 @@ const HeaderToolbar = ({
     selectedBranch,
     setSelectedBranch,
     branches,
-    onNewClick
+    onNewClick,
+    onEndowmentsClick
 }) => {
     return (
         <div className="p-6 border-b border-gray-50 bg-white/50 backdrop-blur-sm z-20">
@@ -48,6 +49,16 @@ const HeaderToolbar = ({
                             icon={Search}
                         />
                     </div>
+
+                    {/* BOTÓN DOTACIONES */}
+                    <Button
+                        onClick={onEndowmentsClick}
+                        icon={Shirt}
+                        variant="secondary"
+                        className="w-full sm:w-auto"
+                    >
+                        <span className="hidden sm:inline">Dotaciones</span>
+                    </Button>
 
                     {/* BOTÓN NUEVO */}
                     <Button

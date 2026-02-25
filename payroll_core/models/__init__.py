@@ -21,6 +21,7 @@ from .work_schedule import WorkSchedule, EmployeeDailyShift
 from .concepts import PayrollConcept, EmployeeConcept
 from .payroll import PayrollPeriod, PayrollReceipt, PayrollReceiptLine, PayrollNovelty
 from .loans import Loan, LoanPayment
+from .endowment import EndowmentEvent
 from .social_benefits import SocialBenefitsLedger, SocialBenefitsSettlement
 from .salary_history import SalaryHistory
 from .government_filings import (
@@ -70,4 +71,5 @@ __all__ = [
     'LPPSSDeclaration',
     'LPPSSDeclarationLine',
     'INCESDeclaration',
+    'EndowmentEvent',
 ]

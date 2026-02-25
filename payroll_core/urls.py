@@ -13,6 +13,8 @@ from .views import (
     ConceptConfigMetadataView, PayrollPolicyView,
     # Social Benefits
     SocialBenefitsViewSet, InterestRateBCVViewSet, ExchangeRateViewSet,
+    # Endowments
+    EndowmentEventViewSet,
     # Import Views
     ImportFieldsView, ImportPreviewView, ImportValidateView, ImportExecuteView
 )
@@ -21,6 +23,7 @@ from .views.export_views import (
     IVSSExportView, FAOVExportView, ISLRXMLExportView,
     LPPSSCalculateView, INCESCalculateView,
     ConstanciaTrabajoView, PayrollExcelReportView,
+    EndowmentSizesExportView
 )
 
 
@@ -47,6 +50,7 @@ router.register(r'loan-payments', LoanPaymentViewSet, basename='loan-payment')
 router.register(r'social-benefits', SocialBenefitsViewSet, basename='social-benefits')
 router.register(r'bcv-rates', InterestRateBCVViewSet, basename='bcv-rate')
 router.register(r'exchange-rates', ExchangeRateViewSet, basename='exchange-rate')
+router.register(r'endowments', EndowmentEventViewSet, basename='endowment')
 
 
 
@@ -73,6 +77,7 @@ urlpatterns = [
     path('exports/ivss/', IVSSExportView.as_view(), name='export-ivss'),
     path('exports/faov/', FAOVExportView.as_view(), name='export-faov'),
     path('exports/islr-xml/', ISLRXMLExportView.as_view(), name='export-islr-xml'),
+    path('exports/endowment-sizes/', EndowmentSizesExportView.as_view(), name='export-endowment-sizes'),
     path('declarations/lppss/calculate/', LPPSSCalculateView.as_view(), name='lppss-calculate'),
     path('declarations/inces/calculate/', INCESCalculateView.as_view(), name='inces-calculate'),
     

@@ -17,8 +17,10 @@ const CreateEmployeeModal = ({ isOpen, onClose, onSuccess }) => {
         position: '',
         branch: '',
         department: '',
-        rif: '',
-        hire_date: new Date().toISOString().split('T')[0]
+        hire_date: new Date().toISOString().split('T')[0],
+        shirt_size: '',
+        pants_size: '',
+        shoe_size: ''
     });
     const [error, setError] = useState(null);
 
@@ -91,7 +93,7 @@ const CreateEmployeeModal = ({ isOpen, onClose, onSuccess }) => {
                 </div>
 
                 {/* Form Body */}
-                <form onSubmit={handleSubmit} className="p-8">
+                <form onSubmit={handleSubmit} className="p-8 max-h-[70vh] overflow-y-auto">
                     {error && (
                         <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-xl text-red-600 text-sm font-medium">
                             {error}
@@ -148,61 +150,84 @@ const CreateEmployeeModal = ({ isOpen, onClose, onSuccess }) => {
                             type="email"
                             placeholder="juan@correo.com"
                         />
+                    </div>
 
-                        {/* RIF */}
-                        <InputField
-                            label="RIF"
-                            name="rif"
-                            value={formData.rif}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                        {/* Sede (Branch) - Prerequisite for Department */}
+                        <SelectField
+                            label="Sede"
+                            name="branch"
+                            value={formData.branch}
                             onChange={handleChange}
-                            placeholder="V-12345678-9"
+                            required
+                            icon={Building2}
+                            options={[
+                                { value: "", label: "-- Seleccionar Sede --" },
+                                ...branches.map(b => ({ value: b.id, label: b.name }))
+                            ]}
+                        />
+
+                        {/* Cargo */}
+                        <InputField
+                            label="Cargo Inicial"
+                            name="position"
+                            value={formData.position}
+                            onChange={handleChange}
+                            required
+                            placeholder="Ej. Farmacéutico"
+                            icon={Briefcase}
                         />
                     </div>
 
-                    {/* Sede (Branch) - Prerequisite for Department */}
-                    <SelectField
-                        label="Sede"
-                        name="branch"
-                        value={formData.branch}
-                        onChange={handleChange}
-                        required
-                        icon={Building2}
-                        options={[
-                            { value: "", label: "-- Seleccionar Sede --" },
-                            ...branches.map(b => ({ value: b.id, label: b.name }))
-                        ]}
-                    />
-
-                    {/* Cargo */}
-                    <InputField
-                        label="Cargo Inicial"
-                        name="position"
-                        value={formData.position}
-                        onChange={handleChange}
-                        required
-                        placeholder="Ej. Farmacéutico"
-                        icon={Briefcase}
-                    />
-
-                    {/* Fecha de Ingreso */}
-                    <InputField
-                        label="Fecha de Ingreso"
-                        name="hire_date"
-                        value={formData.hire_date}
-                        onChange={handleChange}
-                        required
-                        type="date"
-                        icon={Calendar}
-                    />
-
-                    <div className="space-y-1.5 pt-2">
-                        <label className="text-[10px] font-black uppercase text-gray-400 pl-3">Departamento</label>
-                        <DepartmentSelector
-                            branchId={formData.branch}
-                            value={formData.department}
-                            onChange={(val) => setFormData({ ...formData, department: val })}
-                            error={null}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                        {/* Fecha de Ingreso */}
+                        <InputField
+                            label="Fecha de Ingreso"
+                            name="hire_date"
+                            value={formData.hire_date}
+                            onChange={handleChange}
+                            required
+                            type="date"
+                            icon={Calendar}
                         />
+
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase text-gray-400 pl-3">Departamento</label>
+                            <DepartmentSelector
+                                branchId={formData.branch}
+                                value={formData.department}
+                                onChange={(val) => setFormData({ ...formData, department: val })}
+                                error={null}
+                            />
+                        </div>
+                    </div>
+
+                    {/* SECCIÓN TALLAS */}
+                    <div className="mt-8 pt-6 border-t border-gray-100">
+                        <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">Dotación y Tallas</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <InputField
+                                label="Talla Camisa"
+                                name="shirt_size"
+                                value={formData.shirt_size}
+                                onChange={handleChange}
+                                placeholder="S, M, L..."
+                            />
+                            <InputField
+                                label="Talla Pantalón"
+                                name="pants_size"
+                                value={formData.pants_size}
+                                onChange={handleChange}
+                                placeholder="30, 32..."
+                            />
+                            <InputField
+                                label="Talla Calzado"
+                                name="shoe_size"
+                                value={formData.shoe_size}
+                                onChange={handleChange}
+                                placeholder="38, 40..."
+                            />
+                        </div>
                     </div>
 
 

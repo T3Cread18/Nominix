@@ -7,9 +7,9 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 // --- LAYOUTS ---
 import { DashboardLayout, TenantAdminLayout } from './components/layout';
 
-// --- IMPORTACIÓN DE MÓDULOS (Páginas) ---
 import PersonnelManager from './features/hr/PersonnelManager';
 import EmployeeFormPage from './features/hr/EmployeeFormPage';
+import EndowmentsManager from './features/hr/EndowmentsManager';
 import ConceptCatalog from './features/payroll/ConceptCatalog';
 import PayrollClosure from './features/payroll/PayrollClosure';
 import NovedadesGrid from './features/payroll/NovedadesGrid';
@@ -85,6 +85,7 @@ function App() {
                 <Route index element={<PersonnelManager />} />
                 <Route path="personnel" element={<PersonnelManager />} />
                 <Route path="personnel/create" element={<EmployeeFormPage />} />
+                <Route path="personnel/endowments" element={<EndowmentsManager />} />
                 <Route path="personnel/:id" element={<EmployeeFormPage />} />
 
                 {/* Módulo: Nómina */}

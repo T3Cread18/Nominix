@@ -96,6 +96,7 @@ const PersonnelManager = () => {
                     setSelectedBranch={handleBranchChange}
                     branches={branches}
                     onNewClick={() => navigate('/personnel/create')}
+                    onEndowmentsClick={() => navigate('/personnel/endowments')}
                 />
 
                 <PersonnelTable

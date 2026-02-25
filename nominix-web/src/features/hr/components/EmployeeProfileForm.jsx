@@ -261,6 +261,33 @@ const EmployeeProfileForm = ({
                     </div>
                 </Card.Section>
             </Card>
+
+            <Card>
+                <Card.Section title="Dotación y Tallas">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <InputField
+                            label="Talla Camisa"
+                            {...register('shirt_size')}
+                            placeholder="S, M, L..."
+                        />
+                        <InputField
+                            label="Talla Pantalón"
+                            {...register('pants_size')}
+                            placeholder="32, 34..."
+                        />
+                        <InputField
+                            label="Talla Calzado"
+                            {...register('shoe_size')}
+                            placeholder="38, 40..."
+                        />
+                        <InputField
+                            label="Última Dotación"
+                            type="date"
+                            {...register('last_endowment_date')}
+                        />
+                    </div>
+                </Card.Section>
+            </Card>
         </div>
     );
 };

@@ -5,7 +5,8 @@ from .models import (
     PayrollNovelty, Company, Department, Loan, LoanPayment, JobPosition, ExchangeRate,
     PayrollPolicy,
     # Social Benefits
-    SocialBenefitsLedger, SocialBenefitsSettlement, InterestRateBCV
+    SocialBenefitsLedger, SocialBenefitsSettlement, InterestRateBCV,
+    EndowmentEvent
 )
 
 # ============================================================================
@@ -241,6 +242,10 @@ class EmployeeSerializer(serializers.ModelSerializer):
             'phone': {'required': False, 'allow_blank': True},
             'termination_date': {'required': False, 'allow_null': True},
             'date_of_birth': {'required': False, 'allow_null': True},
+            'shirt_size': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'pants_size': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'shoe_size': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'last_endowment_date': {'required': False, 'allow_null': True},
         }
 
     def to_representation(self, instance):
@@ -252,6 +257,20 @@ class EmployeeSerializer(serializers.ModelSerializer):
         if instance.job_position:
             representation['job_position'] = JobPositionSerializer(instance.job_position).data
         return representation
+
+class EndowmentEventSerializer(serializers.ModelSerializer):
+    branch_name = serializers.CharField(source='branch.name', read_only=True)
+    employee_count = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = EndowmentEvent
+        fields = ['id', 'date', 'branch', 'branch_name', 'description', 'employees', 'employee_count', 'created_at']
+        extra_kwargs = {
+            'employees': {'required': False} # Can be empty and assigned via view
+        }
+        
+    def get_employee_count(self, obj):
+        return obj.employees.count()
 
 class PayrollPeriodSerializer(serializers.ModelSerializer):
     class Meta:

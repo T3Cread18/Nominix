@@ -9,6 +9,9 @@ import {
 import { toast } from 'sonner';
 import { cn } from '../../utils/cn';
 
+// Dominio base del tenant — se lee de la variable de entorno de Vite
+const TENANT_DOMAIN = import.meta.env.VITE_TENANT_DOMAIN || 'localhost';
+
 // Componente Interno Wizard (para evitar errores de importación circular/hoisting)
 const TenantWizard = ({ onClose, onCreated }) => {
     const [step, setStep] = useState(1);
@@ -108,7 +111,7 @@ const TenantWizard = ({ onClose, onCreated }) => {
                                 }}
                             />
                             <div className="absolute right-5 top-1/2 -translate-y-1/2 text-gray-500 text-xs font-bold">
-                                .nominix.net
+                                .{TENANT_DOMAIN}
                             </div>
                         </div>
                     </div>
@@ -128,7 +131,7 @@ const TenantWizard = ({ onClose, onCreated }) => {
                     ) : (
                         <button
                             onClick={() => {
-                                const finalDomain = form.domain.includes('.nominix.net') ? form.domain : `${form.domain}.nominix.net`;
+                                const finalDomain = form.domain.includes(`.${TENANT_DOMAIN}`) ? form.domain : `${form.domain}.${TENANT_DOMAIN}`;
                                 handleCreate({ ...form, domain: finalDomain });
                             }}
                             disabled={loading}

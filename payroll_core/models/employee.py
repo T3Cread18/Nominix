@@ -282,6 +282,38 @@ class Employee(models.Model):
         verbose_name='Última Actualización'
     )
     
+    # ==========================================================================
+    # DOTACIÓN / TALLAS
+    # ==========================================================================
+    
+    shirt_size: models.CharField = models.CharField(
+        max_length=20,
+        blank=True,
+        null=True,
+        verbose_name='Talla de Camisa'
+    )
+    
+    pants_size: models.CharField = models.CharField(
+        max_length=20,
+        blank=True,
+        null=True,
+        verbose_name='Talla de Pantalón'
+    )
+    
+    shoe_size: models.CharField = models.CharField(
+        max_length=20,
+        blank=True,
+        null=True,
+        verbose_name='Talla de Calzado'
+    )
+    
+    last_endowment_date = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name='Última Dotación',
+        help_text='Fecha de la última dotación entregada'
+    )
+    
     notes: models.TextField = models.TextField(
         blank=True,
         null=True,

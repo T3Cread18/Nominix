@@ -41,6 +41,7 @@ from vacations.models import VacationPayment, VacationRequest
 
 # Import new views
 from .import_views import *
+from .endowment_views import EndowmentEventViewSet
 
 class CurrencyViewSet(viewsets.ModelViewSet):
     queryset = Currency.objects.all()
