@@ -1,0 +1,1178 @@
+[
+  {
+    "app": "payroll_core",
+    "model": "branch",
+    "codename": "view_branch",
+    "name": "Can view Sede"
+  },
+  {
+    "app": "payroll_core",
+    "model": "branch",
+    "codename": "delete_branch",
+    "name": "Can delete Sede"
+  },
+  {
+    "app": "payroll_core",
+    "model": "branch",
+    "codename": "change_branch",
+    "name": "Can change Sede"
+  },
+  {
+    "app": "payroll_core",
+    "model": "branch",
+    "codename": "add_branch",
+    "name": "Can add Sede"
+  },
+  {
+    "app": "payroll_core",
+    "model": "company",
+    "codename": "view_company",
+    "name": "Can view Configuración de Empresa"
+  },
+  {
+    "app": "payroll_core",
+    "model": "company",
+    "codename": "delete_company",
+    "name": "Can delete Configuración de Empresa"
+  },
+  {
+    "app": "payroll_core",
+    "model": "company",
+    "codename": "change_company",
+    "name": "Can change Configuración de Empresa"
+  },
+  {
+    "app": "payroll_core",
+    "model": "company",
+    "codename": "add_company",
+    "name": "Can add Configuración de Empresa"
+  },
+  {
+    "app": "payroll_core",
+    "model": "currency",
+    "codename": "add_currency",
+    "name": "Can add Moneda"
+  },
+  {
+    "app": "payroll_core",
+    "model": "currency",
+    "codename": "delete_currency",
+    "name": "Can delete Moneda"
+  },
+  {
+    "app": "payroll_core",
+    "model": "currency",
+    "codename": "change_currency",
+    "name": "Can change Moneda"
+  },
+  {
+    "app": "payroll_core",
+    "model": "currency",
+    "codename": "view_currency",
+    "name": "Can view Moneda"
+  },
+  {
+    "app": "payroll_core",
+    "model": "department",
+    "codename": "add_department",
+    "name": "Can add Departamento"
+  },
+  {
+    "app": "payroll_core",
+    "model": "department",
+    "codename": "view_department",
+    "name": "Can view Departamento"
+  },
+  {
+    "app": "payroll_core",
+    "model": "department",
+    "codename": "delete_department",
+    "name": "Can delete Departamento"
+  },
+  {
+    "app": "payroll_core",
+    "model": "department",
+    "codename": "change_department",
+    "name": "Can change Departamento"
+  },
+  {
+    "app": "payroll_core",
+    "model": "employee",
+    "codename": "view_employee",
+    "name": "Can view Empleado"
+  },
+  {
+    "app": "payroll_core",
+    "model": "employee",
+    "codename": "delete_employee",
+    "name": "Can delete Empleado"
+  },
+  {
+    "app": "payroll_core",
+    "model": "employee",
+    "codename": "change_employee",
+    "name": "Can change Empleado"
+  },
+  {
+    "app": "payroll_core",
+    "model": "employee",
+    "codename": "add_employee",
+    "name": "Can add Empleado"
+  },
+  {
+    "app": "payroll_core",
+    "model": "employeeconcept",
+    "codename": "delete_employeeconcept",
+    "name": "Can delete Asignación de Concepto"
+  },
+  {
+    "app": "payroll_core",
+    "model": "employeeconcept",
+    "codename": "add_employeeconcept",
+    "name": "Can add Asignación de Concepto"
+  },
+  {
+    "app": "payroll_core",
+    "model": "employeeconcept",
+    "codename": "change_employeeconcept",
+    "name": "Can change Asignación de Concepto"
+  },
+  {
+    "app": "payroll_core",
+    "model": "employeeconcept",
+    "codename": "view_employeeconcept",
+    "name": "Can view Asignación de Concepto"
+  },
+  {
+    "app": "payroll_core",
+    "model": "employeedailyshift",
+    "codename": "view_employeedailyshift",
+    "name": "Can view Turno Diario"
+  },
+  {
+    "app": "payroll_core",
+    "model": "employeedailyshift",
+    "codename": "delete_employeedailyshift",
+    "name": "Can delete Turno Diario"
+  },
+  {
+    "app": "payroll_core",
+    "model": "employeedailyshift",
+    "codename": "change_employeedailyshift",
+    "name": "Can change Turno Diario"
+  },
+  {
+    "app": "payroll_core",
+    "model": "employeedailyshift",
+    "codename": "add_employeedailyshift",
+    "name": "Can add Turno Diario"
+  },
+  {
+    "app": "payroll_core",
+    "model": "employeevariation",
+    "codename": "delete_employeevariation",
+    "name": "Can delete Variación de Empleado"
+  },
+  {
+    "app": "payroll_core",
+    "model": "employeevariation",
+    "codename": "view_employeevariation",
+    "name": "Can view Variación de Empleado"
+  },
+  {
+    "app": "payroll_core",
+    "model": "employeevariation",
+    "codename": "add_employeevariation",
+    "name": "Can add Variación de Empleado"
+  },
+  {
+    "app": "payroll_core",
+    "model": "employeevariation",
+    "codename": "change_employeevariation",
+    "name": "Can change Variación de Empleado"
+  },
+  {
+    "app": "payroll_core",
+    "model": "endowmentevent",
+    "codename": "add_endowmentevent",
+    "name": "Can add Evento de Dotación"
+  },
+  {
+    "app": "payroll_core",
+    "model": "endowmentevent",
+    "codename": "change_endowmentevent",
+    "name": "Can change Evento de Dotación"
+  },
+  {
+    "app": "payroll_core",
+    "model": "endowmentevent",
+    "codename": "delete_endowmentevent",
+    "name": "Can delete Evento de Dotación"
+  },
+  {
+    "app": "payroll_core",
+    "model": "endowmentevent",
+    "codename": "view_endowmentevent",
+    "name": "Can view Evento de Dotación"
+  },
+  {
+    "app": "payroll_core",
+    "model": "exchangerate",
+    "codename": "delete_exchangerate",
+    "name": "Can delete Tasa de Cambio"
+  },
+  {
+    "app": "payroll_core",
+    "model": "exchangerate",
+    "codename": "add_exchangerate",
+    "name": "Can add Tasa de Cambio"
+  },
+  {
+    "app": "payroll_core",
+    "model": "exchangerate",
+    "codename": "change_exchangerate",
+    "name": "Can change Tasa de Cambio"
+  },
+  {
+    "app": "payroll_core",
+    "model": "exchangerate",
+    "codename": "view_exchangerate",
+    "name": "Can view Tasa de Cambio"
+  },
+  {
+    "app": "payroll_core",
+    "model": "historicalcompany",
+    "codename": "delete_historicalcompany",
+    "name": "Can delete historical Configuración de Empresa"
+  },
+  {
+    "app": "payroll_core",
+    "model": "historicalcompany",
+    "codename": "add_historicalcompany",
+    "name": "Can add historical Configuración de Empresa"
+  },
+  {
+    "app": "payroll_core",
+    "model": "historicalcompany",
+    "codename": "view_historicalcompany",
+    "name": "Can view historical Configuración de Empresa"
+  },
+  {
+    "app": "payroll_core",
+    "model": "historicalcompany",
+    "codename": "change_historicalcompany",
+    "name": "Can change historical Configuración de Empresa"
+  },
+  {
+    "app": "payroll_core",
+    "model": "historicaldepartment",
+    "codename": "view_historicaldepartment",
+    "name": "Can view historical Departamento"
+  },
+  {
+    "app": "payroll_core",
+    "model": "historicaldepartment",
+    "codename": "add_historicaldepartment",
+    "name": "Can add historical Departamento"
+  },
+  {
+    "app": "payroll_core",
+    "model": "historicaldepartment",
+    "codename": "change_historicaldepartment",
+    "name": "Can change historical Departamento"
+  },
+  {
+    "app": "payroll_core",
+    "model": "historicaldepartment",
+    "codename": "delete_historicaldepartment",
+    "name": "Can delete historical Departamento"
+  },
+  {
+    "app": "payroll_core",
+    "model": "historicalemployee",
+    "codename": "view_historicalemployee",
+    "name": "Can view historical Empleado"
+  },
+  {
+    "app": "payroll_core",
+    "model": "historicalemployee",
+    "codename": "add_historicalemployee",
+    "name": "Can add historical Empleado"
+  },
+  {
+    "app": "payroll_core",
+    "model": "historicalemployee",
+    "codename": "change_historicalemployee",
+    "name": "Can change historical Empleado"
+  },
+  {
+    "app": "payroll_core",
+    "model": "historicalemployee",
+    "codename": "delete_historicalemployee",
+    "name": "Can delete historical Empleado"
+  },
+  {
+    "app": "payroll_core",
+    "model": "historicalendowmentevent",
+    "codename": "change_historicalendowmentevent",
+    "name": "Can change historical Evento de Dotación"
+  },
+  {
+    "app": "payroll_core",
+    "model": "historicalendowmentevent",
+    "codename": "view_historicalendowmentevent",
+    "name": "Can view historical Evento de Dotación"
+  },
+  {
+    "app": "payroll_core",
+    "model": "historicalendowmentevent",
+    "codename": "delete_historicalendowmentevent",
+    "name": "Can delete historical Evento de Dotación"
+  },
+  {
+    "app": "payroll_core",
+    "model": "historicalendowmentevent",
+    "codename": "add_historicalendowmentevent",
+    "name": "Can add historical Evento de Dotación"
+  },
+  {
+    "app": "payroll_core",
+    "model": "historicaljobposition",
+    "codename": "add_historicaljobposition",
+    "name": "Can add historical Cargo"
+  },
+  {
+    "app": "payroll_core",
+    "model": "historicaljobposition",
+    "codename": "view_historicaljobposition",
+    "name": "Can view historical Cargo"
+  },
+  {
+    "app": "payroll_core",
+    "model": "historicaljobposition",
+    "codename": "delete_historicaljobposition",
+    "name": "Can delete historical Cargo"
+  },
+  {
+    "app": "payroll_core",
+    "model": "historicaljobposition",
+    "codename": "change_historicaljobposition",
+    "name": "Can change historical Cargo"
+  },
+  {
+    "app": "payroll_core",
+    "model": "historicallaborcontract",
+    "codename": "add_historicallaborcontract",
+    "name": "Can add historical Contrato Laboral"
+  },
+  {
+    "app": "payroll_core",
+    "model": "historicallaborcontract",
+    "codename": "view_historicallaborcontract",
+    "name": "Can view historical Contrato Laboral"
+  },
+  {
+    "app": "payroll_core",
+    "model": "historicallaborcontract",
+    "codename": "delete_historicallaborcontract",
+    "name": "Can delete historical Contrato Laboral"
+  },
+  {
+    "app": "payroll_core",
+    "model": "historicallaborcontract",
+    "codename": "change_historicallaborcontract",
+    "name": "Can change historical Contrato Laboral"
+  },
+  {
+    "app": "payroll_core",
+    "model": "historicalloan",
+    "codename": "change_historicalloan",
+    "name": "Can change historical Préstamo / Anticipo"
+  },
+  {
+    "app": "payroll_core",
+    "model": "historicalloan",
+    "codename": "view_historicalloan",
+    "name": "Can view historical Préstamo / Anticipo"
+  },
+  {
+    "app": "payroll_core",
+    "model": "historicalloan",
+    "codename": "delete_historicalloan",
+    "name": "Can delete historical Préstamo / Anticipo"
+  },
+  {
+    "app": "payroll_core",
+    "model": "historicalloan",
+    "codename": "add_historicalloan",
+    "name": "Can add historical Préstamo / Anticipo"
+  },
+  {
+    "app": "payroll_core",
+    "model": "historicalpayrollpolicy",
+    "codename": "delete_historicalpayrollpolicy",
+    "name": "Can delete historical Política de Nómina"
+  },
+  {
+    "app": "payroll_core",
+    "model": "historicalpayrollpolicy",
+    "codename": "add_historicalpayrollpolicy",
+    "name": "Can add historical Política de Nómina"
+  },
+  {
+    "app": "payroll_core",
+    "model": "historicalpayrollpolicy",
+    "codename": "change_historicalpayrollpolicy",
+    "name": "Can change historical Política de Nómina"
+  },
+  {
+    "app": "payroll_core",
+    "model": "historicalpayrollpolicy",
+    "codename": "view_historicalpayrollpolicy",
+    "name": "Can view historical Política de Nómina"
+  },
+  {
+    "app": "payroll_core",
+    "model": "holiday",
+    "codename": "add_holiday",
+    "name": "Can add Día Feriado"
+  },
+  {
+    "app": "payroll_core",
+    "model": "holiday",
+    "codename": "view_holiday",
+    "name": "Can view Día Feriado"
+  },
+  {
+    "app": "payroll_core",
+    "model": "holiday",
+    "codename": "delete_holiday",
+    "name": "Can delete Día Feriado"
+  },
+  {
+    "app": "payroll_core",
+    "model": "holiday",
+    "codename": "change_holiday",
+    "name": "Can change Día Feriado"
+  },
+  {
+    "app": "payroll_core",
+    "model": "incesdeclaration",
+    "codename": "add_incesdeclaration",
+    "name": "Can add Declaración INCES"
+  },
+  {
+    "app": "payroll_core",
+    "model": "incesdeclaration",
+    "codename": "change_incesdeclaration",
+    "name": "Can change Declaración INCES"
+  },
+  {
+    "app": "payroll_core",
+    "model": "incesdeclaration",
+    "codename": "delete_incesdeclaration",
+    "name": "Can delete Declaración INCES"
+  },
+  {
+    "app": "payroll_core",
+    "model": "incesdeclaration",
+    "codename": "view_incesdeclaration",
+    "name": "Can view Declaración INCES"
+  },
+  {
+    "app": "payroll_core",
+    "model": "interestratebcv",
+    "codename": "add_interestratebcv",
+    "name": "Can add Tasa BCV"
+  },
+  {
+    "app": "payroll_core",
+    "model": "interestratebcv",
+    "codename": "change_interestratebcv",
+    "name": "Can change Tasa BCV"
+  },
+  {
+    "app": "payroll_core",
+    "model": "interestratebcv",
+    "codename": "delete_interestratebcv",
+    "name": "Can delete Tasa BCV"
+  },
+  {
+    "app": "payroll_core",
+    "model": "interestratebcv",
+    "codename": "view_interestratebcv",
+    "name": "Can view Tasa BCV"
+  },
+  {
+    "app": "payroll_core",
+    "model": "islrretention",
+    "codename": "view_islrretention",
+    "name": "Can view Retención ISLR"
+  },
+  {
+    "app": "payroll_core",
+    "model": "islrretention",
+    "codename": "add_islrretention",
+    "name": "Can add Retención ISLR"
+  },
+  {
+    "app": "payroll_core",
+    "model": "islrretention",
+    "codename": "change_islrretention",
+    "name": "Can change Retención ISLR"
+  },
+  {
+    "app": "payroll_core",
+    "model": "islrretention",
+    "codename": "delete_islrretention",
+    "name": "Can delete Retención ISLR"
+  },
+  {
+    "app": "payroll_core",
+    "model": "islrretentiontable",
+    "codename": "view_islrretentiontable",
+    "name": "Can view Tramo ISLR"
+  },
+  {
+    "app": "payroll_core",
+    "model": "islrretentiontable",
+    "codename": "add_islrretentiontable",
+    "name": "Can add Tramo ISLR"
+  },
+  {
+    "app": "payroll_core",
+    "model": "islrretentiontable",
+    "codename": "change_islrretentiontable",
+    "name": "Can change Tramo ISLR"
+  },
+  {
+    "app": "payroll_core",
+    "model": "islrretentiontable",
+    "codename": "delete_islrretentiontable",
+    "name": "Can delete Tramo ISLR"
+  },
+  {
+    "app": "payroll_core",
+    "model": "jobposition",
+    "codename": "add_jobposition",
+    "name": "Can add Cargo"
+  },
+  {
+    "app": "payroll_core",
+    "model": "jobposition",
+    "codename": "view_jobposition",
+    "name": "Can view Cargo"
+  },
+  {
+    "app": "payroll_core",
+    "model": "jobposition",
+    "codename": "delete_jobposition",
+    "name": "Can delete Cargo"
+  },
+  {
+    "app": "payroll_core",
+    "model": "jobposition",
+    "codename": "change_jobposition",
+    "name": "Can change Cargo"
+  },
+  {
+    "app": "payroll_core",
+    "model": "laborcontract",
+    "codename": "view_laborcontract",
+    "name": "Can view Contrato Laboral"
+  },
+  {
+    "app": "payroll_core",
+    "model": "laborcontract",
+    "codename": "add_laborcontract",
+    "name": "Can add Contrato Laboral"
+  },
+  {
+    "app": "payroll_core",
+    "model": "laborcontract",
+    "codename": "change_laborcontract",
+    "name": "Can change Contrato Laboral"
+  },
+  {
+    "app": "payroll_core",
+    "model": "laborcontract",
+    "codename": "delete_laborcontract",
+    "name": "Can delete Contrato Laboral"
+  },
+  {
+    "app": "payroll_core",
+    "model": "loan",
+    "codename": "add_loan",
+    "name": "Can add Préstamo / Anticipo"
+  },
+  {
+    "app": "payroll_core",
+    "model": "loan",
+    "codename": "view_loan",
+    "name": "Can view Préstamo / Anticipo"
+  },
+  {
+    "app": "payroll_core",
+    "model": "loan",
+    "codename": "delete_loan",
+    "name": "Can delete Préstamo / Anticipo"
+  },
+  {
+    "app": "payroll_core",
+    "model": "loan",
+    "codename": "change_loan",
+    "name": "Can change Préstamo / Anticipo"
+  },
+  {
+    "app": "payroll_core",
+    "model": "loanpayment",
+    "codename": "add_loanpayment",
+    "name": "Can add Abono a Préstamo"
+  },
+  {
+    "app": "payroll_core",
+    "model": "loanpayment",
+    "codename": "change_loanpayment",
+    "name": "Can change Abono a Préstamo"
+  },
+  {
+    "app": "payroll_core",
+    "model": "loanpayment",
+    "codename": "delete_loanpayment",
+    "name": "Can delete Abono a Préstamo"
+  },
+  {
+    "app": "payroll_core",
+    "model": "loanpayment",
+    "codename": "view_loanpayment",
+    "name": "Can view Abono a Préstamo"
+  },
+  {
+    "app": "payroll_core",
+    "model": "lppssdeclaration",
+    "codename": "add_lppssdeclaration",
+    "name": "Can add Declaración LPPSS"
+  },
+  {
+    "app": "payroll_core",
+    "model": "lppssdeclaration",
+    "codename": "view_lppssdeclaration",
+    "name": "Can view Declaración LPPSS"
+  },
+  {
+    "app": "payroll_core",
+    "model": "lppssdeclaration",
+    "codename": "delete_lppssdeclaration",
+    "name": "Can delete Declaración LPPSS"
+  },
+  {
+    "app": "payroll_core",
+    "model": "lppssdeclaration",
+    "codename": "change_lppssdeclaration",
+    "name": "Can change Declaración LPPSS"
+  },
+  {
+    "app": "payroll_core",
+    "model": "lppssdeclarationline",
+    "codename": "delete_lppssdeclarationline",
+    "name": "Can delete Línea LPPSS"
+  },
+  {
+    "app": "payroll_core",
+    "model": "lppssdeclarationline",
+    "codename": "add_lppssdeclarationline",
+    "name": "Can add Línea LPPSS"
+  },
+  {
+    "app": "payroll_core",
+    "model": "lppssdeclarationline",
+    "codename": "change_lppssdeclarationline",
+    "name": "Can change Línea LPPSS"
+  },
+  {
+    "app": "payroll_core",
+    "model": "lppssdeclarationline",
+    "codename": "view_lppssdeclarationline",
+    "name": "Can view Línea LPPSS"
+  },
+  {
+    "app": "payroll_core",
+    "model": "payrollconcept",
+    "codename": "view_payrollconcept",
+    "name": "Can view Concepto de Nómina"
+  },
+  {
+    "app": "payroll_core",
+    "model": "payrollconcept",
+    "codename": "add_payrollconcept",
+    "name": "Can add Concepto de Nómina"
+  },
+  {
+    "app": "payroll_core",
+    "model": "payrollconcept",
+    "codename": "change_payrollconcept",
+    "name": "Can change Concepto de Nómina"
+  },
+  {
+    "app": "payroll_core",
+    "model": "payrollconcept",
+    "codename": "delete_payrollconcept",
+    "name": "Can delete Concepto de Nómina"
+  },
+  {
+    "app": "payroll_core",
+    "model": "payrollnovelty",
+    "codename": "add_payrollnovelty",
+    "name": "Can add Novedad de Nómina"
+  },
+  {
+    "app": "payroll_core",
+    "model": "payrollnovelty",
+    "codename": "view_payrollnovelty",
+    "name": "Can view Novedad de Nómina"
+  },
+  {
+    "app": "payroll_core",
+    "model": "payrollnovelty",
+    "codename": "delete_payrollnovelty",
+    "name": "Can delete Novedad de Nómina"
+  },
+  {
+    "app": "payroll_core",
+    "model": "payrollnovelty",
+    "codename": "change_payrollnovelty",
+    "name": "Can change Novedad de Nómina"
+  },
+  {
+    "app": "payroll_core",
+    "model": "payrollperiod",
+    "codename": "add_payrollperiod",
+    "name": "Can add Periodo de Nómina"
+  },
+  {
+    "app": "payroll_core",
+    "model": "payrollperiod",
+    "codename": "view_payrollperiod",
+    "name": "Can view Periodo de Nómina"
+  },
+  {
+    "app": "payroll_core",
+    "model": "payrollperiod",
+    "codename": "delete_payrollperiod",
+    "name": "Can delete Periodo de Nómina"
+  },
+  {
+    "app": "payroll_core",
+    "model": "payrollperiod",
+    "codename": "change_payrollperiod",
+    "name": "Can change Periodo de Nómina"
+  },
+  {
+    "app": "payroll_core",
+    "model": "payrollpolicy",
+    "codename": "add_payrollpolicy",
+    "name": "Can add Política de Nómina"
+  },
+  {
+    "app": "payroll_core",
+    "model": "payrollpolicy",
+    "codename": "view_payrollpolicy",
+    "name": "Can view Política de Nómina"
+  },
+  {
+    "app": "payroll_core",
+    "model": "payrollpolicy",
+    "codename": "delete_payrollpolicy",
+    "name": "Can delete Política de Nómina"
+  },
+  {
+    "app": "payroll_core",
+    "model": "payrollpolicy",
+    "codename": "change_payrollpolicy",
+    "name": "Can change Política de Nómina"
+  },
+  {
+    "app": "payroll_core",
+    "model": "payrollreceipt",
+    "codename": "add_payrollreceipt",
+    "name": "Can add Recibo de Nómina"
+  },
+  {
+    "app": "payroll_core",
+    "model": "payrollreceipt",
+    "codename": "change_payrollreceipt",
+    "name": "Can change Recibo de Nómina"
+  },
+  {
+    "app": "payroll_core",
+    "model": "payrollreceipt",
+    "codename": "delete_payrollreceipt",
+    "name": "Can delete Recibo de Nómina"
+  },
+  {
+    "app": "payroll_core",
+    "model": "payrollreceipt",
+    "codename": "view_payrollreceipt",
+    "name": "Can view Recibo de Nómina"
+  },
+  {
+    "app": "payroll_core",
+    "model": "payrollreceiptline",
+    "codename": "add_payrollreceiptline",
+    "name": "Can add Detalle de Recibo"
+  },
+  {
+    "app": "payroll_core",
+    "model": "payrollreceiptline",
+    "codename": "change_payrollreceiptline",
+    "name": "Can change Detalle de Recibo"
+  },
+  {
+    "app": "payroll_core",
+    "model": "payrollreceiptline",
+    "codename": "delete_payrollreceiptline",
+    "name": "Can delete Detalle de Recibo"
+  },
+  {
+    "app": "payroll_core",
+    "model": "payrollreceiptline",
+    "codename": "view_payrollreceiptline",
+    "name": "Can view Detalle de Recibo"
+  },
+  {
+    "app": "payroll_core",
+    "model": "payslip",
+    "codename": "add_payslip",
+    "name": "Can add Recibo de Pago"
+  },
+  {
+    "app": "payroll_core",
+    "model": "payslip",
+    "codename": "view_payslip",
+    "name": "Can view Recibo de Pago"
+  },
+  {
+    "app": "payroll_core",
+    "model": "payslip",
+    "codename": "delete_payslip",
+    "name": "Can delete Recibo de Pago"
+  },
+  {
+    "app": "payroll_core",
+    "model": "payslip",
+    "codename": "change_payslip",
+    "name": "Can change Recibo de Pago"
+  },
+  {
+    "app": "payroll_core",
+    "model": "payslipdetail",
+    "codename": "change_payslipdetail",
+    "name": "Can change Detalle de Recibo"
+  },
+  {
+    "app": "payroll_core",
+    "model": "payslipdetail",
+    "codename": "view_payslipdetail",
+    "name": "Can view Detalle de Recibo"
+  },
+  {
+    "app": "payroll_core",
+    "model": "payslipdetail",
+    "codename": "delete_payslipdetail",
+    "name": "Can delete Detalle de Recibo"
+  },
+  {
+    "app": "payroll_core",
+    "model": "payslipdetail",
+    "codename": "add_payslipdetail",
+    "name": "Can add Detalle de Recibo"
+  },
+  {
+    "app": "payroll_core",
+    "model": "salaryhistory",
+    "codename": "view_salaryhistory",
+    "name": "Can view Historial Salarial"
+  },
+  {
+    "app": "payroll_core",
+    "model": "salaryhistory",
+    "codename": "add_salaryhistory",
+    "name": "Can add Historial Salarial"
+  },
+  {
+    "app": "payroll_core",
+    "model": "salaryhistory",
+    "codename": "change_salaryhistory",
+    "name": "Can change Historial Salarial"
+  },
+  {
+    "app": "payroll_core",
+    "model": "salaryhistory",
+    "codename": "delete_salaryhistory",
+    "name": "Can delete Historial Salarial"
+  },
+  {
+    "app": "payroll_core",
+    "model": "socialbenefitsledger",
+    "codename": "delete_socialbenefitsledger",
+    "name": "Can delete Movimiento de Prestaciones"
+  },
+  {
+    "app": "payroll_core",
+    "model": "socialbenefitsledger",
+    "codename": "view_socialbenefitsledger",
+    "name": "Can view Movimiento de Prestaciones"
+  },
+  {
+    "app": "payroll_core",
+    "model": "socialbenefitsledger",
+    "codename": "change_socialbenefitsledger",
+    "name": "Can change Movimiento de Prestaciones"
+  },
+  {
+    "app": "payroll_core",
+    "model": "socialbenefitsledger",
+    "codename": "add_socialbenefitsledger",
+    "name": "Can add Movimiento de Prestaciones"
+  },
+  {
+    "app": "payroll_core",
+    "model": "socialbenefitssettlement",
+    "codename": "change_socialbenefitssettlement",
+    "name": "Can change Liquidación de Prestaciones"
+  },
+  {
+    "app": "payroll_core",
+    "model": "socialbenefitssettlement",
+    "codename": "delete_socialbenefitssettlement",
+    "name": "Can delete Liquidación de Prestaciones"
+  },
+  {
+    "app": "payroll_core",
+    "model": "socialbenefitssettlement",
+    "codename": "view_socialbenefitssettlement",
+    "name": "Can view Liquidación de Prestaciones"
+  },
+  {
+    "app": "payroll_core",
+    "model": "socialbenefitssettlement",
+    "codename": "add_socialbenefitssettlement",
+    "name": "Can add Liquidación de Prestaciones"
+  },
+  {
+    "app": "payroll_core",
+    "model": "vacationbalance",
+    "codename": "add_vacationbalance",
+    "name": "Can add Saldo de Vacaciones"
+  },
+  {
+    "app": "payroll_core",
+    "model": "vacationbalance",
+    "codename": "delete_vacationbalance",
+    "name": "Can delete Saldo de Vacaciones"
+  },
+  {
+    "app": "payroll_core",
+    "model": "vacationbalance",
+    "codename": "view_vacationbalance",
+    "name": "Can view Saldo de Vacaciones"
+  },
+  {
+    "app": "payroll_core",
+    "model": "vacationbalance",
+    "codename": "change_vacationbalance",
+    "name": "Can change Saldo de Vacaciones"
+  },
+  {
+    "app": "payroll_core",
+    "model": "variationcause",
+    "codename": "view_variationcause",
+    "name": "Can view Causa de Variación"
+  },
+  {
+    "app": "payroll_core",
+    "model": "variationcause",
+    "codename": "delete_variationcause",
+    "name": "Can delete Causa de Variación"
+  },
+  {
+    "app": "payroll_core",
+    "model": "variationcause",
+    "codename": "change_variationcause",
+    "name": "Can change Causa de Variación"
+  },
+  {
+    "app": "payroll_core",
+    "model": "variationcause",
+    "codename": "add_variationcause",
+    "name": "Can add Causa de Variación"
+  },
+  {
+    "app": "payroll_core",
+    "model": "workschedule",
+    "codename": "change_workschedule",
+    "name": "Can change Horario de Trabajo"
+  },
+  {
+    "app": "payroll_core",
+    "model": "workschedule",
+    "codename": "view_workschedule",
+    "name": "Can view Horario de Trabajo"
+  },
+  {
+    "app": "payroll_core",
+    "model": "workschedule",
+    "codename": "delete_workschedule",
+    "name": "Can delete Horario de Trabajo"
+  },
+  {
+    "app": "payroll_core",
+    "model": "workschedule",
+    "codename": "add_workschedule",
+    "name": "Can add Horario de Trabajo"
+  },
+  {
+    "app": "vacations",
+    "model": "historicalvacationrequest",
+    "codename": "add_historicalvacationrequest",
+    "name": "Can add historical Solicitud de Vacaciones"
+  },
+  {
+    "app": "vacations",
+    "model": "historicalvacationrequest",
+    "codename": "change_historicalvacationrequest",
+    "name": "Can change historical Solicitud de Vacaciones"
+  },
+  {
+    "app": "vacations",
+    "model": "historicalvacationrequest",
+    "codename": "delete_historicalvacationrequest",
+    "name": "Can delete historical Solicitud de Vacaciones"
+  },
+  {
+    "app": "vacations",
+    "model": "historicalvacationrequest",
+    "codename": "view_historicalvacationrequest",
+    "name": "Can view historical Solicitud de Vacaciones"
+  },
+  {
+    "app": "vacations",
+    "model": "holiday",
+    "codename": "add_holiday",
+    "name": "Can add Feriado"
+  },
+  {
+    "app": "vacations",
+    "model": "holiday",
+    "codename": "change_holiday",
+    "name": "Can change Feriado"
+  },
+  {
+    "app": "vacations",
+    "model": "holiday",
+    "codename": "delete_holiday",
+    "name": "Can delete Feriado"
+  },
+  {
+    "app": "vacations",
+    "model": "holiday",
+    "codename": "view_holiday",
+    "name": "Can view Feriado"
+  },
+  {
+    "app": "vacations",
+    "model": "vacationbalance",
+    "codename": "view_vacationbalance",
+    "name": "Can view Movimiento de Vacaciones"
+  },
+  {
+    "app": "vacations",
+    "model": "vacationbalance",
+    "codename": "delete_vacationbalance",
+    "name": "Can delete Movimiento de Vacaciones"
+  },
+  {
+    "app": "vacations",
+    "model": "vacationbalance",
+    "codename": "change_vacationbalance",
+    "name": "Can change Movimiento de Vacaciones"
+  },
+  {
+    "app": "vacations",
+    "model": "vacationbalance",
+    "codename": "add_vacationbalance",
+    "name": "Can add Movimiento de Vacaciones"
+  },
+  {
+    "app": "vacations",
+    "model": "vacationpayment",
+    "codename": "add_vacationpayment",
+    "name": "Can add Pago de Vacaciones"
+  },
+  {
+    "app": "vacations",
+    "model": "vacationpayment",
+    "codename": "change_vacationpayment",
+    "name": "Can change Pago de Vacaciones"
+  },
+  {
+    "app": "vacations",
+    "model": "vacationpayment",
+    "codename": "delete_vacationpayment",
+    "name": "Can delete Pago de Vacaciones"
+  },
+  {
+    "app": "vacations",
+    "model": "vacationpayment",
+    "codename": "view_vacationpayment",
+    "name": "Can view Pago de Vacaciones"
+  },
+  {
+    "app": "vacations",
+    "model": "vacationpaymentline",
+    "codename": "add_vacationpaymentline",
+    "name": "Can add Detalle de Pago Vacacional"
+  },
+  {
+    "app": "vacations",
+    "model": "vacationpaymentline",
+    "codename": "change_vacationpaymentline",
+    "name": "Can change Detalle de Pago Vacacional"
+  },
+  {
+    "app": "vacations",
+    "model": "vacationpaymentline",
+    "codename": "delete_vacationpaymentline",
+    "name": "Can delete Detalle de Pago Vacacional"
+  },
+  {
+    "app": "vacations",
+    "model": "vacationpaymentline",
+    "codename": "view_vacationpaymentline",
+    "name": "Can view Detalle de Pago Vacacional"
+  },
+  {
+    "app": "vacations",
+    "model": "vacationrequest",
+    "codename": "add_vacationrequest",
+    "name": "Can add Solicitud de Vacaciones"
+  },
+  {
+    "app": "vacations",
+    "model": "vacationrequest",
+    "codename": "change_vacationrequest",
+    "name": "Can change Solicitud de Vacaciones"
+  },
+  {
+    "app": "vacations",
+    "model": "vacationrequest",
+    "codename": "delete_vacationrequest",
+    "name": "Can delete Solicitud de Vacaciones"
+  },
+  {
+    "app": "vacations",
+    "model": "vacationrequest",
+    "codename": "view_vacationrequest",
+    "name": "Can view Solicitud de Vacaciones"
+  }
+]
