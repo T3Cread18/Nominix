@@ -5,7 +5,7 @@ import ColumnMapper from './components/ColumnMapper';
 import ValidationReport from './components/ValidationReport';
 import ImportResult from './components/ImportResult';
 import { Loader2, ArrowLeft, ArrowRight, Play, Download, Users, Building2, Network, Briefcase } from 'lucide-react';
-import { toast } from 'react-hot-toast';
+import { toast } from 'sonner';
 
 const ImportWizard = () => {
     const [step, setStep] = useState(1);

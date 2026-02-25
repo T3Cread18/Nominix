@@ -8,6 +8,7 @@ from decimal import Decimal
 from .employee import Employee
 from customers.models import Currency
 from .payroll import PayrollReceipt
+from simple_history.models import HistoricalRecords
 
 
 
@@ -115,6 +116,8 @@ class Loan(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    history = HistoricalRecords()
 
     class Meta:
         verbose_name = 'Préstamo / Anticipo'

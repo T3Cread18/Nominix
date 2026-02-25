@@ -1,6 +1,7 @@
 from django.db import models
 from .organization import Branch
 from .employee import Employee
+from simple_history.models import HistoricalRecords
 
 class EndowmentEvent(models.Model):
     """
@@ -38,6 +39,8 @@ class EndowmentEvent(models.Model):
         auto_now_add=True,
         verbose_name='Fecha de Registro'
     )
+    
+    history = HistoricalRecords()
     
     class Meta:
         verbose_name = 'Evento de Dotación'

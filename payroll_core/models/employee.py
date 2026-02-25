@@ -10,6 +10,7 @@ from .base import tenant_upload_path
 from .organization import Branch, Department, JobPosition
 from .work_schedule import WorkSchedule
 from customers.models import Currency
+from simple_history.models import HistoricalRecords
 
 
 class Employee(models.Model):
@@ -320,6 +321,8 @@ class Employee(models.Model):
         verbose_name='Observaciones'
     )
     
+    history = HistoricalRecords()
+    
     class Meta:
         verbose_name = 'Empleado'
         verbose_name_plural = 'Empleados'
@@ -556,6 +559,8 @@ class LaborContract(models.Model):
         auto_now=True,
         verbose_name='Última Actualización'
     )
+    
+    history = HistoricalRecords()
     
     class Meta:
         verbose_name = 'Contrato Laboral'

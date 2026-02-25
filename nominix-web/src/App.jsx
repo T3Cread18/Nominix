@@ -24,6 +24,7 @@ import { AttendanceDashboard } from './features/attendance';
 import ImportWizard from './features/import/ImportWizard';
 import DeclarationsPanel from './features/declarations/DeclarationsPanel';
 import ReportsPanel from './features/reports/ReportsPanel';
+import AuditLogsManager from './pages/AuditLogsManager';
 
 /**
  * App - Componente principal de la aplicación.
@@ -99,6 +100,7 @@ function App() {
 
                 {/* Módulo: Configuración */}
                 <Route path="config" element={<CompanySettings />} />
+                <Route path="audit-logs" element={<AuditLogsManager />} />
 
                 {/* Módulo: Vacaciones */}
                 <Route path="vacations" element={<VacationManager />} />

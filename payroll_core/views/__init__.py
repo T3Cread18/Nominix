@@ -42,6 +42,7 @@ from vacations.models import VacationPayment, VacationRequest
 # Import new views
 from .import_views import *
 from .endowment_views import EndowmentEventViewSet
+from .audit_views import AuditLogView
 
 class CurrencyViewSet(viewsets.ModelViewSet):
     queryset = Currency.objects.all()
@@ -428,7 +429,9 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         partial = True # Forzamos parcial para que no borre datos no enviados
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
-        serializer.is_valid(raise_exception=True)
+        if not serializer.is_valid():
+            print(f"EmployeeUpdate Validation Error for {instance.id}: {serializer.errors}")
+            serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
         return Response(serializer.data)
     def destroy(self, request, *args, **kwargs):

@@ -28,6 +28,7 @@ const Navbar = () => {
         { path: '/vacations', icon: Calendar, label: 'Vacaciones' },
         { path: '/attendance', icon: Fingerprint, label: 'Asistencia' },
         { path: '/config', icon: Settings, label: 'Config' },
+        { path: '/audit-logs', icon: ShieldCheck, label: 'Bitácora' },
     ];
 
     const secondaryNavItems = [

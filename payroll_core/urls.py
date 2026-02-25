@@ -25,6 +25,7 @@ from .views.export_views import (
     ConstanciaTrabajoView, PayrollExcelReportView,
     EndowmentSizesExportView
 )
+from .views.audit_views import AuditLogView
 
 
 
@@ -84,5 +85,8 @@ urlpatterns = [
     # Reports
     path('reports/constancia-trabajo/<int:employee_id>/', ConstanciaTrabajoView.as_view(), name='constancia-trabajo'),
     path('reports/excel/<int:period_id>/', PayrollExcelReportView.as_view(), name='payroll-excel-report'),
+    
+    # Audit Logs
+    path('audit-logs/', AuditLogView.as_view(), name='audit-logs'),
 
 ]

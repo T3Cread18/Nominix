@@ -9,6 +9,7 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 from decimal import Decimal
 
 from customers.models import Currency
+from simple_history.models import HistoricalRecords
 
 
 class Branch(models.Model):
@@ -108,6 +109,8 @@ class Department(models.Model):
         null=True, 
         blank=True
     )
+    
+    history = HistoricalRecords()
     
     class Meta:
         verbose_name = 'Departamento'
@@ -223,6 +226,8 @@ class JobPosition(models.Model):
         auto_now=True,
         verbose_name='Última Actualización'
     )
+    
+    history = HistoricalRecords()
     
     class Meta:
         verbose_name = 'Cargo'
@@ -372,6 +377,8 @@ class Company(models.Model):
         verbose_name="Moneda del Recibo de Vacaciones",
         help_text="En qué moneda se muestran los montos del recibo PDF"
     )
+
+    history = HistoricalRecords()
 
     class Meta:
         verbose_name = "Configuración de Empresa"
@@ -587,6 +594,8 @@ class PayrollPolicy(models.Model):
     )
 
     updated_at = models.DateTimeField(auto_now=True)
+
+    history = HistoricalRecords()
 
     class Meta:
         verbose_name = "Política de Nómina"

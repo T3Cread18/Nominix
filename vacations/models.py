@@ -16,6 +16,7 @@ from django.core.validators import MinValueValidator
 from django.utils import timezone
 
 from payroll_core.models import Employee, LaborContract
+from simple_history.models import HistoricalRecords
 
 
 class VacationRequest(models.Model):
@@ -151,6 +152,8 @@ class VacationRequest(models.Model):
         auto_now=True,
         verbose_name='Última Actualización'
     )
+    
+    history = HistoricalRecords()
     
     class Meta:
         verbose_name = 'Solicitud de Vacaciones'
