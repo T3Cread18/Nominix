@@ -249,4 +249,15 @@ class UserManagementSerializer(serializers.Serializer):
     is_staff = serializers.BooleanField(default=False)
     is_superuser = serializers.BooleanField(default=False)
     is_active = serializers.BooleanField(default=True)
+    
+    role_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        write_only=True,
+        required=False
+    )
+    roles = serializers.SerializerMethodField(read_only=True)
+
+    def get_roles(self, obj):
+        from .auth_serializers import GroupSerializer
+        return GroupSerializer(obj.groups.all(), many=True).data
 

@@ -20,8 +20,10 @@ from .serializers import (
     TenantStatsSerializer,
     UserManagementSerializer
 )
-from .auth_serializers import LoginSerializer, UserSerializer
+from .auth_serializers import LoginSerializer, UserSerializer, GroupSerializer, PermissionSerializer
 import logging
+from django.contrib.auth.models import Group, Permission
+from django.db.models import Q
 
 logger = logging.getLogger(__name__)
 
@@ -279,6 +281,26 @@ class ClientViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+    @action(detail=True, methods=['get'])
+    def roles(self, request, pk=None):
+        """
+        Listar roles (groups) disponibles en el tenant.
+        """
+        client = self.get_object()
+        schema = client.schema_name
+        
+        from django_tenants.utils import schema_context
+        from django.contrib.auth.models import Group
+        from .auth_serializers import GroupSerializer
+        
+        try:
+            with schema_context(schema):
+                roles = Group.objects.all().order_by('name')
+                serializer = GroupSerializer(roles, many=True)
+                return Response(serializer.data)
+        except Exception as e:
+            return Response({'error': str(e)}, status=500)
+
     @action(detail=True, methods=['post'])
     def renew_subscription(self, request, pk=None):
         """
@@ -353,6 +375,9 @@ class ClientViewSet(viewsets.ModelViewSet):
                         user.is_active = data.get('is_active', True)
                         user.save()
                         
+                        if 'role_ids' in data:
+                            user.groups.set(data['role_ids'])
+                        
                         return Response(UserManagementSerializer(user).data, status=201)
                     return Response(serializer.errors, status=400)
                 
@@ -382,6 +407,10 @@ class ClientViewSet(viewsets.ModelViewSet):
                         user.set_password(data['password'])
                         
                     user.save()
+                    
+                    if 'role_ids' in data:
+                        user.groups.set(data['role_ids'])
+                    
                     return Response(UserManagementSerializer(user).data)
                 
                 # --- ELIMINAR ---
@@ -427,6 +456,32 @@ class TenantInfoView(APIView):
                 'schema': current_schema,
                 'tenant': None
             })
+
+class RoleViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet para gestión de Roles (Grupos) por Tenant.
+    """
+    serializer_class = GroupSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return Group.objects.all().order_by('name')
+
+class PermissionViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet para consultar todos los permisos disponibles en el sistema.
+    """
+    serializer_class = PermissionSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    pagination_class = None # Desactivar paginación para que el frontend cargue todos los módulos
+
+    def get_queryset(self):
+        # Excluir permisos irrelevantes para el usuario final (como migraciones de django u otras apps internas)
+        return Permission.objects.exclude(
+            content_type__app_label__in=[
+                'admin', 'contenttypes', 'sessions', 'migrations', 'authtoken', 'corsheaders'
+            ]
+        ).order_by('content_type__app_label', 'name')
 
 
 class AuthView(viewsets.ViewSet):

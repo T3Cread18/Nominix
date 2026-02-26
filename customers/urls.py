@@ -5,13 +5,15 @@ Define los endpoints de la API REST para gestión de tenants.
 """
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import ClientViewSet, TenantInfoView, AuthView
+from .views import ClientViewSet, TenantInfoView, AuthView, RoleViewSet, PermissionViewSet
 
 app_name = 'customers'
 
 # Router para el ViewSet
 router = DefaultRouter()
 router.register(r'tenants', ClientViewSet, basename='tenant')
+router.register(r'roles', RoleViewSet, basename='role')
+router.register(r'permissions', PermissionViewSet, basename='permission')
 
 urlpatterns = [
     # Endpoints del ViewSet
