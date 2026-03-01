@@ -141,7 +141,7 @@ const ConceptCatalog = () => {
                         { label: 'Deducciones', value: stats.deductions, icon: Percent, color: 'text-red-500' },
                         { label: 'Protegidos', value: stats.system, icon: ShieldCheck, color: 'text-blue-500' }
                     ].map((stat, i) => (
-                        <div key={i} className="bg-white p-4 rounded-2xl border border-gray-100 flex items-center gap-4 shadow-sm">
+                        <div key={stat.label} className="bg-white p-4 rounded-2xl border border-gray-100 flex items-center gap-4 shadow-sm">
                             <div className={cn("p-2 rounded-xl bg-gray-50", stat.color)}>
                                 <stat.icon size={16} />
                             </div>

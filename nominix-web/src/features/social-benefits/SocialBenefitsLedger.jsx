@@ -39,7 +39,7 @@ const SocialBenefitsLedger = ({ employeeId, contractId }) => {
         return (
             <div className="space-y-4">
                 {[1, 2, 3].map(i => (
-                    <Skeleton key={i} className="h-16 w-full rounded-2xl" />
+                    <Skeleton key={`skeleton-${i}`} className="h-16 w-full rounded-2xl" />
                 ))}
             </div>
         );

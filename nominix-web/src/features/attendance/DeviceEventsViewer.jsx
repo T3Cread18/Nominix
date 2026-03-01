@@ -194,7 +194,7 @@ const DeviceEventsViewer = () => {
                                 </thead>
                                 <tbody>
                                     {events.map((evt, i) => (
-                                        <tr key={i} className={`border-b border-gray-50 hover:bg-nominix-smoke/60 transition-colors ${i % 2 !== 0 ? 'bg-gray-50/40' : ''}`}>
+                                        <tr key={`${evt.employee_device_id}-${evt.timestamp}`} className={`border-b border-gray-50 hover:bg-nominix-smoke/60 transition-colors ${i % 2 !== 0 ? 'bg-gray-50/40' : ''}`}>
                                             <td className="py-3 px-4 text-xs font-mono text-gray-500">
                                                 {new Date(evt.timestamp).toLocaleString()}
                                             </td>

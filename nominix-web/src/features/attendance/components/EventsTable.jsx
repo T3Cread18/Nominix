@@ -23,12 +23,13 @@ const VERIFICATION_LABELS = {
     other: '❓ Otro',
 };
 
-const EventsTable = ({ events = [], loading = false, showDevice = true }) => {
+const EMPTY_EVENTS = [];
+const EventsTable = ({ events = EMPTY_EVENTS, loading = false, showDevice = true }) => {
     if (loading) {
         return (
             <div className="space-y-3 p-4">
                 {[...Array(5)].map((_, i) => (
-                    <div key={i} className="h-12 bg-gray-50 rounded-lg animate-pulse" />
+                    <div key={`skeleton-${i}`} className="h-12 bg-gray-50 rounded-lg animate-pulse" />
                 ))}
             </div>
         );

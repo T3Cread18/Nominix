@@ -178,7 +178,15 @@ const CreateEmployeeModal = ({ isOpen, onClose, onSuccess }) => {
                             icon={Briefcase}
                         />
                     </div>
-
+                    <div className="space-y-1.5">
+                        <label className="text-[10px] font-black uppercase text-gray-400 pl-3">Departamento</label>
+                        <DepartmentSelector
+                            branchId={formData.branch}
+                            value={formData.department}
+                            onChange={(val) => setFormData({ ...formData, department: val })}
+                            error={null}
+                        />
+                    </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
                         {/* Fecha de Ingreso */}
                         <InputField
@@ -191,15 +199,7 @@ const CreateEmployeeModal = ({ isOpen, onClose, onSuccess }) => {
                             icon={Calendar}
                         />
 
-                        <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase text-gray-400 pl-3">Departamento</label>
-                            <DepartmentSelector
-                                branchId={formData.branch}
-                                value={formData.department}
-                                onChange={(val) => setFormData({ ...formData, department: val })}
-                                error={null}
-                            />
-                        </div>
+
                     </div>
 
                     {/* SECCIÓN TALLAS */}

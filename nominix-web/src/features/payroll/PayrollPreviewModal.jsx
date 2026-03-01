@@ -137,7 +137,7 @@ const PayrollPreviewModal = ({ isOpen, onClose, data, companyConfig }) => {
                                                                     if (line.code === 'SUELDO_BASE' && companyConfig?.show_base_salary === false) return false;
                                                                     return true;
                                                                 }).map((line, idx) => (
-                                                                    <div key={idx} className="flex justify-between items-center py-2 group/line">
+                                                                    <div key={line.code} className="flex justify-between items-center py-2 group/line">
                                                                         <div>
                                                                             <p className="text-[11px] font-bold text-nominix-dark uppercase tracking-wider">{line.name}</p>
                                                                             <div className="flex items-center gap-2">

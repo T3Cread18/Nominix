@@ -49,14 +49,14 @@ const ValidationReport = ({ validationResult }) => {
                     </thead>
                     <tbody className="bg-white divide-y divide-slate-200">
                         {errors.map((err, idx) => (
-                            <tr key={idx} className="hover:bg-slate-50">
+                            <tr key={err.row} className="hover:bg-slate-50">
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900 border-r border-slate-100">
                                     #{err.row}
                                 </td>
                                 <td className="px-6 py-4 text-sm text-red-600">
                                     <ul className="list-disc list-inside">
                                         {err.errors.map((msg, i) => (
-                                            <li key={i}>{msg}</li>
+                                            <li key={msg}>{msg}</li>
                                         ))}
                                     </ul>
                                 </td>

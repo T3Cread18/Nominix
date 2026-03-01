@@ -113,7 +113,7 @@ function App() {
                 <Route path="vacations/settings" element={<ProtectedRoute permission="vacations.change_vacationsettings"><VacationSettings /></ProtectedRoute>} />
 
                 {/* Módulo: Asistencia */}
-                <Route path="attendance" element={<ProtectedRoute permission="attendance.view_attendancerecord"><AttendanceDashboard /></ProtectedRoute>} />
+                <Route path="attendance" element={<ProtectedRoute permission="biometrics.view_attendanceevent"><AttendanceDashboard /></ProtectedRoute>} />
 
                 {/* Módulo: Importación */}
                 <Route path="import" element={<ProtectedRoute role="Administrador"><ImportWizard /></ProtectedRoute>} />

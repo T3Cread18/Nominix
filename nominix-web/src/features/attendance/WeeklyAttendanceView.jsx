@@ -182,15 +182,15 @@ const WeeklyAttendanceView = () => {
         return () => clearTimeout(timer);
     }, [loadData, search]);
 
-    useEffect(() => {
-        setPage(1);
-    }, [baseDate, branch, search]);
-
     const changeWeek = (deltaWeeks) => {
         const d = new Date(baseDate + 'T12:00:00');
         d.setDate(d.getDate() + (deltaWeeks * 7));
         setBaseDate(d.toISOString().split('T')[0]);
+        setPage(1);
     };
+
+    const handleBranchChange = (e) => { setBranch(e.target.value); setPage(1); };
+    const handleSearchChange = (e) => { setSearch(e.target.value); setPage(1); };
 
     const handlePageChange = (newPage) => {
         if (newPage >= 1 && newPage <= Math.ceil(totalCount / pageSize)) {
@@ -225,7 +225,7 @@ const WeeklyAttendanceView = () => {
                     {/* Sede */}
                     <div className="w-56">
                         <SelectField
-                            value={branch} onChange={(e) => setBranch(e.target.value)}
+                            value={branch} onChange={handleBranchChange}
                             options={[{ value: '', label: 'Todas las Sedes' }, ...branches.map(b => ({ value: b.id, label: b.name }))]}
                             icon={Building2} placeholder="Filtrar Sede" className="!py-1.5 !text-xs"
                         />
@@ -234,7 +234,7 @@ const WeeklyAttendanceView = () => {
                     {/* Búsqueda */}
                     <div className="w-64">
                         <InputField
-                            value={search} onChange={(e) => setSearch(e.target.value)}
+                            value={search} onChange={handleSearchChange}
                             placeholder="Buscar Colaborador..." icon={Search} className="!py-1.5 !text-xs"
                         />
                     </div>

@@ -363,7 +363,7 @@ const PayrollClosure = ({ initialPeriods, onRefresh }) => {
                                     </div>
                                     <ul className="space-y-2">
                                         {successData.warnings.map((w, idx) => (
-                                            <li key={idx} className="text-[10px] text-red-500 font-bold leading-tight flex gap-2">
+                                            <li key={`${idx}-${w}`} className="text-[10px] text-red-500 font-bold leading-tight flex gap-2">
                                                 <span className="shrink-0">•</span> {w}
                                             </li>
                                         ))}

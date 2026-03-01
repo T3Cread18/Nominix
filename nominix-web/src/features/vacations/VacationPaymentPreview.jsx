@@ -19,9 +19,9 @@ const formatCurrency = (amount, currency = 'USD') => {
  * TraceTooltip - Muestra un tooltip con los detalles del cálculo.
  */
 const TraceTooltip = ({ trace, convert, viewCurrency }) => {
-    if (!trace) return null;
-
     const [show, setShow] = useState(false);
+
+    if (!trace) return null;
 
     // Helper para renderizar valores (strings o objetos {type: 'money'})
     const renderValue = (val) => {
@@ -199,7 +199,7 @@ const VacationPaymentPreview = ({
                 <div className="space-y-2">
                     {accruals.map((item, index) => (
                         <div
-                            key={index}
+                            key={item.label}
                             className={cn(
                                 "flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 rounded-xl gap-1 sm:gap-2",
                                 item.color

@@ -79,7 +79,7 @@ const TimeBlock = ({ block, label, expectedTime, onCorrect }) => {
                 minWidth: '120px',
                 position: 'relative',
                 cursor: isMissing ? 'pointer' : 'default',
-                transition: 'all 0.2s ease',
+                transition: 'background-color 0.2s ease, border-color 0.2s ease, opacity 0.2s ease',
             }}
             onMouseEnter={() => setHover(true)}
             onMouseLeave={() => setHover(false)}

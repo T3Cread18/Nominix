@@ -10,7 +10,8 @@ import AdvanceRequestModal from './AdvanceRequestModal';
 import SettlementSimulator from './SettlementSimulator';
 import RequirePermission from '../../context/RequirePermission';
 
-const ManageSocialBenefits = ({ employeeId, employeeData, contracts = [] }) => {
+const EMPTY_CONTRACTS = [];
+const ManageSocialBenefits = ({ employeeId, employeeData, contracts = EMPTY_CONTRACTS }) => {
     const [isAdvanceModalOpen, setIsAdvanceModalOpen] = useState(false);
 
     // Buscar contrato activo en las dos fuentes posibles

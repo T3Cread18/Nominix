@@ -54,7 +54,7 @@ const UpcomingEventsWidget = () => {
                     </div>
                 ) : (
                     events.map((event, idx) => (
-                        <div key={idx} className="flex items-center gap-3 p-3 bg-white rounded-xl border border-slate-100 hover:shadow-sm transition-shadow">
+                        <div key={`${event.employee}-${event.type}`} className="flex items-center gap-3 p-3 bg-white rounded-xl border border-slate-100 hover:shadow-sm transition-shadow">
                             <div className={`w-10 h-10 rounded-full flex items-center justify-center ${event.type === 'birthday'
                                     ? 'bg-rose-100 text-rose-500'
                                     : 'bg-blue-100 text-blue-500'

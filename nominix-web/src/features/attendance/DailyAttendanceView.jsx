@@ -10,7 +10,7 @@ import TimeBlock from './components/TimeBlock';
  * Palette: nominix-dark #1A2B48, nominix-electric #0052FF, nominix-smoke #F8F9FA, surface #FFF
  */
 const DailyAttendanceView = () => {
-    const [date, setDate] = useState(getTodayStr());
+    const [date, setDate] = useState(() => getTodayStr());
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
@@ -68,16 +68,17 @@ const DailyAttendanceView = () => {
         return () => clearTimeout(timer);
     }, [loadData, search]);
 
-    // Reset page when filters change
-    useEffect(() => {
-        setPage(1);
-    }, [date, branch, search, tz]);
-
     const changeDate = (delta) => {
         const d = new Date(date + 'T12:00:00');
         d.setDate(d.getDate() + delta);
         setDate(d.toISOString().split('T')[0]);
+        setPage(1);
     };
+
+    const handleDateChange = (e) => { setDate(e.target.value); setPage(1); };
+    const handleBranchChange = (e) => { setBranch(e.target.value); setPage(1); };
+    const handleSearchChange = (e) => { setSearch(e.target.value); setPage(1); };
+    const handleTzChange = (e) => { setTz(e.target.value); setPage(1); };
 
     const handlePageChange = (newPage) => {
         if (newPage >= 1 && newPage <= Math.ceil(totalCount / pageSize)) {
@@ -118,7 +119,7 @@ const DailyAttendanceView = () => {
                             <input
                                 type="date"
                                 value={date}
-                                onChange={(e) => setDate(e.target.value)}
+                                onChange={handleDateChange}
                                 className="bg-transparent border-none text-xs font-bold text-nominix-dark cursor-pointer outline-none"
                             />
                         </div>
@@ -132,7 +133,7 @@ const DailyAttendanceView = () => {
                     <div className="w-56">
                         <SelectField
                             value={branch}
-                            onChange={(e) => setBranch(e.target.value)}
+                            onChange={handleBranchChange}
                             options={[
                                 { value: '', label: 'Todas las Sedes' },
                                 ...branches.map(b => ({ value: b.id, label: b.name }))
@@ -147,7 +148,7 @@ const DailyAttendanceView = () => {
                     <div className="w-64">
                         <InputField
                             value={search}
-                            onChange={(e) => setSearch(e.target.value)}
+                            onChange={handleSearchChange}
                             placeholder="Buscar por nombre o CI..."
                             icon={Search}
                             className="!py-1.5 !text-xs"
@@ -158,7 +159,7 @@ const DailyAttendanceView = () => {
                     <div className="w-44">
                         <SelectField
                             value={tz}
-                            onChange={(e) => setTz(e.target.value)}
+                            onChange={handleTzChange}
                             options={[
                                 { value: '', label: 'TZ: Por defecto' },
                                 { value: 'UTC', label: 'TZ: UTC' },
@@ -171,7 +172,7 @@ const DailyAttendanceView = () => {
                 </div>
 
                 <div className="flex items-center gap-2">
-                    <button onClick={() => { setBranch(''); setSearch(''); setTz(''); setDate(getTodayStr()); }}
+                    <button onClick={() => { setBranch(''); setSearch(''); setTz(''); setDate(getTodayStr()); setPage(1); }}
                         className="px-3 py-1.5 rounded-xl text-gray-400 text-xs font-bold hover:bg-nominix-smoke transition-colors">
                         Limpiar
                     </button>

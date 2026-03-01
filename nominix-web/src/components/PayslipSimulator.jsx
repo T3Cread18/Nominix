@@ -149,7 +149,7 @@ const PayslipSimulator = ({ employeeId }) => {
                   </thead>
                   <tbody className="divide-y divide-gray-50">
                     {payslip.lines.map((line, idx) => (
-                      <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                      <tr key={`${line.name}-${line.kind}`} className="hover:bg-gray-50 transition-colors">
                         <td className="px-10 py-5 text-sm font-medium">{line.name}</td>
                         <td className="px-10 py-5 text-center">
                           <span className={`text-[10px] px-2 py-1 rounded-full font-bold uppercase ${line.kind === 'EARNING' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'

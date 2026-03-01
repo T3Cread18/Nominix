@@ -64,7 +64,7 @@ const ColumnMapper = ({ headers, fields, mapping, setMapping }) => {
                             const isMapped = !!selectedField;
 
                             return (
-                                <tr key={idx} className={isMapped ? 'bg-green-50/30' : ''}>
+                                <tr key={header} className={isMapped ? 'bg-green-50/30' : ''}>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">
                                         <div className="flex items-center gap-2">
                                             {isMapped ? <Check size={16} className="text-green-500" /> : <X size={16} className="text-slate-300" />}

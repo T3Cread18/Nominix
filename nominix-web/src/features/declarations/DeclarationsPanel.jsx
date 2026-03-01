@@ -11,10 +11,9 @@ import declarationsService from '../../services/declarations.service';
  * - Exportación de archivos planos (IVSS, FAOV, ISLR)
  */
 export default function DeclarationsPanel() {
-    const now = new Date();
-    const [year, setYear] = useState(now.getFullYear());
-    const [month, setMonth] = useState(now.getMonth() + 1);
-    const [quarter, setQuarter] = useState(Math.ceil((now.getMonth() + 1) / 3));
+    const [year, setYear] = useState(() => new Date().getFullYear());
+    const [month, setMonth] = useState(() => new Date().getMonth() + 1);
+    const [quarter, setQuarter] = useState(() => Math.ceil((new Date().getMonth() + 1) / 3));
     const [loading, setLoading] = useState({});
     const [results, setResults] = useState({});
     const [errors, setErrors] = useState({});

@@ -28,7 +28,7 @@ const DashboardMetrics = () => {
         return (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
                 {[1, 2, 3].map(i => (
-                    <div key={i} className="bg-white/40 h-24 rounded-3xl animate-pulse"></div>
+                    <div key={`skeleton-${i}`} className="bg-white/40 h-24 rounded-3xl animate-pulse"></div>
                 ))}
             </div>
         );
@@ -62,7 +62,7 @@ const DashboardMetrics = () => {
     return (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
             {cards.map((card, idx) => (
-                <div key={idx} className="bg-white/80 backdrop-blur-sm p-4 rounded-[1.5rem] border border-white/60 shadow-sm flex items-center justify-between group hover:bg-white transition-all">
+                <div key={card.title} className="bg-white/80 backdrop-blur-sm p-4 rounded-[1.5rem] border border-white/60 shadow-sm flex items-center justify-between group hover:bg-white transition-all">
                     <div>
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{card.title}</p>
                         <div className="flex items-center gap-2">

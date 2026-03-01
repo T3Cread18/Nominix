@@ -911,7 +911,7 @@ const VacationManager = () => {
                                                                 Detalles de errores
                                                             </p>
                                                             {bulkResult.errors.map((err, idx) => (
-                                                                <div key={idx} className="flex items-start gap-2 text-xs py-1 border-b border-gray-100 last:border-0">
+                                                                <div key={`${err.row}-${idx}`} className="flex items-start gap-2 text-xs py-1 border-b border-gray-100 last:border-0">
                                                                     <Badge variant="warning" size="xs">
                                                                         Fila {err.row}
                                                                     </Badge>

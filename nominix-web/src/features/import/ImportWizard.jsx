@@ -217,7 +217,7 @@ const ImportWizard = () => {
                 <div className="flex justify-between mt-8">
                     {step > 1 ? (
                         <button
-                            onClick={() => setStep(step - 1)}
+                            onClick={() => setStep(prev => prev - 1)}
                             className="flex items-center gap-2 px-6 py-2 text-slate-600 hover:text-slate-900 font-medium"
                         >
                             <ArrowLeft size={18} /> Atrás

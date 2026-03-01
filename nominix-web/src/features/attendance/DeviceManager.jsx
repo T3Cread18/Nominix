@@ -168,7 +168,7 @@ const DeviceManager = () => {
             {loading ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                     {[...Array(3)].map((_, i) => (
-                        <Card key={i} className="border-0">
+                        <Card key={`skeleton-${i}`} className="border-0">
                             <CardContent className="p-5">
                                 <div className="space-y-3 animate-pulse">
                                     <div className="h-4 bg-white/5 rounded w-2/3" />

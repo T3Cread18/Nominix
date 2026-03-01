@@ -47,7 +47,7 @@ const TenantWizard = ({ onClose, onCreated }) => {
                 </div>
                 <div className="flex gap-1">
                     {[1, 2].map(i => (
-                        <div key={i} className={cn("w-8 h-1 rounded-full transition-all", i <= step ? "bg-nominix-electric" : "bg-white/10")} />
+                        <div key={`step-${i}`} className={cn("w-8 h-1 rounded-full transition-all", i <= step ? "bg-nominix-electric" : "bg-white/10")} />
                     ))}
                 </div>
             </div>
@@ -361,12 +361,12 @@ const RenewModal = ({ tenant, onClose, onRenewed }) => {
             <p className="text-xs text-gray-400 mb-6">Basado en uso: <span className="text-white font-bold">{tenant.name}</span></p>
 
             <div className="flex items-center justify-center gap-4 mb-6">
-                <button onClick={() => setMonths(Math.max(1, months - 1))} className="p-3 bg-white/5 rounded-xl hover:bg-white/10">-</button>
+                <button onClick={() => setMonths(prev => Math.max(1, prev - 1))} className="p-3 bg-white/5 rounded-xl hover:bg-white/10">-</button>
                 <div className="text-center">
                     <span className="text-3xl font-black italic">{months}</span>
                     <p className="text-[9px] text-gray-500 uppercase font-black tracking-widest">Meses</p>
                 </div>
-                <button onClick={() => setMonths(months + 1)} className="p-3 bg-white/5 rounded-xl hover:bg-white/10">+</button>
+                <button onClick={() => setMonths(prev => prev + 1)} className="p-3 bg-white/5 rounded-xl hover:bg-white/10">+</button>
             </div>
 
             <div className="bg-white/5 rounded-2xl p-4 mb-6 border border-white/10 text-left">
@@ -756,7 +756,7 @@ const TenantsAdmin = () => {
                         { label: 'Modo Producción', value: stats?.active_tenants, icon: CheckCircle2, color: 'text-green-500' },
                         { label: 'Período de Prueba', value: stats?.trial_tenants, icon: Activity, color: 'text-amber-500' },
                     ].map((s, idx) => (
-                        <div key={idx} className="bg-white/5 border border-white/10 p-6 rounded-[28px] backdrop-blur-xl">
+                        <div key={s.label} className="bg-white/5 border border-white/10 p-6 rounded-[28px] backdrop-blur-xl">
                             <div className="flex justify-between items-start mb-4">
                                 <div className={cn("p-3 rounded-2xl bg-white/5", s.color)}>
                                     <s.icon size={24} />

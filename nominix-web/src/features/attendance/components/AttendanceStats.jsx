@@ -7,7 +7,8 @@ import { Users, UserCheck, UserX, RefreshCw } from 'lucide-react';
  * 
  * Muestra tarjetas con: total marcajes hoy, presentes, ausentes, última sincronización.
  */
-const AttendanceStats = ({ stats = {} }) => {
+const EMPTY_STATS = {};
+const AttendanceStats = ({ stats = EMPTY_STATS }) => {
     const cards = [
         {
             title: 'Marcajes Hoy',

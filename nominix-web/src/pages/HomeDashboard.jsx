@@ -24,7 +24,7 @@ const HomeDashboard = () => {
         { path: '/payroll', icon: Calculator, title: 'Nómina', desc: 'Cálculos procesales y cierres', perm: 'payroll_core.view_menu_payroll', color: 'from-emerald-500 to-teal-600' },
         { path: '/catalog', icon: ClipboardList, title: 'Conceptos', desc: 'Catálogo salarial y deducciones', perm: 'payroll_core.view_menu_catalog', color: 'from-amber-500 to-orange-600' },
         { path: '/vacations', icon: Calendar, title: 'Vacaciones', desc: 'Solicitudes y provisiones', perm: 'payroll_core.view_menu_vacations', color: 'from-rose-500 to-pink-600' },
-        { path: '/attendance', icon: Fingerprint, title: 'Asistencia', desc: 'Biométricos y marcajes', perm: 'payroll_core.view_menu_attendance', color: 'from-cyan-500 to-blue-600' },
+        { path: '/attendance', icon: Fingerprint, title: 'Asistencia', desc: 'Biométricos y marcajes', perm: 'biometrics.view_attendanceevent', color: 'from-cyan-500 to-blue-600' },
     ];
 
     // Secondary modules (Smaller Cards)

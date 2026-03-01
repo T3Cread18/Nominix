@@ -56,7 +56,7 @@ const Row = ({ row }) => {
             return (
                 <div className="flex flex-col gap-1">
                     {row.changes.map((change, i) => (
-                        <div key={i} className="text-xs font-mono bg-gray-50 p-1.5 rounded border border-gray-100">
+                        <div key={change.field} className="text-xs font-mono bg-gray-50 p-1.5 rounded border border-gray-100">
                             <span className="font-bold text-gray-700">{change.field}:</span>{' '}
                             <span className="line-through text-red-400">{change.old === 'None' ? 'Vacío' : change.old}</span>{' '}
                             <span className="text-gray-400 mx-1">➔</span>{' '}
