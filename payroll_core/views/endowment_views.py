@@ -17,7 +17,7 @@ class EndowmentEventViewSet(viewsets.ModelViewSet):
     serializer_class = EndowmentEventSerializer
     permission_classes = [permissions.IsAuthenticated, DjangoModelPermissions]
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
-    filterset_fields = ['employee', 'endowment_type', 'status']
+    filterset_fields = ['branch']
     ordering_fields = ['date', 'employee__first_name']
     
     def get_queryset(self):
