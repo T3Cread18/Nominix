@@ -378,6 +378,16 @@ class Company(models.Model):
         help_text="En qué moneda se muestran los montos del recibo PDF"
     )
 
+    # ==========================================================================
+    # CONFIGURACIÓN DE ASISTENCIA
+    # ==========================================================================
+    
+    auto_approve_attendance = models.BooleanField(
+        default=False,
+        verbose_name="Auto-Aprobar Asistencia",
+        help_text="Si está activo, los resúmenes de asistencia por periodo se aprueban automáticamente al generar"
+    )
+
     history = HistoricalRecords()
 
     class Meta:

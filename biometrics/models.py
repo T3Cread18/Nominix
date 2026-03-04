@@ -324,3 +324,110 @@ class EmployeeDeviceMapping(models.Model):
 
     def __str__(self):
         return f"{self.employee} → {self.device.name} (ID: {self.device_employee_id})"
+
+
+class AttendancePeriodSummary(models.Model):
+    """
+    Resumen de asistencia por empleado por periodo de nómina.
+    
+    Agrega las marcaciones biométricas del rango del periodo,
+    calcula horas totales, extras, nocturnas, domingos, etc.
+    Requiere aprobación antes de inyectarse como novedades a la nómina.
+    """
+    class Status(models.TextChoices):
+        PENDING = 'PENDING', 'Pendiente'
+        APPROVED = 'APPROVED', 'Aprobado'
+        REJECTED = 'REJECTED', 'Rechazado'
+
+    employee = models.ForeignKey(
+        'payroll_core.Employee',
+        on_delete=models.CASCADE,
+        related_name='attendance_summaries',
+        verbose_name='Empleado'
+    )
+    period = models.ForeignKey(
+        'payroll_core.PayrollPeriod',
+        on_delete=models.CASCADE,
+        related_name='attendance_summaries',
+        verbose_name='Periodo de Nómina'
+    )
+
+    # ── Totales calculados ──
+    total_hours = models.DecimalField(
+        max_digits=8, decimal_places=2, default=0,
+        verbose_name='Horas Totales'
+    )
+    regular_day_hours = models.DecimalField(
+        max_digits=8, decimal_places=2, default=0,
+        verbose_name='Horas Diurnas Regulares'
+    )
+    night_hours = models.DecimalField(
+        max_digits=8, decimal_places=2, default=0,
+        verbose_name='Horas Nocturnas'
+    )
+    overtime_day_hours = models.DecimalField(
+        max_digits=8, decimal_places=2, default=0,
+        verbose_name='Horas Extras Diurnas'
+    )
+    overtime_night_hours = models.DecimalField(
+        max_digits=8, decimal_places=2, default=0,
+        verbose_name='Horas Extras Nocturnas'
+    )
+    sunday_hours = models.DecimalField(
+        max_digits=8, decimal_places=2, default=0,
+        verbose_name='Horas en Domingos'
+    )
+    sunday_count = models.PositiveSmallIntegerField(
+        default=0,
+        verbose_name='Domingos Trabajados'
+    )
+    absences = models.PositiveSmallIntegerField(
+        default=0,
+        verbose_name='Ausencias (sin marcaje)'
+    )
+    days_worked = models.PositiveSmallIntegerField(
+        default=0,
+        verbose_name='Días Trabajados'
+    )
+
+    # ── Aprobación ──
+    status = models.CharField(
+        max_length=10,
+        choices=Status.choices,
+        default=Status.PENDING,
+        verbose_name='Estado'
+    )
+    approved_by = models.ForeignKey(
+        'auth.User',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='approved_attendance_summaries',
+        verbose_name='Aprobado por'
+    )
+    approved_at = models.DateTimeField(
+        null=True, blank=True,
+        verbose_name='Fecha de Aprobación'
+    )
+
+    # ── Auditoría ──
+    detail_json = models.JSONField(
+        default=list, blank=True,
+        verbose_name='Desglose Diario',
+        help_text='Lista de objetos con el detalle día a día (horas, tipo, etc.)'
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Resumen de Asistencia por Periodo'
+        verbose_name_plural = 'Resúmenes de Asistencia por Periodo'
+        unique_together = ['employee', 'period']
+        ordering = ['period', 'employee__last_name']
+        permissions = [
+            ('approve_attendanceperiodsummary', 'Puede aprobar resúmenes de asistencia'),
+        ]
+
+    def __str__(self):
+        return f"{self.employee} - {self.period.name}: {self.total_hours}h ({self.get_status_display()})"
+

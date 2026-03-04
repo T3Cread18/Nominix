@@ -23,6 +23,7 @@ from .models import (
     BiometricDevice,
     AttendanceEvent,
     EmployeeDeviceMapping,
+    AttendancePeriodSummary,
 )
 from .serializers import (
     BiometricDeviceTypeSerializer,
@@ -32,9 +33,11 @@ from .serializers import (
     EmployeeDeviceMappingSerializer,
     SyncResultSerializer,
     DeviceTestResultSerializer,
+    AttendancePeriodSummarySerializer,
 )
 from .services.sync_service import BiometricSyncService
 from .services.daily_attendance import DailyAttendanceService
+from .services.period_attendance import PeriodAttendanceService
 
 import logging
 
@@ -393,6 +396,123 @@ class DailyAttendanceViewSet(viewsets.ViewSet):
             return Response(summary)
         except Exception as e:
             logger.exception("Error generating daily attendance summary")
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class AttendancePeriodSummaryViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet para resúmenes de asistencia por periodo de nómina.
+
+    GET    /api/biometric/period-summary/?period_id=X  → Listar resúmenes
+    POST   /api/biometric/period-summary/generate/     → Generar resúmenes
+    POST   /api/biometric/period-summary/{id}/approve/  → Aprobar uno
+    POST   /api/biometric/period-summary/approve_all/   → Aprobar todos
+    """
+    queryset = AttendancePeriodSummary.objects.select_related(
+        'employee', 'employee__department', 'period', 'approved_by'
+    ).all()
+    serializer_class = AttendancePeriodSummarySerializer
+    permission_classes = [permissions.IsAuthenticated]
+    pagination_class = EventPagination
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        period_id = self.request.query_params.get('period_id')
+        status_filter = self.request.query_params.get('status')
+
+        if period_id:
+            queryset = queryset.filter(period_id=period_id)
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+
+        return queryset.order_by('employee__last_name', 'employee__first_name')
+
+    @action(detail=False, methods=['post'])
+    def generate(self, request):
+        """
+        Genera (o recalcula) resúmenes de asistencia para un periodo.
+
+        POST /api/biometric/period-summary/generate/
+        Body: { "period_id": 5 }
+        """
+        period_id = request.data.get('period_id')
+        if not period_id:
+            return Response(
+                {'error': 'period_id es obligatorio.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            # Check auto-approve config
+            from payroll_core.models import Company
+            company = Company.objects.first()
+            auto_approve = company.auto_approve_attendance if company else False
+
+            result = PeriodAttendanceService.generate_summaries(
+                period_id=int(period_id),
+                auto_approve=auto_approve,
+                user=request.user,
+            )
+            return Response(result, status=status.HTTP_200_OK)
+        except Exception as e:
+            logger.exception('Error generating period attendance summaries')
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=True, methods=['post'])
+    def approve(self, request, pk=None):
+        """
+        Aprueba un resumen individual y genera PayrollNovelty.
+
+        POST /api/biometric/period-summary/{id}/approve/
+        """
+        try:
+            summary = PeriodAttendanceService.approve_summary(
+                summary_id=int(pk),
+                user=request.user,
+            )
+            serializer = self.get_serializer(summary)
+            return Response(serializer.data)
+        except AttendancePeriodSummary.DoesNotExist:
+            return Response(
+                {'error': 'Resumen no encontrado.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.exception('Error approving attendance summary')
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=False, methods=['post'])
+    def approve_all(self, request):
+        """
+        Aprueba todos los resúmenes pendientes de un periodo.
+
+        POST /api/biometric/period-summary/approve_all/
+        Body: { "period_id": 5 }
+        """
+        period_id = request.data.get('period_id')
+        if not period_id:
+            return Response(
+                {'error': 'period_id es obligatorio.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            count = PeriodAttendanceService.approve_all(
+                period_id=int(period_id),
+                user=request.user,
+            )
+            return Response({'approved': count})
+        except Exception as e:
+            logger.exception('Error approving all attendance summaries')
             return Response(
                 {'error': str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR

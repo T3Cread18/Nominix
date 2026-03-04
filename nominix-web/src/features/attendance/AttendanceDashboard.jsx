@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Fingerprint, LayoutDashboard, Wifi, Link2, CalendarDays, Calendar, List } from 'lucide-react';
+import { Fingerprint, LayoutDashboard, Wifi, Link2, CalendarDays, Calendar, List, ClipboardCheck } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui';
 import { PageHeader } from '../../components/layout';
 import attendanceService from '../../services/attendance.service';
@@ -14,6 +14,7 @@ import EventsTable from './components/EventsTable';
 import DeviceEventsViewer from './DeviceEventsViewer';
 import DailyAttendanceView from './DailyAttendanceView';
 import WeeklyAttendanceView from './WeeklyAttendanceView';
+import PeriodAttendanceView from './PeriodAttendanceView';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui';
 
 /**
@@ -110,9 +111,13 @@ const AttendanceDashboard = () => {
                         <TabsTrigger value="weekly" icon={Calendar}>Semanal</TabsTrigger>
                     </RequirePermission>
 
-                    {/* Eventos RAW */}
                     <RequirePermission permission="attendance.view_attendanceevent">
                         <TabsTrigger value="log" icon={List}>Registro</TabsTrigger>
+                    </RequirePermission>
+
+                    {/* Por Periodo */}
+                    <RequirePermission permission="attendance.view_attendanceevent">
+                        <TabsTrigger value="period" icon={ClipboardCheck}>Por Periodo</TabsTrigger>
                     </RequirePermission>
 
                     {/* Dashboard */}
@@ -159,6 +164,15 @@ const AttendanceDashboard = () => {
                     <TabsContent value="log">
                         <div className="mt-4">
                             <AttendanceLog />
+                        </div>
+                    </TabsContent>
+                </RequirePermission>
+
+                {/* Tab: Por Periodo */}
+                <RequirePermission permission="attendance.view_attendanceevent">
+                    <TabsContent value="period">
+                        <div className="mt-4">
+                            <PeriodAttendanceView />
                         </div>
                     </TabsContent>
                 </RequirePermission>

@@ -13,6 +13,7 @@ router.register(r'devices', views.BiometricDeviceViewSet, basename='biometric-de
 router.register(r'events', views.AttendanceEventViewSet, basename='biometric-events')
 router.register(r'mappings', views.EmployeeDeviceMappingViewSet, basename='biometric-mappings')
 router.register(r'daily-attendance', views.DailyAttendanceViewSet, basename='daily-attendance')
+router.register(r'period-summary', views.AttendancePeriodSummaryViewSet, basename='period-summary')
 
 urlpatterns = [
     path('', include(router.urls)),

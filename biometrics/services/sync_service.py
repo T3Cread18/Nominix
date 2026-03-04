@@ -240,26 +240,33 @@ class BiometricSyncService:
                             EmployeeDeviceMapping.objects.get_or_create(
                                 device=device,
                                 employee=employee,
-                                defaults={'device_employee_id': employee_device_id, 'is_active': True}
+                                defaults={'device_employee_id': employee_device_id}
                             )
                             mappings[employee_device_id] = employee
                             logger.info(f"Auto-mapeado: device_id='{employee_device_id}' -> {employee.full_name} (CI: {employee.national_id})")
                     
                     # DEDUPLICATION LOGIC:
-                    # Check if there is already an event for this employee on this device
-                    # within the last 5 minutes.
+                    # Check if there is already an event for this employee
+                    # across ALL devices within the last 5 minutes.
+                    # This prevents double marks when an employee walks from
+                    # Device A to Device B and marks on both.
                     time_window = timedelta(minutes=5)
                     min_time = event_data['timestamp'] - time_window
                     max_time = event_data['timestamp'] + time_window
                     
-                    # We check for existing events in the DB to avoid re-inserting
-                    # similar events that might be considered "duplicates" by business logic
-                    # even if they have different seconds.
-                    duplicate_exists = AttendanceEvent.objects.filter(
-                        device=device,
-                        employee_device_id=employee_device_id,
-                        timestamp__range=(min_time, max_time)
-                    ).exists()
+                    if employee:
+                        # Cross-device dedup by resolved employee FK
+                        duplicate_exists = AttendanceEvent.objects.filter(
+                            employee=employee,
+                            timestamp__range=(min_time, max_time)
+                        ).exists()
+                    else:
+                        # Fallback: per-device dedup by raw ID (unmapped employees)
+                        duplicate_exists = AttendanceEvent.objects.filter(
+                            device=device,
+                            employee_device_id=employee_device_id,
+                            timestamp__range=(min_time, max_time)
+                        ).exists()
                     
                     if duplicate_exists:
                         # Skip this event as it is considered a duplicate/bounce

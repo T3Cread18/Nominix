@@ -7,6 +7,7 @@ from .models import (
     BiometricDevice,
     AttendanceEvent,
     EmployeeDeviceMapping,
+    AttendancePeriodSummary,
 )
 
 
@@ -158,3 +159,68 @@ class DeviceTestResultSerializer(serializers.Serializer):
     device_info = serializers.DictField(required=False)
     error_type = serializers.CharField(required=False)
     message = serializers.CharField()
+
+
+class AttendancePeriodSummarySerializer(serializers.ModelSerializer):
+    """Serializer para resúmenes de asistencia por periodo."""
+    employee_name = serializers.SerializerMethodField()
+    employee_cedula = serializers.SerializerMethodField()
+    department = serializers.SerializerMethodField()
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    approved_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AttendancePeriodSummary
+        fields = [
+            'id', 'employee', 'employee_name', 'employee_cedula', 'department',
+            'period',
+            'total_hours', 'regular_day_hours', 'night_hours',
+            'overtime_day_hours', 'overtime_night_hours',
+            'sunday_hours', 'sunday_count',
+            'absences', 'days_worked',
+            'status', 'status_display',
+            'approved_by', 'approved_by_name', 'approved_at',
+            'detail_json',
+            'created_at', 'updated_at',
+        ]
+        read_only_fields = [
+            'id', 'created_at', 'updated_at',
+            'approved_by', 'approved_at',
+        ]
+
+    def get_employee_name(self, obj):
+        return f"{obj.employee.first_name} {obj.employee.last_name}"
+
+    def get_employee_cedula(self, obj):
+        return obj.employee.national_id
+
+    def get_department(self, obj):
+        return obj.employee.department.name if obj.employee.department_id else ''
+
+    def get_approved_by_name(self, obj):
+        if obj.approved_by:
+            return obj.approved_by.get_full_name() or obj.approved_by.username
+        return None
+
+    def validate(self, attrs):
+        """No permitir editar resúmenes ya aprobados."""
+        if self.instance and self.instance.status == 'APPROVED':
+            raise serializers.ValidationError(
+                'No se puede editar un resumen ya aprobado.'
+            )
+        return attrs
+
+    def update(self, instance, validated_data):
+        """Auto-recalcular total_hours si se editan campos individuales."""
+        instance = super().update(instance, validated_data)
+        # Recalcular total si se editó algún campo de horas
+        hour_fields = {'regular_day_hours', 'night_hours', 'overtime_day_hours',
+                       'overtime_night_hours', 'sunday_hours'}
+        if hour_fields & set(validated_data.keys()):
+            instance.total_hours = (
+                instance.regular_day_hours + instance.night_hours +
+                instance.overtime_day_hours + instance.overtime_night_hours
+            )
+            instance.save(update_fields=['total_hours'])
+        return instance
+

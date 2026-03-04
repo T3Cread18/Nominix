@@ -170,6 +170,45 @@ const attendanceService = {
         const response = await axiosClient.delete(`/biometric/mappings/${id}/`);
         return response.data;
     },
+
+    // ==================== RESUMEN POR PERIODO ====================
+
+    /** Obtiene resúmenes de asistencia por periodo */
+    getPeriodSummaries: async (params = {}) => {
+        const response = await axiosClient.get('/biometric/period-summary/', { params });
+        if (response.data && response.data.results !== undefined) {
+            return response.data;
+        }
+        return { count: response.data.length, results: response.data };
+    },
+
+    /** Genera (o recalcula) resúmenes para un periodo */
+    generatePeriodSummaries: async (periodId) => {
+        const response = await axiosClient.post('/biometric/period-summary/generate/', {
+            period_id: periodId,
+        });
+        return response.data;
+    },
+
+    /** Aprueba un resumen individual */
+    approvePeriodSummary: async (summaryId) => {
+        const response = await axiosClient.post(`/biometric/period-summary/${summaryId}/approve/`);
+        return response.data;
+    },
+
+    /** Actualiza campos de un resumen (PATCH) */
+    updatePeriodSummary: async (summaryId, data) => {
+        const response = await axiosClient.patch(`/biometric/period-summary/${summaryId}/`, data);
+        return response.data;
+    },
+
+    /** Aprueba todos los resúmenes pendientes de un periodo */
+    approveAllPeriodSummaries: async (periodId) => {
+        const response = await axiosClient.post('/biometric/period-summary/approve_all/', {
+            period_id: periodId,
+        });
+        return response.data;
+    },
 };
 
 export default attendanceService;
