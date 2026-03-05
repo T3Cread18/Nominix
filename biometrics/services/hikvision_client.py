@@ -259,16 +259,23 @@ class HikvisionClient:
         # Consistent searchID is required for pagination across the same historical query
         final_search_id = search_id if search_id else f"s_{int(datetime.now().timestamp())}"
 
+        acs_event_cond = {
+            "searchID": final_search_id,
+            "searchResultPosition": position,
+            "maxResults": page_size,
+            "startTime": start_str,
+            "endTime": end_str,
+        }
+        
+        # Hikvision firmware often rejects major=0 or minor=0 with badParameters
+        # Omitting them entirely fetches all events successfully
+        if major_event > 0:
+            acs_event_cond["major"] = major_event
+        if minor_event > 0:
+            acs_event_cond["minor"] = minor_event
+
         payload = {
-            "AcsEventCond": {
-                "searchID": final_search_id,
-                "searchResultPosition": position,
-                "maxResults": page_size,
-                "major": major_event,
-                "minor": minor_event,
-                "startTime": start_str,
-                "endTime": end_str,
-            }
+            "AcsEventCond": acs_event_cond
         }
         
         response = self._request(
