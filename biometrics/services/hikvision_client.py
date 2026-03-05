@@ -112,8 +112,13 @@ class HikvisionClient:
         except HikvisionAuthError:
             raise
         except requests.exceptions.HTTPError as e:
+            error_body = ""
+            try:
+                error_body = response.text
+            except Exception:
+                pass
             raise HikvisionConnectionError(
-                f"Error HTTP {response.status_code} del dispositivo: {e}"
+                f"Error HTTP {response.status_code} del dispositivo. Detalles: {error_body}"
             )
 
     def test_connection(self) -> Dict[str, Any]:
@@ -266,73 +271,16 @@ class HikvisionClient:
             }
         }
         
-        try:
-            response = self._request(
-                'POST', 
-                '/ISAPI/AccessControl/AcsEvent?format=json',
-                json=payload
-            )
-            data = response.json()
-            acs_event = data.get('AcsEvent', {})
-            total = acs_event.get('totalMatches', 0)
-            info_list = acs_event.get('InfoList', [])
+        response = self._request(
+            'POST', 
+            '/ISAPI/AccessControl/AcsEvent?format=json',
+            json=payload
+        )
         
-        except HikvisionConnectionError as e:
-            if "Error HTTP 400" in str(e):
-                logger.warning(f"Fallback a XML para AcsEvent en {self._ip}: El dispositivo no soporta format=json")
-                # Fallback to XML
-                xml_payload = f"""<?xml version="1.0" encoding="utf-8"?>
-<AcsEventCond version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
-    <searchID>{final_search_id}</searchID>
-    <searchResultPosition>{position}</searchResultPosition>
-    <maxResults>{page_size}</maxResults>
-    <major>{major_event}</major>
-    <minor>{minor_event}</minor>
-    <startTime>{start_str}</startTime>
-    <endTime>{end_str}</endTime>
-</AcsEventCond>"""
-                # Hacemos la llamada HTTP directo con requests para saltarnos el raise de _request
-                response = self.session.post(
-                    f"{self.base_url}/ISAPI/AccessControl/AcsEvent",
-                    data=xml_payload.encode('utf-8'),
-                    headers={'Content-Type': 'application/xml'},
-                    timeout=self.TIMEOUT
-                )
-                if response.status_code >= 400:
-                    raise HikvisionConnectionError(f"Error HTTP {response.status_code} en fallback XML: {response.text}")
-                
-                # Parse XML Response
-                import xml.etree.ElementTree as ET
-                xml_clean = response.text
-                if 'xmlns=' in xml_clean:
-                    import re
-                    xml_clean = re.sub(r'\sxmlns="[^"]+"', '', xml_clean, count=1)
-                
-                root = ET.fromstring(xml_clean)
-                
-                total_el = root.find('totalMatches')
-                total = int(total_el.text) if total_el is not None and total_el.text else 0
-                
-                info_list = []
-                for event in root.findall('.//InfoList/Info'):
-                    def get_text(tag, default=''):
-                        el = event.find(tag)
-                        return el.text if el is not None and el.text else default
-                    
-                    info_list.append({
-                        'major': get_text('major', 0),
-                        'minor': int(get_text('minor', 0)) if get_text('minor') else 0,
-                        'time': get_text('time'),
-                        'employeeNoString': get_text('employeeNoString'),
-                        'cardNo': get_text('cardNo'),
-                        'name': get_text('name'),
-                        'cardReaderNo': int(get_text('cardReaderNo', 0)) if get_text('cardReaderNo') else 0,
-                        'doorNo': int(get_text('doorNo', 0)) if get_text('doorNo') else 0,
-                        'attendanceStatus': get_text('attendanceStatus'),
-                        'currentVerifyMode': int(get_text('currentVerifyMode', 0)) if get_text('currentVerifyMode') else 0,
-                    })
-            else:
-                raise e
+        data = response.json()
+        acs_event = data.get('AcsEvent', {})
+        total = acs_event.get('totalMatches', 0)
+        info_list = acs_event.get('InfoList', [])
 
         events = []
         for info in info_list:
