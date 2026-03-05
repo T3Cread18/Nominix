@@ -221,34 +221,18 @@ class HikvisionClient:
                 - total: int, total de eventos encontrados.
                 - events: list[dict], lista de eventos parseados.
         """
-        # Formato de fecha ISAPI: 2026-02-10T00:00:00-04:00
-        # Convertimos timezone de Django a formato ISO con offset
+        # Formato de fecha ISAPI estricto: 2026-02-10T00:00:00Z (UTC forzado)
+        # Algunos firmwares DS-K1T dan badParameters si ven "-04:00" u offsets locales.
         def format_isapi_time(dt):
             import pytz
             
+            # Convert to UTC
             if dt.tzinfo is None:
-                # Si es naive, lo hacemos aware usando la timezone del dispositivo
-                try:
-                    tz = pytz.timezone(self.device_timezone)
-                    dt = tz.localize(dt)
-                except pytz.UnknownTimeZoneError:
-                    dt = pytz.UTC.localize(dt)
-            elif dt.tzinfo != pytz.timezone(self.device_timezone):
-                # Si viene en otra zona (ej UTC), convertirlo a la del dispositivo
-                try:
-                    tz = pytz.timezone(self.device_timezone)
-                    dt = dt.astimezone(tz)
-                except pytz.UnknownTimeZoneError:
-                    pass
+                tz = pytz.timezone(self.device_timezone)
+                dt = tz.localize(dt)
             
-            # strftime('%z') da "+0000" pero ISAPI quiere "+00:00"
-            offset = dt.strftime('%z')
-            if offset:
-                offset_fmt = f"{offset[:3]}:{offset[3:]}"
-            else:
-                offset_fmt = "+00:00"
-                
-            return dt.strftime('%Y-%m-%dT%H:%M:%S') + offset_fmt
+            dt_utc = dt.astimezone(pytz.UTC)
+            return dt_utc.strftime('%Y-%m-%dT%H:%M:%SZ')
         
         start_str = format_isapi_time(start_time)
         end_str = format_isapi_time(end_time)
