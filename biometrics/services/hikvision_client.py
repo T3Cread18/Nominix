@@ -307,13 +307,13 @@ class HikvisionClient:
     <endTime>{end_str}</endTime>
 </AcsEventCond>"""
                 
-                # Petición HTTP directa como XML
+                # Petición HTTP directa como XML, SIN ?format=json
                 response = self.session.post(
                     f"{self.base_url}/ISAPI/AccessControl/AcsEvent",
                     data=xml_payload.encode('utf-8'),
                     headers={
                         'Content-Type': 'application/xml',
-                        'Accept': '*/*, application/xml'
+                        'Accept': 'application/xml'
                     },
                     timeout=self.TIMEOUT
                 )
