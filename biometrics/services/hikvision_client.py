@@ -311,7 +311,10 @@ class HikvisionClient:
                 response = self.session.post(
                     f"{self.base_url}/ISAPI/AccessControl/AcsEvent",
                     data=xml_payload.encode('utf-8'),
-                    headers={'Content-Type': 'application/xml'},
+                    headers={
+                        'Content-Type': 'application/xml',
+                        'Accept': '*/*, application/xml'
+                    },
                     timeout=self.TIMEOUT
                 )
                 
