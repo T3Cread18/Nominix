@@ -259,20 +259,18 @@ class HikvisionClient:
         # Consistent searchID is required for pagination across the same historical query
         final_search_id = search_id if search_id else f"s_{int(datetime.now().timestamp())}"
 
+        # The firmware requires major and minor to be present (MessageParametersLack if omitted)
+        # but rejects them if they are 0 (badParameters).
+        # We default to 5 (Access Event) and 75 (Fingerprint Compare pass) if 0 is passed.
         acs_event_cond = {
             "searchID": final_search_id,
             "searchResultPosition": position,
             "maxResults": page_size,
+            "major": major_event if major_event > 0 else 5,
+            "minor": minor_event if minor_event > 0 else 75,
             "startTime": start_str,
             "endTime": end_str,
         }
-        
-        # Hikvision firmware often rejects major=0 or minor=0 with badParameters
-        # Omitting them entirely fetches all events successfully
-        if major_event > 0:
-            acs_event_cond["major"] = major_event
-        if minor_event > 0:
-            acs_event_cond["minor"] = minor_event
 
         payload = {
             "AcsEventCond": acs_event_cond
