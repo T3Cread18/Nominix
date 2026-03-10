@@ -24,7 +24,7 @@ from .views.export_views import (
     IVSSExportView, FAOVExportView, ISLRXMLExportView,
     LPPSSCalculateView, INCESCalculateView,
     ConstanciaTrabajoView, PayrollExcelReportView,
-    EndowmentSizesExportView
+    EndowmentSizesExportView, ARCExportView
 )
 from .views.audit_views import AuditLogView
 from .views.dashboard import DashboardMetricsView, DashboardTasksView, DashboardEventsView
@@ -93,6 +93,7 @@ urlpatterns = [
     # Reports
     path('reports/constancia-trabajo/<int:employee_id>/', ConstanciaTrabajoView.as_view(), name='constancia-trabajo'),
     path('reports/excel/<int:period_id>/', PayrollExcelReportView.as_view(), name='payroll-excel-report'),
+    path('reports/arc/', ARCExportView.as_view(), name='arc-report'),
     
     # Audit Logs
     path('audit-logs/', AuditLogView.as_view(), name='audit-logs'),

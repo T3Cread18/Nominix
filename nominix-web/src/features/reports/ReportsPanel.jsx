@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { FileSpreadsheet, FileText, Download, Loader2, Files, Calculator } from 'lucide-react';
+import { FileSpreadsheet, FileText, Download, Loader2, Files, Calculator, Receipt } from 'lucide-react';
 import declarationsService from '../../services/declarations.service';
 import payrollService from '../../services/payroll.service';
 import axiosClient from '../../api/axiosClient';
+import ARCExportModal from '../payroll/ARCExportModal';
 
 /**
  * ReportsPanel — Centro de reportes y descargas.
@@ -23,6 +24,7 @@ export default function ReportsPanel() {
     const [selectedContract, setSelectedContract] = useState('');
     const [terminationDate, setTerminationDate] = useState('');
     const [loading, setLoading] = useState({});
+    const [isARCOpen, setIsARCOpen] = useState(false);
 
     useEffect(() => {
         loadData();
@@ -235,6 +237,39 @@ export default function ReportsPanel() {
                         </div>
                     </div>
 
+                    {/* Comprobante ARC — Retención ISLR */}
+                    <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="p-2 bg-blue-50 rounded-xl">
+                                <Receipt className="text-nominix-electric" size={20} />
+                            </div>
+                            <div>
+                                <h3 className="text-nominix-dark font-bold">Comprobante ARC</h3>
+                                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Retención ISLR · Forma AR-C</p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-3">
+                            <div className="bg-nominix-smoke rounded-xl p-3 text-xs text-gray-500">
+                                <p className="font-bold text-nominix-dark mb-1">¿Qué incluye?</p>
+                                <ul className="list-disc list-inside space-y-0.5">
+                                    <li>Desglose mensual de remuneraciones e ISLR retenido</li>
+                                    <li>Totales del ejercicio fiscal completo</li>
+                                    <li>Individual por empleado o lote (todos a la vez)</li>
+                                    <li>Base legal: Decreto N° 1.808, Art. 23</li>
+                                </ul>
+                            </div>
+
+                            <button
+                                onClick={() => setIsARCOpen(true)}
+                                className="w-full flex items-center justify-center gap-2 bg-nominix-electric/10 hover:bg-nominix-electric/20 text-nominix-electric border border-nominix-electric/20 rounded-xl py-2.5 px-4 text-xs font-black uppercase tracking-widest transition-colors"
+                            >
+                                <Receipt size={16} />
+                                Generar Comprobante ARC
+                            </button>
+                        </div>
+                    </div>
+
                     {/* Simulación de Liquidación */}
                     <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
                         <div className="flex items-center gap-3 mb-4">
@@ -293,6 +328,12 @@ export default function ReportsPanel() {
                     </div>
                 </div>
             </div>
+
+            <ARCExportModal
+                isOpen={isARCOpen}
+                onClose={() => setIsARCOpen(false)}
+                employees={employees}
+            />
         </div>
     );
 }

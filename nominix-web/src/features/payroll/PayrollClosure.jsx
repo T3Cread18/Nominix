@@ -14,12 +14,14 @@ import {
     Users,
     DollarSign,
     PlusCircle,
-    Eye
+    Eye,
+    Receipt
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import CreatePeriodModal from './CreatePeriodModal';
 import PayslipsListModal from './PayslipsListModal';
-import PayrollPreviewModal from './PayrollPreviewModal'; // <--- NUEVO
+import PayrollPreviewModal from './PayrollPreviewModal';
+import ARCExportModal from './ARCExportModal';
 
 /**
  * PayrollClosure - Módulo de Cierre Masivo y Reportes Históricos.
@@ -44,6 +46,10 @@ const PayrollClosure = ({ initialPeriods, onRefresh }) => {
     // Estado para dropdown de tipo de recibo
     const [pdfDropdownOpen, setPdfDropdownOpen] = useState(null);
 
+    // Estado para el modal ARC
+    const [isARCModalOpen, setIsARCModalOpen] = useState(false);
+    const [allEmployees, setAllEmployees] = useState([]);
+
     useEffect(() => {
         if (initialPeriods) {
             setPeriods(initialPeriods);
@@ -61,6 +67,18 @@ const PayrollClosure = ({ initialPeriods, onRefresh }) => {
         } catch (error) {
             console.error("Error cargando configuración de empresa:", error);
         }
+    };
+
+    const openARCModal = async () => {
+        if (allEmployees.length === 0) {
+            try {
+                const res = await import('../../api/axiosClient').then(m => m.default.get('/employees/?is_active=true&page_size=1000'));
+                setAllEmployees(res.data.results || res.data);
+            } catch {
+                // abrir igual, el modal manejará lista vacía
+            }
+        }
+        setIsARCModalOpen(true);
     };
 
     const loadPeriods = async () => {
@@ -381,6 +399,38 @@ const PayrollClosure = ({ initialPeriods, onRefresh }) => {
                     </div>
                 </div>
             )}
+            {/* ── Obligaciones Fiscales Anuales ── */}
+            <div className="mt-4 p-6 bg-white rounded-3xl border border-gray-100 shadow-sm">
+                <div className="flex items-center justify-between mb-5">
+                    <div>
+                        <h4 className="text-base font-black text-nominix-dark">Obligaciones Fiscales Anuales</h4>
+                        <p className="text-xs text-gray-400 font-medium mt-0.5">Comprobantes y declaraciones de cierre de ejercicio</p>
+                    </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <button
+                        type="button"
+                        onClick={openARCModal}
+                        className="flex items-center gap-4 p-5 bg-slate-50 hover:bg-nominix-electric/5 hover:border-nominix-electric border border-gray-100 rounded-2xl transition-all group text-left"
+                    >
+                        <div className="w-10 h-10 rounded-xl bg-blue-50 group-hover:bg-nominix-electric/10 flex items-center justify-center shrink-0 transition-colors">
+                            <Receipt size={20} className="text-nominix-electric" />
+                        </div>
+                        <div>
+                            <p className="text-xs font-black text-nominix-dark uppercase tracking-widest">Comprobante ARC</p>
+                            <p className="text-[9px] text-gray-400 font-medium mt-0.5">Retención ISLR · Forma AR-C</p>
+                        </div>
+                    </button>
+                </div>
+            </div>
+
+            {/* Modal ARC */}
+            <ARCExportModal
+                isOpen={isARCModalOpen}
+                onClose={() => setIsARCModalOpen(false)}
+                employees={allEmployees}
+            />
+
             {/* Modal de Creación */}
             <CreatePeriodModal
                 isOpen={isCreateModalOpen}

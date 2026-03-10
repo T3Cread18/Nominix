@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <title>Comprobante ARC — Ejercicio {{ year }}</title>
+    <style>
+        @page {
+            size: letter;
+            margin: 1.5cm;
+        }
+
+        body {
+            font-family: Helvetica, Arial, sans-serif;
+            font-size: 10px;
+            color: #1a1a2e;
+            margin: 0;
+            padding: 0;
+        }
+
+        .arc-page {
+            page-break-after: always;
+        }
+        .arc-page:last-of-type {
+            page-break-after: avoid;
+        }
+
+        /* ── Encabezado ── */
+        .arc-header {
+            border-bottom: 3px solid #0052FF;
+            padding-bottom: 10px;
+            margin-bottom: 12px;
+        }
+        .header-row {
+            display: table;
+            width: 100%;
+        }
+        .header-left {
+            display: table-cell;
+            width: 65%;
+            vertical-align: top;
+        }
+        .header-right {
+            display: table-cell;
+            width: 35%;
+            text-align: right;
+            vertical-align: top;
+        }
+        .company-name {
+            font-size: 13px;
+            font-weight: bold;
+            color: #0052FF;
+            text-transform: uppercase;
+        }
+        .company-sub {
+            font-size: 8.5px;
+            color: #555;
+            margin-top: 2px;
+        }
+        .doc-title {
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+            color: #1a1a2e;
+            letter-spacing: 0.4px;
+        }
+        .doc-ref {
+            font-size: 8.5px;
+            color: #64748b;
+            margin-top: 2px;
+        }
+        .badge {
+            display: inline-block;
+            background-color: #0052FF;
+            color: #fff;
+            font-size: 7.5px;
+            font-weight: bold;
+            padding: 2px 7px;
+            border-radius: 3px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 5px;
+        }
+
+        /* ── Bloques Agente / Retenido ── */
+        .parties {
+            display: table;
+            width: 100%;
+            margin-bottom: 12px;
+            border-collapse: collapse;
+        }
+        .party {
+            display: table-cell;
+            width: 50%;
+            padding: 9px 12px;
+            background-color: #f8fafc;
+            border: 1px solid #e2e8f0;
+            vertical-align: top;
+        }
+        .party:first-child {
+            border-right: none;
+        }
+        .party-title {
+            font-size: 7px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #0052FF;
+            margin-bottom: 5px;
+            padding-bottom: 3px;
+            border-bottom: 1px solid #dbeafe;
+        }
+        .party-row {
+            margin-bottom: 3px;
+        }
+        .pk {
+            font-size: 7.5px;
+            color: #94a3b8;
+            font-weight: bold;
+            text-transform: uppercase;
+            display: inline-block;
+            width: 70px;
+        }
+        .pv {
+            font-size: 10px;
+            font-weight: bold;
+            color: #1a1a2e;
+        }
+
+        /* ── Tabla Mensual ── */
+        .ret-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 12px;
+            font-size: 9px;
+        }
+        .ret-table thead tr {
+            background-color: #0052FF;
+        }
+        .ret-table th {
+            padding: 6px 8px;
+            color: #fff;
+            font-size: 7.5px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            border: 1px solid #003acc;
+            text-align: right;
+        }
+        .ret-table th:first-child {
+            text-align: left;
+            width: 16%;
+        }
+        .ret-table td {
+            padding: 4px 8px;
+            border: 1px solid #e2e8f0;
+            text-align: right;
+            font-family: 'Courier New', monospace;
+        }
+        .ret-table td.mes {
+            text-align: left;
+            font-family: Helvetica, Arial, sans-serif;
+            font-weight: bold;
+            color: #374151;
+        }
+        .ret-table td.center {
+            text-align: center;
+        }
+        .ret-table tr:nth-child(even) td {
+            background-color: #f8fafc;
+        }
+        .ret-table tr.no-data td {
+            color: #cbd5e1;
+        }
+        .ret-table tr.total-row td {
+            background-color: #eff6ff;
+            font-weight: bold;
+            border-top: 2px solid #0052FF;
+            font-size: 10px;
+        }
+        .ret-table tr.total-row td.mes {
+            color: #0052FF;
+            text-transform: uppercase;
+            font-size: 8.5px;
+            letter-spacing: 0.5px;
+        }
+
+        /* ── Resalte Total ── */
+        .total-box {
+            padding: 9px 14px;
+            background-color: #eff6ff;
+            border: 2px solid #0052FF;
+            border-radius: 5px;
+            display: table;
+            width: 100%;
+            margin-bottom: 14px;
+        }
+        .total-box-left {
+            display: table-cell;
+            vertical-align: middle;
+        }
+        .total-box-right {
+            display: table-cell;
+            text-align: right;
+            vertical-align: middle;
+        }
+        .tb-label {
+            font-size: 8.5px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: #3b82f6;
+        }
+        .tb-sub {
+            font-size: 7.5px;
+            color: #94a3b8;
+            margin-top: 1px;
+        }
+        .tb-amount {
+            font-size: 17px;
+            font-weight: bold;
+            color: #0052FF;
+            font-family: 'Courier New', monospace;
+        }
+        .tb-amount-label {
+            font-size: 7.5px;
+            color: #64748b;
+            font-weight: bold;
+        }
+
+        /* ── Nota Legal ── */
+        .legal {
+            font-size: 7.5px;
+            color: #64748b;
+            padding: 7px 10px;
+            background-color: #fafafa;
+            border-left: 3px solid #cbd5e1;
+            margin-bottom: 20px;
+            line-height: 1.55;
+        }
+
+        /* ── Firmas ── */
+        .sigs {
+            display: table;
+            width: 100%;
+            margin-top: 24px;
+        }
+        .sig {
+            display: table-cell;
+            width: 42%;
+            text-align: center;
+            vertical-align: top;
+        }
+        .sig-space {
+            display: table-cell;
+            width: 16%;
+        }
+        .sig-line {
+            border-top: 1px solid #374151;
+            padding-top: 5px;
+            font-size: 8px;
+            font-weight: bold;
+            color: #374151;
+        }
+        .sig-sub {
+            font-size: 7.5px;
+            color: #94a3b8;
+            margin-top: 2px;
+        }
+
+        /* ── Pie ── */
+        .arc-footer {
+            margin-top: 14px;
+            padding-top: 5px;
+            border-top: 1px solid #e2e8f0;
+            display: table;
+            width: 100%;
+        }
+        .footer-l {
+            display: table-cell;
+            font-size: 7px;
+            color: #94a3b8;
+        }
+        .footer-r {
+            display: table-cell;
+            font-size: 7px;
+            color: #94a3b8;
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+
+{% for arc in arcs %}
+<div class="arc-page">
+
+    <!-- ENCABEZADO -->
+    <div class="arc-header">
+        <div class="header-row">
+            <div class="header-left">
+                <div class="company-name">{{ arc.company_name }}</div>
+                <div class="company-sub">RIF: {{ arc.company_rif }}</div>
+                {% if arc.company_address %}
+                <div class="company-sub">{{ arc.company_address }}{% if arc.company_city %}, {{ arc.company_city }}{% endif %}</div>
+                {% endif %}
+            </div>
+            <div class="header-right">
+                <div class="doc-title">Comprobante de Retención</div>
+                <div class="doc-title">de Impuesto Sobre la Renta</div>
+                <div class="doc-ref">Ejercicio Fiscal: {{ arc.year }}</div>
+                <div class="badge">Forma AR-C</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AGENTE DE RETENCIÓN / EMPLEADO -->
+    <div class="parties">
+        <div class="party">
+            <div class="party-title">Agente de Retención (Empleador)</div>
+            <div class="party-row"><span class="pk">Razón Social:</span> <span class="pv">{{ arc.company_name }}</span></div>
+            <div class="party-row"><span class="pk">RIF:</span> <span class="pv">{{ arc.company_rif }}</span></div>
+            {% if arc.company_address %}
+            <div class="party-row"><span class="pk">Dirección:</span> <span class="pv">{{ arc.company_address }}</span></div>
+            {% endif %}
+        </div>
+        <div class="party">
+            <div class="party-title">Trabajador (Sujeto Retenido)</div>
+            <div class="party-row"><span class="pk">Nombre:</span> <span class="pv">{{ arc.employee_name }}</span></div>
+            <div class="party-row"><span class="pk">Cédula:</span> <span class="pv">{{ arc.employee_cedula }}</span></div>
+            {% if arc.employee_rif %}
+            <div class="party-row"><span class="pk">RIF:</span> <span class="pv">{{ arc.employee_rif }}</span></div>
+            {% endif %}
+            {% if arc.employee_position %}
+            <div class="party-row"><span class="pk">Cargo:</span> <span class="pv">{{ arc.employee_position }}</span></div>
+            {% endif %}
+            {% if arc.employee_department %}
+            <div class="party-row"><span class="pk">Departamento:</span> <span class="pv">{{ arc.employee_department }}</span></div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- TABLA MENSUAL DE RETENCIONES -->
+    <table class="ret-table">
+        <thead>
+            <tr>
+                <th style="text-align:left;">Mes</th>
+                <th>Remuneraciones Pagadas (Bs.)</th>
+                <th>% Retención</th>
+                <th>Valor UT (Bs.)</th>
+                <th>ISLR Retenido (Bs.)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for m in arc.months %}
+            <tr {% if not m.has_data %}class="no-data"{% endif %}>
+                <td class="mes">{{ m.name }}</td>
+                <td>{{ m.taxable_income|floatformat:2 }}</td>
+                <td class="center">{% if m.has_data %}{{ m.rate|floatformat:2 }}%{% else %}—{% endif %}</td>
+                <td class="center">{% if m.has_data %}{{ m.ut_value|floatformat:2 }}{% else %}—{% endif %}</td>
+                <td>{{ m.retention|floatformat:2 }}</td>
+            </tr>
+            {% endfor %}
+            <tr class="total-row">
+                <td class="mes">Total Ejercicio {{ arc.year }}</td>
+                <td>{{ arc.total_taxable_income|floatformat:2 }}</td>
+                <td class="center">—</td>
+                <td class="center">—</td>
+                <td>{{ arc.total_retention|floatformat:2 }}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- RESALTE TOTAL RETENIDO -->
+    <div class="total-box">
+        <div class="total-box-left">
+            <div class="tb-label">Total ISLR Retenido en el Ejercicio {{ arc.year }}</div>
+            <div class="tb-sub">Monto a declarar ante el SENIAT por concepto de sueldos y salarios</div>
+        </div>
+        <div class="total-box-right">
+            <div class="tb-amount-label">Bs.</div>
+            <div class="tb-amount">{{ arc.total_retention|floatformat:2 }}</div>
+        </div>
+    </div>
+
+    <!-- NOTA LEGAL -->
+    <div class="legal">
+        <strong>NOTA LEGAL:</strong> Este comprobante es emitido conforme al Artículo 23 del Decreto N° 1.808 (Reglamento Parcial de la Ley de Impuesto Sobre la Renta en Materia de Retenciones).
+        El trabajador deberá presentarlo como soporte al momento de realizar su Declaración Definitiva de Impuesto Sobre la Renta (Forma DPN-25) ante el SENIAT.
+        Las retenciones aquí descritas corresponden exclusivamente a ingresos derivados de la relación de dependencia laboral (sueldos, salarios y demás remuneraciones similares).
+    </div>
+
+    <!-- FIRMAS -->
+    <div class="sigs">
+        <div class="sig">
+            <div style="height: 32px;"></div>
+            <div class="sig-line">{{ arc.company_name }}</div>
+            <div class="sig-sub">Agente de Retención — Firma y Sello</div>
+        </div>
+        <div class="sig-space"></div>
+        <div class="sig">
+            <div style="height: 32px;"></div>
+            <div class="sig-line">{{ arc.employee_name }}</div>
+            <div class="sig-sub">C.I. {{ arc.employee_cedula }} — Recibí Conforme</div>
+        </div>
+    </div>
+
+    <!-- PIE -->
+    <div class="arc-footer">
+        <div class="footer-l">
+            Generado el {{ arc.generation_day }} de {{ arc.generation_month }} de {{ arc.generation_year }} — Nóminix SaaS
+        </div>
+        <div class="footer-r">
+            Decreto N° 1.808 · Art. 23 · LISLR Venezuela
+        </div>
+    </div>
+
+</div>
+{% endfor %}
+
+</body>
+</html>

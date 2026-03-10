@@ -6,6 +6,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.http import HttpResponse
 from datetime import date
+from payroll_core.models import Employee
 
 
 class IVSSExportView(APIView):
@@ -223,6 +224,50 @@ class PayrollExcelReportView(APIView):
             return response
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class ARCExportView(APIView):
+    """
+    GET /api/reports/arc/?year=2025
+    GET /api/reports/arc/?year=2025&employee=<id>
+
+    Genera el Comprobante de Retención ISLR (Forma AR-C) en PDF.
+    - Sin ?employee → lote completo (todos los empleados con retenciones ese año).
+    - Con ?employee=<id> → ARC individual del empleado.
+    """
+
+    def get(self, request):
+        year = request.query_params.get('year')
+        employee_id = request.query_params.get('employee')
+
+        if not year:
+            return Response(
+                {'error': 'Se requiere el parámetro year (ej. ?year=2025)'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            year = int(year)
+        except ValueError:
+            return Response({'error': 'year debe ser un número entero'}, status=status.HTTP_400_BAD_REQUEST)
+
+        from payroll_core.services.reports.arc_export import ARCExportService
+
+        try:
+            if employee_id:
+                pdf_bytes = ARCExportService.generate_for_employee(int(employee_id), year)
+            else:
+                pdf_bytes = ARCExportService.generate_batch(year)
+
+            filename = ARCExportService.get_filename(year, int(employee_id) if employee_id else None)
+            response = HttpResponse(pdf_bytes, content_type='application/pdf')
+            response['Content-Disposition'] = f'inline; filename="{filename}"'
+            return response
+
+        except Employee.DoesNotExist:
+            return Response({'error': 'Empleado no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 class EndowmentSizesExportView(APIView):
     """
