@@ -61,6 +61,8 @@ const WeekCell = ({ dayData, date }) => {
 
     const { blocks, effective_hours, is_synced } = dayData;
     const entry = blocks?.entry;
+    const lunchOut = blocks?.lunch_out;
+    const lunchIn = blocks?.lunch_in;
     const exit = blocks?.exit;
 
     // Colores
@@ -95,6 +97,14 @@ const WeekCell = ({ dayData, date }) => {
                     <div className="flex justify-between items-center mb-1">
                         <span className="text-gray-400">Entrada:</span>
                         <span className="font-medium">{fmtTime(entry?.time)}</span>
+                    </div>
+                    <div className="flex justify-between items-center mb-1">
+                        <span className="text-gray-400">Salida descanso:</span>
+                        <span className="font-medium">{fmtTime(lunchOut?.time)}</span>
+                    </div>
+                    <div className="flex justify-between items-center mb-1">
+                        <span className="text-gray-400">Regreso descanso:</span>
+                        <span className="font-medium">{fmtTime(lunchIn?.time)}</span>
                     </div>
                     <div className="flex justify-between items-center mb-1">
                         <span className="text-gray-400">Salida:</span>
