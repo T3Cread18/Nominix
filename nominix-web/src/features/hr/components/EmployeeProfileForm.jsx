@@ -283,6 +283,7 @@ const EmployeeProfileForm = ({
                         <InputField
                             label="Última Dotación"
                             type="date"
+                            defaultValue={new Date().toISOString().split('T')[0]}
                             {...register('last_endowment_date')}
                         />
                     </div>
