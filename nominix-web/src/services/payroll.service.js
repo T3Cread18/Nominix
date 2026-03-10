@@ -130,6 +130,29 @@ const payrollService = {
     getLegalReport: async (id) => { throw new Error("Usar downloadFinanceReport"); },
 
     /**
+     * Descarga el Comprobante de Retención ISLR (AR-C) en PDF.
+     * @param {number} year - Año fiscal (ej. 2025)
+     * @param {number|null} employeeId - ID del empleado (null = lote completo)
+     * @param {string|null} employeeName - Nombre para el archivo (solo individual)
+     */
+    downloadARC: async (year, employeeId = null, employeeName = null) => {
+        try {
+            const params = new URLSearchParams({ year });
+            if (employeeId) params.append('employee', employeeId);
+            const response = await axiosClient.get(`/reports/arc/?${params.toString()}`, {
+                responseType: 'blob',
+            });
+            const filename = employeeName
+                ? `ARC_${employeeName}_${year}.pdf`
+                : `ARC_LOTE_${year}.pdf`;
+            triggerFileDownload(response.data, filename);
+        } catch (error) {
+            console.error('Error descargando ARC', error);
+            throw error;
+        }
+    },
+
+    /**
      * Obtiene la configuración de la empresa (para visibilidad en recibos).
      */
     getCompanyConfig: async () => {
