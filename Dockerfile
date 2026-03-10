@@ -24,6 +24,8 @@ RUN apt-get update && apt-get install -y \
     libffi-dev \
     gettext \
     netcat-openbsd \
+    tesseract-ocr \
+    tesseract-ocr-spa \
     && rm -rf /var/lib/apt/lists/*
 
 # Instalar dependencias de Python

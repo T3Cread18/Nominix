@@ -3,6 +3,11 @@ FROM node:20-slim AS build
 
 WORKDIR /app
 
+# ARG para sobreescribir VITE_API_URL en build local (default: proxy nginx)
+# En producción (Vercel), .env.production usa https://api.nominix.net
+ARG VITE_API_URL=/api
+ENV VITE_API_URL=$VITE_API_URL
+
 # Instalar dependencias
 COPY package*.json ./
 RUN npm install

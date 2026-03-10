@@ -408,6 +408,8 @@ class Company(models.Model):
             ("view_dashboard_metrics", "Ver Widget de Métricas (KPIs)"),
             ("view_dashboard_tasks", "Ver Widget de Tareas Pendientes"),
             ("view_dashboard_events", "Ver Widget de Cumpleaños y Eventos"),
+            # Permisos adiciones para nuevos módulos:
+            ("view_menu_audits", "Can view Menú Auditorías"),
         ]
 
     def __str__(self):

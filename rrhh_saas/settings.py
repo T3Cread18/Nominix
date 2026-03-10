@@ -22,7 +22,8 @@ DEBUG: bool = os.environ.get('DEBUG', 'True').lower() in ('true', '1', 'yes')
 ALLOWED_HOSTS: List[str] = ['.nominix.net', 'localhost', '127.0.0.1', '.localhost']
 
 # Dominio base para la creación automática de subdominios
-TENANT_BASE_DOMAIN: str = os.environ.get('TENANT_BASE_DOMAIN', 'nominix.net')
+# Local: 'localhost' | Producción: 'nominix.net' (definido en .env del VPS)
+TENANT_BASE_DOMAIN: str = os.environ.get('TENANT_BASE_DOMAIN', 'localhost')
 
 # Orígenes confiables para CSRF (Necesario para el frontend desacoplado)
 CSRF_TRUSTED_ORIGINS: List[str] = [
@@ -31,6 +32,8 @@ CSRF_TRUSTED_ORIGINS: List[str] = [
     'http://*.localhost:3000',
     'http://localhost:8000',
     'http://*.localhost:8000',
+    'http://localhost:8080',
+    'http://*.localhost:8080',
     'https://nominix.net',
     'https://www.nominix.net',
     'https://api.nominix.net',
@@ -44,24 +47,27 @@ CORS_ALLOWED_ORIGINS = [
     'http://localhost:5175',
     'http://localhost:8000',
     'http://127.0.0.1:8000',
+    'http://localhost:8080',
+    'http://127.0.0.1:8080',
     'https://nominix.net',
     'https://www.nominix.net',
     'https://app.nominix.net',
 ]
 CORS_ALLOW_CREDENTIALS = True
 
-# Configuración de Cookies para Cross-Domain (Vercel <-> API)
-# 'None' es necesario para que las cookies viajen entre dominios diferentes (nominix.vercel.app -> api.nominix.net)
-SESSION_COOKIE_SAMESITE = 'None'
-CSRF_COOKIE_SAMESITE = 'None'
-SESSION_COOKIE_SECURE = True  # Requerido si SameSite='None' (solo HTTPS)
-CSRF_COOKIE_SECURE = True     # Requerido si SameSite='None' (solo HTTPS)
+# Configuración de Cookies — se adapta automáticamente al entorno
+# Local (DEBUG=True):  SameSite=Lax, Secure=False, Domain=None (navegador usa localhost)
+# Producción (.env):   SameSite=None, Secure=True, Domain=.nominix.net
+SESSION_COOKIE_SAMESITE = os.environ.get('COOKIE_SAMESITE', 'Lax')
+CSRF_COOKIE_SAMESITE = os.environ.get('COOKIE_SAMESITE', 'Lax')
+SESSION_COOKIE_SECURE = not DEBUG  # True en producción (HTTPS), False en local (HTTP)
+CSRF_COOKIE_SECURE = not DEBUG
 
 # Permitir que el frontend lea la cookie CSRF
 CSRF_COOKIE_HTTPONLY = False  
 SESSION_COOKIE_HTTPONLY = True # La session ID sí debe ser oculta
-CSRF_COOKIE_DOMAIN = '.nominix.net'
-SESSION_COOKIE_DOMAIN = '.nominix.net'      # Dejar que el navegador maneje el dominio automáticamente o fijar si es necesario
+CSRF_COOKIE_DOMAIN = os.environ.get('COOKIE_DOMAIN', None)  # None = navegador usa dominio actual
+SESSION_COOKIE_DOMAIN = os.environ.get('COOKIE_DOMAIN', None)
 # =============================================================================
 # CONFIGURACIÓN DE DJANGO-TENANTS
 # =============================================================================
@@ -71,7 +77,7 @@ SESSION_COOKIE_DOMAIN = '.nominix.net'      # Dejar que el navegador maneje el d
 SHARED_APPS: List[str] = [
     'django_tenants',  # Debe estar primero
     'customers',
-    'corsheaders',       # Gestión de clientes/inquilinos
+    'corsheaders',        # CORS headers
     
     # Apps de Django
     'django.contrib.contenttypes',
@@ -101,6 +107,7 @@ TENANT_APPS: List[str] = [
     'payroll_core',
     'vacations',  # Módulo de Gestión de Vacaciones
     'biometrics',  # Módulo de Control Biométrico
+    'assets',      # Módulo de Activos Fijos
 ]
 
 # Combinación de todas las apps instaladas
@@ -121,7 +128,7 @@ TENANT_DOMAIN_MODEL: str = 'customers.Domain'
 
 MIDDLEWARE: List[str] = [
     'django_tenants.middleware.main.TenantMainMiddleware',
-    'corsheaders.middleware.CorsMiddleware',  # Debe estar primero
+    'corsheaders.middleware.CorsMiddleware',  # Debe estar antes de CommonMiddleware
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -164,7 +171,7 @@ WSGI_APPLICATION: str = 'rrhh_saas.wsgi.application'
 # Configuración de Base de Datos dinámica para Docker/Producción
 DATABASES = {
     'default': dj_database_url.config(
-        default='postgres://postgres:T3Cread18@localhost:5432/rrhh_saas',
+        default=f'postgres://nominix_user:nominix_password@nominix_db:5432/rrhh_saas',
         conn_max_age=600
     )
 }

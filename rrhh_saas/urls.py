@@ -14,6 +14,7 @@ urlpatterns: List = [
     path('api/', include('customers.urls')),  # API de gestión de tenants
     path('api/', include('vacations.urls')),  # Módulo de Vacaciones
     path('api/biometric/', include('biometrics.urls')),  # Módulo Biométrico
+    path('api/assets/', include('assets.urls')),  # Módulo Activos Fijos
 ]
 
 # Servir archivos media en desarrollo

@@ -23,9 +23,11 @@ import TenantsAdmin from './features/tenants/TenantsAdmin';
 import VacationManager from './features/vacations/VacationManager';
 import VacationSettings from './features/vacations/VacationSettings';
 import { AttendanceDashboard } from './features/attendance';
+import { AssetsModule } from './features/assets';
 import ImportWizard from './features/import/ImportWizard';
 import DeclarationsPanel from './features/declarations/DeclarationsPanel';
 import ReportsPanel from './features/reports/ReportsPanel';
+import TasksModule from './features/tasks/TasksModule';
 import AuditLogsManager from './pages/AuditLogsManager';
 import HomeDashboard from './pages/HomeDashboard';
 
@@ -114,6 +116,12 @@ function App() {
 
                 {/* Módulo: Asistencia */}
                 <Route path="attendance" element={<ProtectedRoute permission="biometrics.view_attendanceevent"><AttendanceDashboard /></ProtectedRoute>} />
+
+                {/* Módulo: Activos Fijos */}
+                <Route path="activos" element={<ProtectedRoute permission="assets.view_asset"><AssetsModule /></ProtectedRoute>} />
+
+                {/* Módulo: Gestor de Tareas Operativas */}
+                <Route path="audits/*" element={<ProtectedRoute permission="payroll_core.view_menu_audits"><TasksModule /></ProtectedRoute>} />
 
                 {/* Módulo: Importación */}
                 <Route path="import" element={<ProtectedRoute role="Administrador"><ImportWizard /></ProtectedRoute>} />

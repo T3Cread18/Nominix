@@ -223,30 +223,60 @@ class LaborContractSerializer(serializers.ModelSerializer):
 
 class EmployeeSerializer(serializers.ModelSerializer):
     photo = serializers.ImageField(use_url=True, required=False, allow_null=True)
+    full_name = serializers.ReadOnlyField()
+    password = serializers.CharField(write_only=True, required=False, style={'input_type': 'password'})
+    has_user = serializers.BooleanField(source='user_id', read_only=True)
     
     class Meta:
         model = Employee
-        fields = '__all__'
-        extra_kwargs = {
-            'branch': {'required': False, 'allow_null': True},
-            'department': {'required': False, 'allow_null': True},
-            'rif': {'required': False, 'allow_null': True, 'allow_blank': True},
-            'ivss_code': {'required': False, 'allow_null': True, 'allow_blank': True},
-            'faov_code': {'required': False, 'allow_null': True, 'allow_blank': True},
-            'bank_account_number': {'required': False, 'allow_null': True, 'allow_blank': True},
-            'bank_name': {'required': False, 'allow_null': True, 'allow_blank': True},
-            'employee_code': {'required': False, 'allow_null': True, 'allow_blank': True},
-            'position': {'required': False, 'allow_blank': True},
-            'job_position': {'required': False, 'allow_null': True},
-            'address': {'required': False, 'allow_blank': True},
-            'phone': {'required': False, 'allow_blank': True},
-            'termination_date': {'required': False, 'allow_null': True},
-            'date_of_birth': {'required': False, 'allow_null': True},
-            'shirt_size': {'required': False, 'allow_blank': True, 'allow_null': True},
-            'pants_size': {'required': False, 'allow_blank': True, 'allow_null': True},
-            'shoe_size': {'required': False, 'allow_blank': True, 'allow_null': True},
-            'last_endowment_date': {'required': False, 'allow_null': True},
-        }
+        fields = [
+            'id', 'first_name', 'last_name', 'second_name', 'second_last_name',
+            'full_name', 'email', 'phone', 'date_of_birth', 'gender',
+            'marital_status', 'address', 'nationality', 'photo',
+            'national_id', 'rif', 'ivss_code', 'faov_code', 'branch',
+            'employee_code', 'hire_date', 'termination_date', 'is_active',
+            'department', 'position', 'job_position', 'work_schedule',
+            'bank_name', 'bank_account_number', 'bank_account_type',
+            'shirt_size', 'pants_size', 'shoe_size', 'last_endowment_date',
+            'notes', 'password', 'has_user'
+        ]
+        # ... extra_kwargs ...
+
+    def create(self, validated_data):
+        from django.contrib.auth.models import User
+        password = validated_data.pop('password', None)
+        employee = super().create(validated_data)
+        
+        if password:
+            # Crear usuario usando national_id como username
+            user, created = User.objects.get_or_create(username=employee.national_id)
+            user.set_password(password)
+            user.email = employee.email or ""
+            user.first_name = employee.first_name
+            user.last_name = employee.last_name
+            user.save()
+            employee.user = user
+            employee.save()
+            
+        return employee
+
+    def update(self, instance, validated_data):
+        from django.contrib.auth.models import User
+        password = validated_data.pop('password', None)
+        employee = super().update(instance, validated_data)
+        
+        if password:
+            if not employee.user:
+                user, created = User.objects.get_or_create(username=employee.national_id)
+                employee.user = user
+                employee.save()
+            
+            user = employee.user
+            user.set_password(password)
+            user.username = employee.national_id # Sincronizar por si cambia la cédula
+            user.save()
+            
+        return employee
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)

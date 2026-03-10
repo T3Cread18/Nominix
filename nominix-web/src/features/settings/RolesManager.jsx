@@ -24,7 +24,7 @@ const MODEL_TO_MODULE_MAP = {
     'payrollnovelty': 'Novedades',
     'payrollpolicy': 'Políticas de Nómina',
     'payrollreceipt': 'Recibos de Pago',
-    'company': 'Dashboard (Widgets)',
+    'dashboard': 'Dashboard (Widgets)',
     'dashboard_metrics': 'Dashboard (Widgets)',
     'dashboard_tasks': 'Dashboard (Widgets)',
     'dashboard_events': 'Dashboard (Widgets)',

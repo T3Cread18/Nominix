@@ -7,9 +7,9 @@ while ! nc -z db 5432; do
 done
 echo "Base de datos disponible."
 
-# Ejecutar migraciones del esquema público (shared)
-echo "Ejecutando migraciones de esquemas compartidos..."
-python manage.py migrate_schemas --shared --noinput
+# Ejecutar migraciones del esquema público (shared) y esquemas de inquilinos (tenant)
+echo "Ejecutando migraciones de esquemas compartidos y de inquilinos..."
+python manage.py migrate_schemas --noinput
 
 # Recolectar estáticos
 echo "Recolectando archivos estáticos..."

@@ -10,6 +10,7 @@ from .base import tenant_upload_path
 from .organization import Branch, Department, JobPosition
 from .work_schedule import WorkSchedule
 from customers.models import Currency
+from django.contrib.auth.models import User
 from simple_history.models import HistoricalRecords
 
 
@@ -20,6 +21,16 @@ class Employee(models.Model):
     Almacena la información del empleado con campos específicos
     para cumplir con la legislación laboral venezolana.
     """
+    
+    user = models.OneToOneField(
+        User, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='employee',
+        verbose_name='Usuario de Sistema',
+        help_text='Usuario asociado para acceso a la aplicación móvil'
+    )
     
     class Gender(models.TextChoices):
         """Género del empleado."""

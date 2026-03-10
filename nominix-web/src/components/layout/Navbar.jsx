@@ -6,7 +6,7 @@ import { cn } from '../../utils/cn';
 import {
     LogOut, Loader2, Calculator, Users, ClipboardList,
     Settings, ShieldCheck, FileSpreadsheet, PieChart, Banknote, Calendar, Fingerprint, Shield,
-    Menu, X
+    Menu, X, Package
 } from 'lucide-react';
 
 import RequirePermission from '../../context/RequirePermission';
@@ -32,7 +32,7 @@ const Navbar = () => {
         { path: '/payroll', icon: Calculator, label: 'Nómina', perm: 'payroll_core.view_menu_payroll' },
         { path: '/catalog', icon: ClipboardList, label: 'Conceptos', perm: 'payroll_core.view_menu_catalog' },
         { path: '/vacations', icon: Calendar, label: 'Vacaciones', perm: 'payroll_core.view_menu_vacations' },
-        { path: '/attendance', icon: Fingerprint, label: 'Asistencia', perm: 'payroll_core.view_menu_attendance' },
+        { path: '/attendance', icon: Fingerprint, label: 'Asistencia', perm: 'biometrics.view_attendanceevent' },
         { path: '/config', icon: Settings, label: 'Config', perm: 'payroll_core.view_menu_config' },
         { path: '/audit-logs', icon: ShieldCheck, label: 'Bitácora', role: 'Administrador' },
     ];
@@ -40,6 +40,8 @@ const Navbar = () => {
     const secondaryNavItems = [
         { path: '/import', icon: FileSpreadsheet, label: 'Importar', perm: 'payroll_core.view_menu_import' },
         { path: '/loans', icon: Banknote, label: 'Préstamos', perm: 'payroll_core.view_menu_loans' },
+        { path: '/activos', icon: Package, label: 'Activos', perm: 'assets.view_asset' },
+        { path: '/audits', icon: ClipboardList, label: 'Auditorías Tienda', perm: 'payroll_core.view_menu_audits' },
         { path: '/declarations', icon: Shield, label: 'Ley y Gob', perm: 'payroll_core.view_menu_declarations' },
         { path: '/reports', icon: PieChart, label: 'Reportes', perm: 'payroll_core.view_menu_reports' },
     ];
