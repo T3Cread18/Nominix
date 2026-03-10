@@ -145,6 +145,26 @@ export const useCreateDepartment = (options = {}) => {
     });
 };
 
+export const useUpdateDepartment = (options = {}) => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({ id, ...data }) => {
+            const response = await axiosClient.patch(`/departments/${id}/`, data);
+            return response.data;
+        },
+        onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: orgKeys.departments });
+            toast.success('Departamento actualizado');
+            options.onSuccess?.(data);
+        },
+        onError: (error) => {
+            toast.error(getErrorMessage(error));
+            options.onError?.(error);
+        },
+    });
+};
+
 // ============ JOB POSITIONS ============
 
 export const useJobPositions = (departmentId, options = {}) => {
@@ -173,6 +193,26 @@ export const useCreateJobPosition = (options = {}) => {
         onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: orgKeys.positions });
             toast.success('Cargo creado');
+            options.onSuccess?.(data);
+        },
+        onError: (error) => {
+            toast.error(getErrorMessage(error));
+            options.onError?.(error);
+        },
+    });
+};
+
+export const useUpdateJobPosition = (options = {}) => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({ id, ...data }) => {
+            const response = await axiosClient.patch(`/job-positions/${id}/`, data);
+            return response.data;
+        },
+        onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: orgKeys.positions });
+            toast.success('Cargo actualizado');
             options.onSuccess?.(data);
         },
         onError: (error) => {

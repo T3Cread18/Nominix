@@ -28,15 +28,15 @@ const BranchFormModal = ({ branch, onClose, onSuccess }) => {
     const onSubmit = (data) => {
         if (isEditing) {
             updateBranch({ id: branch.id, data }, {
-                onSuccess: () => {
-                    if (onSuccess) onSuccess();
+                onSuccess: (result) => {
+                    onSuccess?.(result);
                     onClose();
                 }
             });
         } else {
             createBranch(data, {
-                onSuccess: () => {
-                    if (onSuccess) onSuccess();
+                onSuccess: (result) => {
+                    onSuccess?.(result);
                     onClose();
                 }
             });
@@ -48,10 +48,10 @@ const BranchFormModal = ({ branch, onClose, onSuccess }) => {
             isOpen={true}
             onClose={onClose}
             title={isEditing ? 'Editar Sede' : 'Nueva Sede'}
-            maxWidth="lg"
+            size="lg"
         >
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-                <div className="grid grid-cols-2 gap-5">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <InputField
                         label="Nombre"
                         placeholder="Ej: Sucursal Centro"
@@ -64,7 +64,7 @@ const BranchFormModal = ({ branch, onClose, onSuccess }) => {
                     />
                 </div>
 
-                <div className="grid grid-cols-2 gap-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <InputField
                         label="RIF"
                         placeholder="J-12345678-9"

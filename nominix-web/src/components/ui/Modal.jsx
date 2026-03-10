@@ -95,62 +95,66 @@ const Modal = ({
     if (!isOpen) return null;
 
     const modalContent = (
+        /* Overlay: cubre toda la pantalla y actúa como scroll container */
         <div
-            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-nominix-dark/70 backdrop-blur-md animate-in fade-in duration-200"
+            className="fixed inset-0 z-[100] overflow-y-auto bg-nominix-dark/70 backdrop-blur-md animate-in fade-in duration-200"
             onClick={handleOverlayClick}
             role="presentation"
         >
-            <div
-                ref={modalRef}
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby={title ? "modal-title" : undefined}
-                aria-describedby={description ? "modal-description" : undefined}
-                tabIndex={-1}
-                className={cn(
-                    "relative w-full bg-white rounded-[2rem] shadow-2xl",
-                    "animate-in zoom-in-95 slide-in-from-bottom-4 duration-300",
-                    "focus:outline-none",
-                    modalSizes[size],
-                    className
-                )}
-            >
-                {/* Header */}
-                {(title || showCloseButton) && (
-                    <div className="flex items-start justify-between p-4 sm:p-8 pb-0 sm:pb-0">
-                        <div className="flex-1 pr-4">
-                            {title && (
-                                <h2
-                                    id="modal-title"
-                                    className="text-lg sm:text-xl font-black text-nominix-dark"
+            {/* Wrapper de centrado: min-h-full permite scroll cuando el modal supera la pantalla */}
+            <div className="flex min-h-full items-start sm:items-center justify-center p-4 sm:p-6">
+                <div
+                    ref={modalRef}
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby={title ? "modal-title" : undefined}
+                    aria-describedby={description ? "modal-description" : undefined}
+                    tabIndex={-1}
+                    className={cn(
+                        "relative w-full bg-white rounded-[2rem] shadow-2xl my-4",
+                        "animate-in zoom-in-95 slide-in-from-bottom-4 duration-300",
+                        "focus:outline-none",
+                        modalSizes[size],
+                        className
+                    )}
+                >
+                    {/* Header */}
+                    {(title || showCloseButton) && (
+                        <div className="flex items-start justify-between p-4 sm:p-8 pb-0 sm:pb-0">
+                            <div className="flex-1 pr-4">
+                                {title && (
+                                    <h2
+                                        id="modal-title"
+                                        className="text-lg sm:text-xl font-black text-nominix-dark"
+                                    >
+                                        {title}
+                                    </h2>
+                                )}
+                                {description && (
+                                    <p
+                                        id="modal-description"
+                                        className="text-xs sm:text-sm text-gray-500 mt-1"
+                                    >
+                                        {description}
+                                    </p>
+                                )}
+                            </div>
+                            {showCloseButton && (
+                                <button
+                                    onClick={onClose}
+                                    className="p-2 sm:p-3 hover:bg-gray-100 rounded-2xl transition-all text-gray-300 hover:text-nominix-dark"
+                                    aria-label="Cerrar"
                                 >
-                                    {title}
-                                </h2>
-                            )}
-                            {description && (
-                                <p
-                                    id="modal-description"
-                                    className="text-xs sm:text-sm text-gray-500 mt-1"
-                                >
-                                    {description}
-                                </p>
+                                    <X size={20} className="sm:w-6 sm:h-6" />
+                                </button>
                             )}
                         </div>
-                        {showCloseButton && (
-                            <button
-                                onClick={onClose}
-                                className="p-2 sm:p-3 hover:bg-gray-100 rounded-2xl transition-all text-gray-300 hover:text-nominix-dark"
-                                aria-label="Cerrar"
-                            >
-                                <X size={20} className="sm:w-6 sm:h-6" />
-                            </button>
-                        )}
-                    </div>
-                )}
+                    )}
 
-                {/* Content */}
-                <div className="p-4 sm:p-8">
-                    {children}
+                    {/* Content */}
+                    <div className="p-4 sm:p-8">
+                        {children}
+                    </div>
                 </div>
             </div>
         </div>
