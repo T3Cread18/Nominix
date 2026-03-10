@@ -4,6 +4,29 @@ import { Card, CardContent, InputField, SelectField } from '../../components/ui'
 import attendanceService from '../../services/attendance.service';
 import { useBranches } from '../../hooks/useOrganization';
 
+const DAY_NAMES_FULL = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+const MONTH_NAMES_SHORT = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+/** YYYY-MM-DD → "DD/MM" */
+const fmtDateShort = (dateStr) => {
+    const [, m, d] = dateStr.split('-');
+    return `${d}/${m}`;
+};
+
+/** YYYY-MM-DD → "Lunes, 02 Mar 2026" */
+const fmtDateFull = (dateStr) => {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const dt = new Date(y, m - 1, d, 12, 0, 0);
+    return `${DAY_NAMES_FULL[dt.getDay()]}, ${String(d).padStart(2, '0')} ${MONTH_NAMES_SHORT[m - 1]} ${y}`;
+};
+
+/** ISO datetime string → "HH:MM" in local time */
+const fmtTime = (isoStr) => {
+    if (!isoStr) return '--:--';
+    const dt = new Date(isoStr);
+    return dt.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit', hour12: false });
+};
+
 /**
  * Gets a week's date range (Monday to Sunday) given any date string (YYYY-MM-DD).
  * Creates dates assuming local time at midnight to prevent timezone boundary drifts.
@@ -68,14 +91,14 @@ const WeekCell = ({ dayData, date }) => {
 
                 {/* Tooltip on hover */}
                 <div className="absolute z-50 bottom-full mb-2 left-1/2 -translate-x-1/2 w-48 p-3 rounded-xl bg-[#1A2B48] text-white text-xs opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all shadow-xl pointer-events-none">
-                    <div className="font-bold text-blue-300 mb-2 border-b border-white/10 pb-1">{date}</div>
+                    <div className="font-bold text-blue-300 mb-2 border-b border-white/10 pb-1">{fmtDateFull(date)}</div>
                     <div className="flex justify-between items-center mb-1">
                         <span className="text-gray-400">Entrada:</span>
-                        <span className="font-medium">{entry?.time || '--:--'}</span>
+                        <span className="font-medium">{fmtTime(entry?.time)}</span>
                     </div>
                     <div className="flex justify-between items-center mb-1">
                         <span className="text-gray-400">Salida:</span>
-                        <span className="font-medium">{exit?.time || '--:--'}</span>
+                        <span className="font-medium">{fmtTime(exit?.time)}</span>
                     </div>
                     <div className="flex justify-between items-center mt-2 pt-2 border-t border-white/10">
                         <span className="text-gray-400">Horas ef:</span>
@@ -214,7 +237,7 @@ const WeeklyAttendanceView = () => {
                         <div className="flex items-center gap-2 px-3">
                             <Calendar size={14} className="text-nominix-electric" />
                             <span className="text-[11px] font-bold text-nominix-dark tracking-wide">
-                                {weekDates[0]} <span className="text-gray-400 font-normal mx-1">al</span> {weekDates[6]}
+                                {fmtDateShort(weekDates[0])} <span className="text-gray-400 font-normal mx-1">al</span> {fmtDateShort(weekDates[6])}
                             </span>
                         </div>
                         <button onClick={() => changeWeek(1)} className="p-1.5 rounded-lg hover:bg-white text-gray-400 hover:text-nominix-dark transition-colors" title="Semana siguiente">
@@ -285,7 +308,7 @@ const WeeklyAttendanceView = () => {
                                                 <th key={date} className="px-3 py-4 text-center">
                                                     <div className="flex flex-col items-center">
                                                         <span className="text-[10px] font-bold uppercase tracking-widest text-nominix-dark mb-0.5">{dayNames[idx]}</span>
-                                                        <span className="text-[9px] font-medium text-gray-400">{date.split('-').slice(1).join('/')}</span>
+                                                        <span className="text-[9px] font-medium text-gray-400">{fmtDateShort(date)}</span>
                                                     </div>
                                                 </th>
                                             ))}
