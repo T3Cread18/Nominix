@@ -58,7 +58,7 @@ const payrollService = {
             const response = await axiosClient.get(`/payroll-periods/${periodId}/export-finance/`, {
                 responseType: 'blob'
             });
-            triggerFileDownload(response.data, `${Date.now()}_finanzas_nomina_${periodName || periodId}.csv`);
+            triggerFileDownload(response.data, `${Date.now()}_finanzas_nomina_${periodName || periodId}.xlsx`);
         } catch (error) {
             console.error("Error descargando Reporte Finanzas", error);
             throw error;
@@ -100,7 +100,7 @@ const payrollService = {
      */
     downloadSinglePayslipPdf: async (receiptId, empName) => {
         try {
-            const response = await axiosClient.get(`/payslips/${receiptId}/download-pdf/`, {
+            const response = await axiosClient.get(`/payslips/${receiptId}/export-pdf/`, {
                 responseType: 'blob'
             });
             triggerFileDownload(response.data, `recibo_${empName}_${receiptId}.pdf`);

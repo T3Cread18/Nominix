@@ -127,18 +127,18 @@ const PayslipsListModal = ({ isOpen, onClose, period }) => {
                                                 </div>
                                             </td>
                                             <td className="px-4 py-4 text-right">
-                                                <span className="text-xs font-bold text-slate-600">{formatCurrency(p.total_income_ves || p.total_earnings || 0)}</span>
+                                                <span className="text-xs font-bold text-slate-600">{formatCurrency(p.total_earnings || 0)}</span>
                                             </td>
                                             <td className="px-4 py-4 text-right">
-                                                <span className="text-xs font-bold text-red-500">{formatCurrency(p.total_deductions_ves || p.total_deductions || 0)}</span>
+                                                <span className="text-xs font-bold text-red-500">{formatCurrency(p.total_deductions || 0)}</span>
                                             </td>
                                             <td className="px-4 py-4 text-right">
                                                 <span className="inline-block px-3 py-1 bg-nominix-electric/10 text-nominix-electric rounded-lg font-black text-sm">
-                                                    {formatCurrency(p.net_pay_ves || p.net_pay || 0)}
+                                                    {formatCurrency(p.net_pay || 0)}
                                                 </span>
                                             </td>
                                             <td className="px-4 py-4 text-center">
-                                                <span className="text-[10px] font-bold text-gray-400">{p.exchange_rate_applied} Bs.</span>
+                                                <span className="text-[10px] font-bold text-gray-400">{p.exchange_rate_snapshot} Bs.</span>
                                             </td>
                                             <td className="px-4 py-4 text-center">
                                                 <button
