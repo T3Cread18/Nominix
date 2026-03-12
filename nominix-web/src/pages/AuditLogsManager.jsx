@@ -75,7 +75,8 @@ const Row = ({ row }) => {
                 {new Date(row.timestamp).toLocaleString('es-VE', {
                     day: '2-digit', month: '2-digit', year: 'numeric',
                     hour: '2-digit', minute: '2-digit', second: '2-digit',
-                    hour12: false
+                    hour12: false,
+                    timeZone: 'America/Caracas'
                 })}
             </td>
             <td className="p-3 font-medium text-sm text-gray-900">{row.user}</td>

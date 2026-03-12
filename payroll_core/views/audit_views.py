@@ -1,5 +1,6 @@
 from rest_framework import views, response, status, permissions
 from django.contrib.contenttypes.models import ContentType
+from django.utils.timezone import localtime
 from rest_framework.pagination import PageNumberPagination
 
 class AuditLogPagination(PageNumberPagination):
@@ -66,7 +67,7 @@ class AuditLogView(views.APIView):
                     
                     all_history.append({
                         'id': record.history_id,
-                        'timestamp': record.history_date,
+                        'timestamp': localtime(record.history_date),
                         'user': user_str,
                         'action': action,
                         'model_name': model._meta.verbose_name.title(),
