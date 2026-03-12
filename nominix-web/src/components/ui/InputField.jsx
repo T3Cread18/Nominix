@@ -11,7 +11,7 @@ const InputField = forwardRef(({
 }, ref) => (
     <div className={cn("space-y-1.5", className)}>
         {label && (
-            <label className="text-[10px] font-black uppercase text-gray-400 pl-3 tracking-wider flex items-center gap-2">
+            <label className="text-[10px] font-black uppercase text-gray-600 pl-3 tracking-wider flex items-center gap-2">
                 {Icon && <Icon size={12} className="text-gray-300" />}
                 {label}
                 {props.required && <span className="text-red-400">*</span>}
