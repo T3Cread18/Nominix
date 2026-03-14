@@ -28,6 +28,7 @@ import DeclarationsPanel from './features/declarations/DeclarationsPanel';
 import ReportsPanel from './features/reports/ReportsPanel';
 import AuditLogsManager from './pages/AuditLogsManager';
 import HomeDashboard from './pages/HomeDashboard';
+import LandingPage from './features/landing/LandingPage';
 
 /**
  * App - Componente principal de la aplicación.
@@ -42,6 +43,8 @@ function App() {
     const location = useLocation();
 
     const isTenantAdminPath = location.pathname.startsWith('/tenants');
+    // Esquema público si no hay tenant (API caída) o si el schema_name es 'public'
+    const isPublicSchema = !tenant || tenant.schema_name === 'public';
 
     // Loading state
     if (loading) {
@@ -50,6 +53,16 @@ function App() {
                 <Loader2 className="animate-spin text-nominix-electric" size={48} />
             </div>
         );
+    }
+
+    // Landing page pública en dominio raíz
+    if (isPublicSchema && !user && location.pathname === '/') {
+        return <LandingPage />;
+    }
+
+    // Ruta de login en dominio público
+    if (isPublicSchema && !user && location.pathname === '/login') {
+        return <TenantsLogin />;
     }
 
     // Ruta especial de login para tenants (acceso público)
@@ -63,7 +76,6 @@ function App() {
     }
 
     // Proteger contra acceso a apps de inquilino desde el dominio público
-    const isPublicSchema = tenant?.schema_name === 'public';
     if (isPublicSchema && !isTenantAdminPath) {
         return <Navigate to="/tenants" replace />;
     }

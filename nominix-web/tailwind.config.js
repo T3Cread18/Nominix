@@ -12,6 +12,10 @@ export default {
                     electric: '#0052FF',
                     smoke: '#F8F9FA',
                     surface: '#FFFFFF',
+                },
+                landing: {
+                    deep: '#0f172a',
+                    teal: '#0d9488',
                 }
             },
             fontFamily: {
