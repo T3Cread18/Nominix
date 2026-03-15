@@ -10,6 +10,8 @@ from rest_framework.views import APIView
 from django.db import connection
 from django.shortcuts import get_object_or_404
 from django.contrib.auth import authenticate, login, logout
+from django.core.mail import EmailMessage
+from django.conf import settings
 from typing import Any
 
 from .models import Client, Domain
@@ -564,6 +566,65 @@ class AuthView(viewsets.ViewSet):
         if request.user.is_authenticated:
             return Response(UserSerializer(request.user).data)
         return Response(
-            {'error': 'No autenticado'}, 
+            {'error': 'No autenticado'},
             status=status.HTTP_401_UNAUTHORIZED
+        )
+
+
+class ContactRequestView(APIView):
+    """
+    Endpoint público para recibir solicitudes de acceso desde la landing page.
+    No requiere autenticación. Envía un correo al equipo de ventas.
+    """
+    authentication_classes = []
+    permission_classes = [permissions.AllowAny]
+
+    EMPLOYEE_RANGES = ['1-10', '11-50', '51-100', '101-250', '250+']
+
+    def post(self, request):
+        data = request.data
+        required = ['nombre', 'apellido', 'empresa', 'telefono', 'correo', 'empleados', 'direccion']
+        missing = [f for f in required if not str(data.get(f, '')).strip()]
+        if missing:
+            return Response(
+                {'error': f'Campos requeridos: {", ".join(missing)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if data['empleados'] not in self.EMPLOYEE_RANGES:
+            return Response(
+                {'error': 'Rango de empleados no válido.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        body = (
+            f"Nueva solicitud de acceso a Nóminix\n"
+            f"{'=' * 45}\n\n"
+            f"Nombre:          {data['nombre']} {data['apellido']}\n"
+            f"Empresa:         {data['empresa']}\n"
+            f"Correo:          {data['correo']}\n"
+            f"Teléfono:        {data['telefono']}\n"
+            f"N° de Empleados: {data['empleados']}\n"
+            f"Dirección:       {data['direccion']}\n"
+        )
+
+        try:
+            email = EmailMessage(
+                subject=f"[Nóminix] Solicitud de acceso — {data['empresa']}",
+                body=body,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                to=[settings.CONTACT_RECIPIENT_EMAIL],
+                reply_to=[data['correo']],
+            )
+            email.send(fail_silently=False)
+        except Exception:
+            logger.exception('Error al enviar correo de contacto')
+            return Response(
+                {'error': 'No se pudo enviar el mensaje. Intente de nuevo más tarde.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+        return Response(
+            {'message': 'Solicitud enviada correctamente. Nos comunicaremos pronto.'},
+            status=status.HTTP_200_OK
         )

@@ -17,6 +17,8 @@ services:
     container_name: nominix_backend
     volumes:
       - .:/app
+    env_file:
+      - .env
     environment:
       - DEBUG=True
       - SECRET_KEY=django-insecure-docker-dev-key

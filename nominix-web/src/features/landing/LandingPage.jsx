@@ -5,6 +5,7 @@ import {
     Users, Clock, FileText, ChevronDown, ChevronUp, Zap, Building2,
     Fingerprint, Landmark, ClipboardList, BookOpen, ArrowRight, Star, Mail
 } from 'lucide-react';
+import ContactForm from './ContactForm';
 
 const HERO_IMAGE = '/images/dashboard-preview.png';
 const LOGO_IMAGE = '/images/nominix-logo.svg';
@@ -384,23 +385,17 @@ export default function LandingPage() {
 
             {/* ═══════════ CONTACT ═══════════ */}
             <section className="py-24 bg-slate-50 border-t border-slate-200" id="contact">
-                <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-                    <span className="inline-block py-1 px-3 rounded-full bg-teal-50 text-landing-teal text-xs font-bold tracking-widest uppercase mb-4">Soporte y Ventas</span>
-                    <h2 className="text-3xl md:text-4xl font-bold text-landing-deep mb-4">
-                        ¿Tienes dudas específicas sobre tu empresa?
-                    </h2>
-                    <p className="text-slate-600 max-w-2xl mx-auto text-lg mb-10">
-                        Nuestro equipo de expertos en la LOTTT y desarrollo de software está listo para ayudarte. Escríbenos y te contactaremos a la brevedad.
-                    </p>
-                    <a
-                        href="mailto:info@vexitech.net"
-                        className="inline-flex items-center gap-3 bg-white border border-slate-200 text-landing-deep px-8 py-4 rounded-xl font-bold text-lg hover:border-landing-teal hover:text-landing-teal hover:shadow-lg transition-all group"
-                    >
-                        <div className="bg-teal-50 p-2 rounded-lg group-hover:bg-landing-teal transition-colors">
-                            <Mail className="w-6 h-6 text-landing-teal group-hover:text-white transition-colors" />
-                        </div>
-                        info@vexitech.net
-                    </a>
+                <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="text-center mb-10">
+                        <span className="inline-block py-1 px-3 rounded-full bg-teal-50 text-landing-teal text-xs font-bold tracking-widest uppercase mb-4">Solicitud de Acceso</span>
+                        <h2 className="text-3xl md:text-4xl font-bold text-landing-deep mb-4">
+                            Comienza a Digitalizar tu Nómina
+                        </h2>
+                        <p className="text-slate-600 max-w-2xl mx-auto text-lg">
+                            Completa el formulario y un especialista de Nóminix se comunicará contigo para configurar tu cuenta.
+                        </p>
+                    </div>
+                    <ContactForm />
                 </div>
             </section>
 
