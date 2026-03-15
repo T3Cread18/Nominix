@@ -125,6 +125,14 @@ export default function LandingPage() {
 
     return (
         <div className="bg-white text-slate-900 antialiased">
+            {/* Skip to content — accesibilidad teclado */}
+            <a
+                href="#main-content"
+                className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:bg-landing-teal focus:text-white focus:px-4 focus:py-2 focus:rounded-lg focus:font-semibold"
+            >
+                Ir al contenido principal
+            </a>
+
             {/* ═══════════ NAVIGATION ═══════════ */}
             <nav className="fixed top-0 w-full bg-white/90 backdrop-blur-md border-b border-slate-100 z-50" aria-label="Navegación principal">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -166,7 +174,7 @@ export default function LandingPage() {
             </nav>
 
             {/* ═══════════ HERO ═══════════ */}
-            <section className="relative pt-32 pb-20 lg:pt-48 lg:pb-32 overflow-hidden">
+            <section id="main-content" className="relative pt-32 pb-20 lg:pt-48 lg:pb-32 overflow-hidden">
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full -z-10 opacity-5">
                     <div className="absolute top-0 right-0 w-96 h-96 bg-landing-teal rounded-full blur-3xl" />
                     <div className="absolute bottom-0 left-0 w-96 h-96 bg-landing-deep rounded-full blur-3xl" />
@@ -184,9 +192,9 @@ export default function LandingPage() {
                             <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
                                 <button
                                     onClick={goToLogin}
-                                    className="px-8 py-4 bg-landing-teal text-white font-bold rounded-xl shadow-lg hover:shadow-teal-500/30 hover:-translate-y-1 transition-all flex items-center justify-center gap-2"
+                                    className="px-8 py-4 bg-landing-teal text-white font-bold rounded-xl shadow-lg hover:shadow-teal-500/30 motion-safe:hover:-translate-y-1 transition-[colors,box-shadow,transform] duration-200 flex items-center justify-center gap-2"
                                 >
-                                    Solicitar Demo Gratuita <ArrowRight className="w-5 h-5" />
+                                    Solicitar Acceso <ArrowRight className="w-5 h-5" />
                                 </button>
                                 <a
                                     href="#modules"
@@ -207,6 +215,7 @@ export default function LandingPage() {
                                     alt="Panel de control Nóminix mostrando gestión de nómina multi-moneda en Venezuela"
                                     className="w-full h-auto"
                                     src={HERO_IMAGE}
+                                    loading="eager"
                                 />
                             </div>
                             <div className="absolute -bottom-6 -left-6 bg-white p-4 rounded-xl shadow-xl border border-slate-100 z-20 hidden md:block">
@@ -258,7 +267,7 @@ export default function LandingPage() {
                                 {i < STEPS.length - 1 && (
                                     <div className="hidden md:block absolute top-12 left-full w-full h-0.5 bg-gradient-to-r from-landing-teal/30 to-transparent -translate-x-1/2 z-0" />
                                 )}
-                                <div className="relative z-10 bg-white p-8 rounded-2xl border border-slate-200 hover:border-landing-teal hover:shadow-lg transition-all group">
+                                <div className="relative z-10 bg-white p-8 rounded-2xl border border-slate-200 hover:border-landing-teal hover:shadow-lg transition-[border-color,box-shadow] duration-200 group cursor-pointer">
                                     <span className="text-5xl font-black text-landing-teal/15 group-hover:text-landing-teal/30 transition-colors">{num}</span>
                                     <h3 className="text-xl font-bold text-landing-deep mt-2 mb-3">{title}</h3>
                                     <p className="text-slate-600 text-sm leading-relaxed">{description}</p>
@@ -283,7 +292,7 @@ export default function LandingPage() {
                     </div>
                     <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
                         {MODULES.map(({ icon: Icon, title, description, keywords }) => (
-                            <div key={title} className="bg-white p-8 rounded-2xl border border-slate-200 hover:border-landing-teal hover:shadow-lg transition-all group">
+                            <div key={title} className="bg-white p-8 rounded-2xl border border-slate-200 hover:border-landing-teal hover:shadow-lg transition-[border-color,box-shadow] duration-200 group cursor-pointer">
                                 <div className="w-14 h-14 bg-teal-50 rounded-xl flex items-center justify-center mb-6 group-hover:bg-landing-teal transition-colors">
                                     <Icon className="w-8 h-8 text-landing-teal group-hover:text-white transition-colors" />
                                 </div>
@@ -412,9 +421,9 @@ export default function LandingPage() {
                             <div className="flex flex-col sm:flex-row gap-4 justify-center">
                                 <button
                                     onClick={goToLogin}
-                                    className="bg-white text-landing-teal px-10 py-4 rounded-xl font-bold text-lg hover:bg-slate-50 transition-colors shadow-xl flex items-center justify-center gap-2"
+                                    className="bg-white text-landing-teal px-10 py-4 rounded-xl font-bold text-lg hover:bg-slate-50 transition-colors duration-200 shadow-xl flex items-center justify-center gap-2 cursor-pointer"
                                 >
-                                    Comenzar Prueba Gratuita <ArrowRight className="w-5 h-5" />
+                                    Comenzar Ahora <ArrowRight className="w-5 h-5" />
                                 </button>
                             </div>
                             <p className="mt-6 text-teal-100 text-sm">
@@ -427,6 +436,7 @@ export default function LandingPage() {
                 </div>
             </section>
 
+            {/* ═══════════ FOOTER ═══════════ */}
             {/* ═══════════ FOOTER ═══════════ */}
             <footer className="bg-slate-50 pt-20 pb-10 border-t border-slate-200">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -455,7 +465,7 @@ export default function LandingPage() {
                             <ul className="space-y-4 text-slate-600">
                                 <li><a href="#howItWorks" className="hover:text-landing-teal transition-colors">¿Cómo Funciona?</a></li>
                                 <li><a href="#faq" className="hover:text-landing-teal transition-colors">Preguntas Frecuentes</a></li>
-                                <li><a href="#" className="hover:text-landing-teal transition-colors">Documentación</a></li>
+                                <li><a href="#contact" className="hover:text-landing-teal transition-colors">Documentación</a></li>
                                 <li><a href="#contact" className="hover:text-landing-teal transition-colors">Contacto</a></li>
                             </ul>
                         </div>
@@ -463,8 +473,8 @@ export default function LandingPage() {
                     <div className="border-t border-slate-200 pt-10 flex flex-col md:flex-row justify-between items-center gap-4">
                         <p className="text-slate-500 text-sm">&copy; {new Date().getFullYear()} Nóminix Suite. Todos los derechos reservados.</p>
                         <div className="flex gap-6 text-sm text-slate-500">
-                            <a href="#" className="hover:text-landing-teal transition-colors">Términos de Servicio</a>
-                            <a href="#" className="hover:text-landing-teal transition-colors">Privacidad</a>
+                            <a href="#contact" className="hover:text-landing-teal transition-colors">Términos de Servicio</a>
+                            <a href="#contact" className="hover:text-landing-teal transition-colors">Privacidad</a>
                         </div>
                     </div>
                 </div>
