@@ -19,7 +19,13 @@ export default {
                 }
             },
             fontFamily: {
-                sans: ['Inter', 'sans-serif'],
+                sans: ['Plus Jakarta Sans', 'Inter', 'sans-serif'],
+            },
+            zIndex: {
+                overlay: '90',
+                sidebar: '95',
+                modal: '100',
+                toast: '110',
             },
             keyframes: {
                 'fade-in-up': {

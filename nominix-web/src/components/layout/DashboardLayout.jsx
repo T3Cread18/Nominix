@@ -1,83 +1,107 @@
 import React from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
-import Navbar from './Navbar';
+import Sidebar from './Navbar';
 import { PageHeader, getPageHeader } from './PageHeader';
 import { Toaster } from 'sonner';
+import { Menu } from 'lucide-react';
 import { cn } from '../../utils/cn';
 
 /**
- * DashboardLayout - Layout principal de la aplicación.
- * 
- * Usa React Router Outlet para renderizar rutas hijas.
- * Esto evita duplicar la navegación y header en cada página.
- * 
- * @example
- * // En App.jsx o router config:
- * <Route element={<DashboardLayout />}>
- *   <Route path="/personnel" element={<PersonnelManager />} />
- *   <Route path="/payroll" element={<PayrollDashboard />} />
- * </Route>
+ * DashboardLayout - Layout principal con sidebar lateral.
+ *
+ * Estructura:
+ *   ┌─────────┬────────────────────────────────┐
+ *   │         │  TopBar (mobile only)           │
+ *   │ Sidebar ├────────────────────────────────┤
+ *   │ (240px) │  <main> contenido de la ruta   │
+ *   │         │                                │
+ *   └─────────┴────────────────────────────────┘
+ *
+ * En mobile el sidebar es un drawer animado.
+ * En desktop es estático y siempre visible.
  */
 const DashboardLayout = ({
     showHeader = true,
-    showFooter = true,
-    maxWidth = '7xl',
-    className
+    className,
 }) => {
+    const [sidebarOpen, setSidebarOpen] = React.useState(false);
     const location = useLocation();
     const headerConfig = getPageHeader(location.pathname);
 
-    // Rutas donde no mostrar el header automático (tienen su propio header)
+    // Rutas que renderizan su propio header interno
     const noAutoHeaderRoutes = [
         '/personnel/create',
-        '/personnel/',  // Rutas con ID dinámico
+        '/personnel/',
     ];
 
     const shouldShowAutoHeader = showHeader &&
         headerConfig &&
-        !noAutoHeaderRoutes.some(route => location.pathname.startsWith(route) && route !== '/personnel/');
+        !noAutoHeaderRoutes.some(
+            route => location.pathname.startsWith(route) && route !== '/personnel/'
+        );
 
     return (
-        <div className="min-h-screen bg-nominix-smoke/30 flex flex-col">
-            {/* Navbar */}
-            <Navbar />
+        <div className="flex h-screen overflow-hidden bg-slate-50">
 
-            {/* Contenido Principal */}
-            <main className={cn(
-                "flex-1 py-6 sm:py-10 mx-auto px-4 sm:px-6 lg:px-8 w-full",
-                `max-w-${maxWidth}`,
-                className
-            )}>
-                {/* Header automático basado en ruta */}
-                {shouldShowAutoHeader && (
-                    <PageHeader
-                        title={headerConfig.title}
-                        subtitle={headerConfig.subtitle}
-                    />
-                )}
+            {/* Skip to main content — Accesibilidad */}
+            <a
+                href="#main-content"
+                className="sr-only focus:not-sr-only focus:absolute focus:z-[110] focus:top-4 focus:left-4 focus:px-4 focus:py-2 focus:bg-nominix-electric focus:text-white focus:rounded-xl focus:text-sm focus:font-bold focus:shadow-lg"
+            >
+                Saltar al contenido principal
+            </a>
 
-                {/* Aquí se renderiza el componente de la ruta actual */}
-                <Outlet />
-            </main>
+            {/* Sidebar */}
+            <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-            {/* Footer */}
-            {showFooter && (
-                <footer className="py-10 text-center text-gray-400 text-[10px] uppercase font-bold border-t border-gray-100">
-                    &copy; 2025 NÓMINIX SaaS - Sistema Integral de Recursos Humanos para Venezuela
-                </footer>
-            )}
+            {/* Área de contenido principal */}
+            <div className="flex-1 flex flex-col overflow-hidden min-w-0">
 
-            {/* Toaster para notificaciones */}
+                {/* Top bar — solo en mobile, para el hamburger */}
+                <header className="h-14 bg-white border-b border-gray-100 flex items-center gap-3 px-4 shrink-0 shadow-sm lg:hidden">
+                    <button
+                        onClick={() => setSidebarOpen(true)}
+                        className="p-2 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-nominix-electric/30"
+                        aria-label="Abrir menú de navegación"
+                    >
+                        <Menu size={20} className="text-nominix-dark" />
+                    </button>
+
+                    {headerConfig && (
+                        <p className="text-sm font-black text-nominix-dark truncate">
+                            {headerConfig.title}
+                        </p>
+                    )}
+                </header>
+
+                {/* Contenido scrollable */}
+                <main
+                    id="main-content"
+                    className={cn("flex-1 overflow-y-auto", className)}
+                >
+                    <div className="p-5 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+                        {shouldShowAutoHeader && (
+                            <PageHeader
+                                title={headerConfig.title}
+                                subtitle={headerConfig.subtitle}
+                            />
+                        )}
+                        <Outlet />
+                    </div>
+                </main>
+
+            </div>
+
             <Toaster position="top-center" richColors />
         </div>
     );
 };
 
 /**
- * MinimalLayout - Layout sin navbar para páginas de login/error.
+ * MinimalLayout - Layout sin sidebar para páginas de login/error.
  */
 const MinimalLayout = ({ children }) => (
-    <div className="min-h-screen bg-nominix-smoke/30">
+    <div className="min-h-screen bg-slate-50">
         {children || <Outlet />}
         <Toaster position="top-center" richColors />
     </div>

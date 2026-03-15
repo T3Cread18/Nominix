@@ -1,11 +1,11 @@
 /**
  * Layout Components - Nominix
- * 
+ *
  * Componentes de estructura y navegación.
  */
 
-export { default as Navbar } from './Navbar';
-export { Navbar as NavbarComponent, NavLink } from './Navbar';
+export { default as Sidebar } from './Navbar';
+export { Sidebar as Navbar } from './Navbar'; // alias para compatibilidad
 
 export { default as PageHeader } from './PageHeader';
 export { PageHeader as PageHeaderComponent, pageHeaders, getPageHeader } from './PageHeader';
