@@ -201,9 +201,9 @@ const NovedadesGrid = ({ initialPeriods, initialEmployees }) => {
         e.target.value = '';
     };
 
-    const handleUpdateCell = (rowIndex, columnId, value) => {
-        setData(old => old.map((row, index) => {
-            if (index === rowIndex) {
+    const handleUpdateCell = (rowId, columnId, value) => {
+        setData(old => old.map(row => {
+            if (row.id === rowId) {
                 return {
                     ...row,
                     [columnId]: value === '' ? 0 : parseFloat(value),
@@ -285,11 +285,11 @@ const NovedadesGrid = ({ initialPeriods, initialEmployees }) => {
         const dynamicCols = noveltyConcepts.map(c => ({
             header: c.name,
             accessorKey: c.code,
-            cell: ({ getValue, row: { index }, column: { id } }) => (
+            cell: ({ getValue, row: { original }, column: { id } }) => (
                 <input
                     type="number"
                     value={getValue()}
-                    onChange={e => handleUpdateCell(index, id, e.target.value)}
+                    onChange={e => handleUpdateCell(original.id, id, e.target.value)}
                     className={cn(
                         "w-full bg-transparent border-none focus:bg-white focus:ring-2 text-right font-black p-2 rounded-lg transition-all outline-none",
                         c.kind === 'DEDUCTION' ? "text-red-500 focus:ring-red-100" : "text-nominix-electric focus:ring-nominix-electric/20"
