@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import {
     useReactTable,
@@ -14,7 +14,8 @@ import {
     AlertCircle,
     Calendar,
     Download,
-    Upload
+    Upload,
+    Building2
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 
@@ -31,9 +32,30 @@ const NovedadesGrid = ({ initialPeriods, initialEmployees }) => {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [isDirty, setIsDirty] = useState(false);
+    const [selectedBranchId, setSelectedBranchId] = useState('');
 
     // Estado local de la data de la tabla
     const [data, setData] = useState([]);
+
+    // Extraer sedes únicas de los empleados
+    const uniqueBranches = useMemo(() => {
+        const branches = employees
+            .map(e => ({ id: e.branch?.id || e.branch || '', name: e.branch?.name || e.branch || 'Sin Sede' }))
+            .filter((b, i, arr) => arr.findIndex(x => x.id === b.id) === i)
+            .sort((a, b) => a.name.localeCompare(b.name));
+        return branches;
+    }, [employees]);
+
+    // Data filtrada por sede
+    const filteredData = useMemo(() => {
+        if (!selectedBranchId) return data;
+        return data.filter(row => {
+            const emp = employees.find(e => e.id === row.id);
+            if (!emp) return false;
+            const empBranchId = emp.branch?.id || emp.branch || '';
+            return String(empBranchId) === String(selectedBranchId);
+        });
+    }, [data, selectedBranchId, employees]);
 
     useEffect(() => {
         loadInitialData();
@@ -91,6 +113,7 @@ const NovedadesGrid = ({ initialPeriods, initialEmployees }) => {
                     name: emp.first_name + ' ' + emp.last_name,
                     national_id: emp.national_id,
                     position: emp.position,
+                    branch_name: emp.branch?.name || emp.branch || 'Sin Sede',
                 };
 
                 // Poblar dinámicamente cada concepto
@@ -246,6 +269,16 @@ const NovedadesGrid = ({ initialPeriods, initialEmployees }) => {
                 accessorKey: 'national_id',
                 cell: info => <span className="font-mono text-xs font-bold text-gray-400">{info.getValue()}</span>
             },
+            {
+                header: 'Sede',
+                accessorKey: 'branch_name',
+                cell: info => (
+                    <span className="text-[10px] font-bold text-gray-400 flex items-center gap-1">
+                        <Building2 size={10} />
+                        {info.getValue()}
+                    </span>
+                )
+            },
         ];
 
         // Columnas dinámicas de novedades
@@ -270,7 +303,7 @@ const NovedadesGrid = ({ initialPeriods, initialEmployees }) => {
     }, [noveltyConcepts, data]);
 
     const table = useReactTable({
-        data,
+        data: filteredData,
         columns,
         getCoreRowModel: getCoreRowModel(),
     });
@@ -333,6 +366,20 @@ const NovedadesGrid = ({ initialPeriods, initialEmployees }) => {
                         </select>
                     </div>
 
+                    <div className="flex-1 lg:flex-initial min-w-[200px] relative">
+                        <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                        <select
+                            value={selectedBranchId}
+                            onChange={e => setSelectedBranchId(e.target.value)}
+                            className="w-full pl-12 pr-10 py-3.5 bg-gray-50 border-2 border-transparent focus:border-nominix-electric rounded-2xl text-sm font-bold transition-all appearance-none cursor-pointer"
+                        >
+                            <option value="">Todas las Sedes</option>
+                            {uniqueBranches.map(b => (
+                                <option key={b.id} value={b.id}>{b.name}</option>
+                            ))}
+                        </select>
+                    </div>
+
                     <button
                         onClick={handleSave}
                         disabled={!isDirty || saving}
@@ -389,7 +436,10 @@ const NovedadesGrid = ({ initialPeriods, initialEmployees }) => {
                 <div className="p-6 bg-gray-50/50 border-t border-gray-100 flex justify-between items-center text-[10px] font-bold text-gray-400 uppercase tracking-widest">
                     <div className="flex items-center gap-2">
                         <Search size={12} />
-                        Universo de Colaboradores: {data.length}
+                        {selectedBranchId
+                            ? `Mostrando ${filteredData.length} de ${data.length} colaboradores`
+                            : `Universo de Colaboradores: ${data.length}`
+                        }
                     </div>
                     {isDirty && (
                         <div className="flex items-center gap-2 text-nominix-electric font-black animate-pulse">
